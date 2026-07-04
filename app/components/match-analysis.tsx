@@ -363,7 +363,7 @@ function WinProbabilityPanel({ probability, score }: { probability: WinProbabili
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="section-label">预测胜率</p>
-          <p className="mt-1 text-sm text-ink-dim">{probability.source === "strategy" ? "综合评分套用 Statbotics logistic 公式" : "Statbotics fallback"}</p>
+          {probability.source === "statbotics" ? <p className="mt-1 text-sm text-ink-dim">Statbotics fallback</p> : null}
         </div>
         {score.predictedRed != null && score.predictedBlue != null ? (
           <div className="text-sm font-semibold text-ink-dim">

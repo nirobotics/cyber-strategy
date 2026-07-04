@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  FileText,
   GripVertical,
   LineChart,
   ListChecks,
@@ -173,6 +174,13 @@ export function AnalyticsDashboard({
           <SegmentedTab active={tab} value="picklist" onClick={setTab} icon={<ListChecks className="size-4" />}>
             Picklist
           </SegmentedTab>
+          <NavLink
+            to={`/strategy-proposal?event=${encodeURIComponent(selectedEventKey ?? dataset.eventKey)}`}
+            className="btn"
+          >
+            <FileText className="size-4" />
+            Strategy Proposal
+          </NavLink>
           {isAdmin ? (
             <>
               <NavLink
