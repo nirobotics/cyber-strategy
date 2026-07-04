@@ -32,9 +32,6 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
         <div className="min-w-0">
           <p className="section-label">Scouting Lead</p>
           <h1 className="text-2xl font-semibold text-ink">信心分排行</h1>
-          <p className="mt-1 text-sm text-ink-dim">
-            预测正确加信心分，预测错误扣信心分；未完赛比赛暂不计分。
-          </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
             <Badge className="border-brand/40 bg-brand/10 text-brand">{sourceStatus.label}</Badge>
             <span>{sourceStatus.message}</span>

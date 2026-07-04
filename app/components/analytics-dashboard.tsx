@@ -620,6 +620,12 @@ function PicklistBoard({
                 <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
                   {team.avgTotal} 综合均分
                 </span>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  Drive score {team.avgDriver.toFixed(1)}
+                </span>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  Defence score {defenceScore(team).toFixed(1)}
+                </span>
                 <TierBadge tier={tierByTeam.get(team.team)} />
                 <div className="ml-auto flex justify-end gap-1">
                   <Button
@@ -708,6 +714,12 @@ function PicklistBoard({
                 </button>
                 <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
                   {team.avgTotal} 综合均分
+                </span>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  Drive score {team.avgDriver.toFixed(1)}
+                </span>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  Defence score {defenceScore(team).toFixed(1)}
                 </span>
                 <Button
                   type="button"
