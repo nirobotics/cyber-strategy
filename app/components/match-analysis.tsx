@@ -5,22 +5,16 @@ import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, cn } from "./ui";
 import {
   buildTeamEventMap,
-  epaAuto,
-  epaEndgame,
-  epaTele,
-  epaTotal,
   fmt,
   levelLabel,
   matchIdentity,
   matchLabel,
   matchTeams,
   mergeMatches,
-  record,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
   sortedMatches,
-  teamNumber,
   type CombinedMatch,
   type StatboticsMatch,
   type TbaMatch,
@@ -30,15 +24,12 @@ import {
 } from "../lib/match-analysis";
 import type { TeamData } from "../lib/scouting";
 
-type View = "matches" | "epa";
-
 type LoadState =
   | { status: "idle" | "loading" }
   | { status: "error"; message: string }
   | { status: "ready"; matches: CombinedMatch[]; teamEvents: TeamEvent[] };
 
 export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamData: TeamData }) {
-  const [view, setView] = useState<View>("matches");
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "idle" });
 
@@ -80,11 +71,6 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
     };
   }, [eventKey]);
 
-  function chooseView(next: View) {
-    setView(next);
-    setSelectedMatchKey(null);
-  }
-
   const selectedMatch = state.status === "ready" && selectedMatchKey
     ? state.matches.find((match) => matchIdentity(match) === selectedMatchKey) ?? null
     : null;
@@ -95,14 +81,6 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
         <div>
           <p className="section-label">TBA / Strategy / Statbotics</p>
           <h2 className="text-lg font-semibold text-ink">{eventKey}</h2>
-        </div>
-        <div className="flex gap-2">
-          <Button type="button" variant={view === "matches" ? "active" : "default"} onClick={() => chooseView("matches")}>
-            赛程预测
-          </Button>
-          <Button type="button" variant={view === "epa" ? "active" : "default"} onClick={() => chooseView("epa")}>
-            EPA 排名
-          </Button>
         </div>
       </Card>
 
@@ -120,7 +98,7 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
         </Card>
       ) : null}
 
-      {state.status === "ready" && view === "matches" && selectedMatch ? (
+      {state.status === "ready" && selectedMatch ? (
         <MatchDetail
           match={selectedMatch}
           matches={state.matches}
@@ -129,14 +107,13 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
           onBack={() => setSelectedMatchKey(null)}
         />
       ) : null}
-      {state.status === "ready" && view === "matches" && !selectedMatch ? (
+      {state.status === "ready" && !selectedMatch ? (
         <MatchSchedule
           matches={state.matches}
           teamData={teamData}
           onSelectMatch={(match) => setSelectedMatchKey(matchIdentity(match))}
         />
       ) : null}
-      {state.status === "ready" && view === "epa" ? <EpaRankings teamEvents={state.teamEvents} /> : null}
     </div>
   );
 }
@@ -452,7 +429,7 @@ function TeamMetricCard({ metric }: { metric: TeamMetric }) {
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-brand">队伍 {metric.team}</p>
+          <p className="text-sm font-semibold text-brand">Team {metric.team}</p>
           <p className="text-[11px] font-semibold uppercase text-ink-faint">{metric.ratingLabel}</p>
         </div>
         <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
@@ -482,61 +459,6 @@ function ChartCard({ title, icon, children }: { title: string; icon: ReactNode; 
         {title}
       </h3>
       {children}
-    </Card>
-  );
-}
-
-function EpaRankings({ teamEvents }: { teamEvents: TeamEvent[] }) {
-  if (!teamEvents.length) return <Card className="p-8 text-center text-ink-dim">暂无 EPA 数据。</Card>;
-
-  const sorted = [...teamEvents].sort((a, b) => (epaTotal(b) ?? 0) - (epaTotal(a) ?? 0));
-  const max = Math.max(epaTotal(sorted[0]) ?? 0, 1);
-  const hasBreakdown = sorted.some((team) => epaAuto(team) != null);
-  const hasRecord = sorted.some((team) => team.record || team.wins != null || team.losses != null);
-
-  return (
-    <Card className="overflow-hidden p-0">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-collapse text-sm">
-          <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
-            <tr>
-              <th className="w-12 px-3 py-2 text-center">#</th>
-              <th className="px-3 py-2 text-left">队伍</th>
-              <th className="px-3 py-2 text-left">EPA</th>
-              {hasBreakdown ? (
-                <>
-                  <th className="px-3 py-2 text-left">自动</th>
-                  <th className="px-3 py-2 text-left">手动</th>
-                  <th className="px-3 py-2 text-left">收尾</th>
-                </>
-              ) : null}
-              {hasRecord ? <th className="px-3 py-2 text-left">胜-负-平</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((team, index) => (
-              <tr key={teamNumber(team)} className="border-t border-line">
-                <td className={cn("px-3 py-2 text-center font-semibold text-ink-faint", index < 3 && "text-brand")}>{index + 1}</td>
-                <td className="px-3 py-2 font-semibold text-brand">队伍 {teamNumber(team)}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 rounded-full bg-brand" style={{ width: `${Math.max(4, ((epaTotal(team) ?? 0) / max) * 120)}px` }} />
-                    <span className="font-semibold">{fmt(epaTotal(team))}</span>
-                  </div>
-                </td>
-                {hasBreakdown ? (
-                  <>
-                    <td className="px-3 py-2">{fmt(epaAuto(team))}</td>
-                    <td className="px-3 py-2">{fmt(epaTele(team))}</td>
-                    <td className="px-3 py-2">{fmt(epaEndgame(team))}</td>
-                  </>
-                ) : null}
-                {hasRecord ? <td className="px-3 py-2 text-ink-dim">{record(team)}</td> : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </Card>
   );
 }

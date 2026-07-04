@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getTier, parseScoutingCsv, processCsvRows, reliability } from "./scouting";
+import { parseScoutingCsv, processCsvRows, reliability } from "./scouting";
+import { DEFAULT_TIER_PERCENTAGES, getTierForRank, validateTierPercentages } from "./tier-settings";
 
 describe("scouting data processing", () => {
   it("computes Advantalytics team summaries from CSV rows", () => {
@@ -42,12 +43,17 @@ describe("scouting data processing", () => {
     expect(data["1"].matches[0].accuracy).toBeNull();
   });
 
-  it("uses the same tier thresholds as Advantalytics", () => {
-    expect(getTier(70).label).toBe("Elite");
-    expect(getTier(40).label).toBe("Strong");
-    expect(getTier(20).label).toBe("Mid");
-    expect(getTier(5).label).toBe("Low");
-    expect(getTier(4.9).label).toBe("Struggling");
+  it("assigns tiers by ranking percentages", () => {
+    expect(getTierForRank(0, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Elite");
+    expect(getTierForRank(1, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Strong");
+    expect(getTierForRank(3, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Mid");
+    expect(getTierForRank(7, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Low");
+    expect(getTierForRank(9, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Struggling");
+  });
+
+  it("validates editable tier percentages", () => {
+    expect(validateTierPercentages(DEFAULT_TIER_PERCENTAGES)).toBeNull();
+    expect(validateTierPercentages({ ...DEFAULT_TIER_PERCENTAGES, Elite: 11 })).toContain("100%");
   });
 });
 

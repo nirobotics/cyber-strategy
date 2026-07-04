@@ -20,7 +20,6 @@ import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import { MatchAnalysis } from "./match-analysis";
 import {
-  getTier,
   reliability,
   sortedTeams,
   type DatasetSourceStatus,
@@ -29,6 +28,7 @@ import {
   type ScoutingMatch,
   type TeamSummary,
 } from "../lib/scouting";
+import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 
 type Tab = "browser" | "compare" | "match";
 
@@ -40,15 +40,18 @@ export function AnalyticsDashboard({
   selectedEventKey,
   sourceStatus,
   isAdmin,
+  tierPercentages,
 }: {
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
   selectedEventKey: string | null;
   sourceStatus: DatasetSourceStatus;
   isAdmin: boolean;
+  tierPercentages: TierPercentages;
 }) {
   const navigate = useNavigate();
   const teams = useMemo(() => sortedTeams(dataset.teamData), [dataset.teamData]);
+  const tierByTeam = useMemo(() => buildTierAssignments(teams, tierPercentages), [teams, tierPercentages]);
   const [tab, setTab] = useState<Tab>("browser");
   const [selectedTeam, setSelectedTeam] = useState(() => teams[0]?.team ?? "");
   const [search, setSearch] = useState("");
@@ -239,7 +242,7 @@ export function AnalyticsDashboard({
                   <span className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-ink-dim">
                     {team.avgTotal} 综合均分
                   </span>
-                  <TierBadge team={team} />
+                  <TierBadge tier={tierByTeam.get(team.team)} />
                   <span
                     role="button"
                     tabIndex={0}
@@ -264,7 +267,12 @@ export function AnalyticsDashboard({
             </div>
           </Card>
 
-          <TeamDetail team={selected} photos={photos} onOpenPhoto={(index) => setLightbox({ team: selected.team, index })} />
+          <TeamDetail
+            team={selected}
+            tier={tierByTeam.get(selected.team)}
+            photos={photos}
+            onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
+          />
         </div>
       ) : null}
 
@@ -299,10 +307,12 @@ export function AnalyticsDashboard({
 
 function TeamDetail({
   team,
+  tier,
   photos,
   onOpenPhoto,
 }: {
   team: TeamSummary;
+  tier?: TierInfo;
   photos: string[];
   onOpenPhoto: (index: number) => void;
 }) {
@@ -310,8 +320,8 @@ function TeamDetail({
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl font-semibold text-ink">队伍 {team.team}</h2>
-        <TierBadge team={team} large />
+        <h2 className="text-2xl font-semibold text-ink">Team {team.team}</h2>
+        <TierBadge tier={tier} large />
         <Badge
           className={cn(
             team.trend === "up" && "border-ok/40 bg-ok/10 text-ok",
@@ -351,7 +361,7 @@ function TeamDetail({
                 onClick={() => onOpenPhoto(index)}
                 className="h-24 w-32 shrink-0 overflow-hidden rounded-md border border-line bg-surface-2 transition hover:border-brand"
               >
-                <img src={src} alt={`队伍 ${team.team}`} loading="lazy" className="h-full w-full object-cover" />
+                <img src={src} alt={`Team ${team.team}`} loading="lazy" className="h-full w-full object-cover" />
               </button>
             ))}
           </div>
@@ -365,7 +375,7 @@ function TeamDetail({
             逐场综合分
           </h3>
           <ChartCanvas
-            label={`队伍 ${team.team} 逐场综合分`}
+            label={`Team ${team.team} 逐场综合分`}
             configKey={`team-line:${team.team}:${team.matches.map((match) => match.totalPts).join(",")}`}
             buildConfig={(palette) => teamLineConfig(team, palette)}
           />
@@ -376,7 +386,7 @@ function TeamDetail({
             自动 / 手动贡献
           </h3>
           <ChartCanvas
-            label={`队伍 ${team.team} 自动和手动贡献拆分`}
+            label={`Team ${team.team} 自动和手动贡献拆分`}
             configKey={`team-bars:${team.team}:${team.matches.map((match) => `${match.autoPts}/${match.telePts}`).join(",")}`}
             buildConfig={(palette) => teamBarConfig(team, palette)}
           />
@@ -443,7 +453,7 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
           {[0, 1, 2].map((index) => (
             <label key={index} className="grid gap-1 text-sm">
-              <span className="font-medium text-ink-dim">队伍 {index + 1}</span>
+              <span className="font-medium text-ink-dim">Team {index + 1}</span>
               <select
               value={selectedTeams[index] ?? ""}
                 onChange={(event) => setTeam(index, event.target.value)}
@@ -451,7 +461,7 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
               >
                 {teams.map((team) => (
                   <option key={team.team} value={team.team}>
-                    队伍 {team.team}（{team.avgTotal} 综合均分）
+                    Team {team.team}（{team.avgTotal} 综合均分）
                   </option>
                 ))}
               </select>
@@ -611,7 +621,7 @@ function PhotoLightbox({
         <Button type="button" onClick={() => onChange((safeIndex - 1 + photos.length) % photos.length)} className="h-10 px-3">
           <ChevronLeft className="size-5" />
         </Button>
-        <img src={photos[safeIndex]} alt="队伍机器人" className="max-h-[82dvh] max-w-[78vw] rounded-md object-contain" />
+        <img src={photos[safeIndex]} alt="Team 机器人" className="max-h-[82dvh] max-w-[78vw] rounded-md object-contain" />
         <Button type="button" onClick={() => onChange((safeIndex + 1) % photos.length)} className="h-10 px-3">
           <ChevronRight className="size-5" />
         </Button>
@@ -651,9 +661,9 @@ function SegmentedTab({
   );
 }
 
-function TierBadge({ team, large = false }: { team: TeamSummary; large?: boolean }) {
-  const tier = getTier(team.avgTotal);
-  return <Badge className={cn("shrink-0 whitespace-nowrap", tier.className, large && "px-3 py-1 text-sm")}>{tierLabel(tier.label)}</Badge>;
+function TierBadge({ tier, large = false }: { tier?: TierInfo; large?: boolean }) {
+  if (!tier) return null;
+  return <Badge className={cn("shrink-0 whitespace-nowrap", tier.className, large && "px-3 py-1 text-sm")}>{tierDisplayLabel(tier.label)}</Badge>;
 }
 
 function Stat({ label, value, sub }: { label: string; value: ReactNode; sub: ReactNode }) {
@@ -701,16 +711,6 @@ function StatePill({ match }: { match: ScoutingMatch }) {
       {match.disabled ? <span className="text-danger">已禁用</span> : null}
     </span>
   );
-}
-
-function tierLabel(label: string) {
-  return {
-    Elite: "顶级",
-    Strong: "强队",
-    Mid: "中游",
-    Low: "低分",
-    Struggling: "待观察",
-  }[label] ?? label;
 }
 
 function botStateLabel(match: ScoutingMatch) {
@@ -861,7 +861,7 @@ function compareLineConfig(teams: TeamSummary[], palette: ChartPaletteLike): Cha
     type: "line",
     data: {
       datasets: teams.map((team, index) => ({
-        label: `队伍 ${team.team}`,
+        label: `Team ${team.team}`,
         data: team.matches.map((match) => ({ x: match.match, y: match.totalPts })),
         borderColor: palette.colors[index],
         backgroundColor: `${palette.colors[index]}18`,
@@ -888,7 +888,7 @@ function compareBarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Char
   return {
     type: "bar",
     data: {
-      labels: teams.map((team) => `队伍 ${team.team}`),
+      labels: teams.map((team) => `Team ${team.team}`),
       datasets: [
         { label: "自动贡献", data: teams.map((team) => team.avgAuto), backgroundColor: teams.map((_, index) => palette.colors[index]) },
         { label: "手动贡献", data: teams.map((team) => team.avgTele), backgroundColor: teams.map((_, index) => `${palette.colors[index]}66`) },
@@ -907,7 +907,7 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
   return {
     type: "bar",
     data: {
-      labels: teams.map((team) => `队伍 ${team.team}`),
+      labels: teams.map((team) => `Team ${team.team}`),
       datasets: [{ label: "Scout 命中率 %", data: teams.map((team) => team.avgAccuracy), backgroundColor: teams.map((_, index) => palette.colors[index]) }],
     },
     options: {
@@ -931,7 +931,7 @@ function compareRadarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
       datasets: teams.map((team, index) => {
         const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
         return {
-          label: `队伍 ${team.team}`,
+          label: `Team ${team.team}`,
           data: [team.avgDriver, team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency],
           borderColor: palette.colors[index],
           backgroundColor: `${palette.colors[index]}22`,
@@ -982,7 +982,7 @@ function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
   return {
     type: "bar",
     data: {
-      labels: teams.map((team) => `队伍 ${team.team}`),
+      labels: teams.map((team) => `Team ${team.team}`),
       datasets: [
         { label: "最低", data: teams.map((team) => team.minPts), backgroundColor: "transparent", borderColor: "transparent", stack: "range" },
         { label: "范围", data: teams.map((team) => team.maxPts - team.minPts), backgroundColor: teams.map((_, index) => `${palette.colors[index]}44`), borderColor: teams.map((_, index) => palette.colors[index]), borderWidth: 1, stack: "range" },

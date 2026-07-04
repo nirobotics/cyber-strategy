@@ -3,7 +3,7 @@
 ![Next Innovation](https://img.shields.io/badge/Next-Innovation-8A2BE2?labelColor=555555&style=flat)
 ![Lang zh-CN](https://img.shields.io/badge/Lang-zh--CN-2DBA4E?labelColor=555555&style=flat)
 
-Cyber App 系列的 FRC 战术数据分析网页：导入 scouting CSV，按队伍浏览、比较、查看赛程和 EPA。
+Cyber App 系列的 FRC 战术数据分析网页：导入 scouting CSV，按队伍浏览、比较、查看赛程预测和比赛详情。
 
 ## 用途
 
@@ -12,7 +12,7 @@ Cyber App 系列的 FRC 战术数据分析网页：导入 scouting CSV，按队�
 - 飞书组织身份登录。
 - 管理员上传 scouting CSV 并激活共享数据集。
 - 队伍浏览、pick list、DNP、隐藏队伍、本地偏好。
-- 队伍详情、三队对比、Statbotics 赛程和 EPA 排名。
+- 队伍详情、三队对比、赛程预测和 Match Analysis 比赛详情。
 
 ## 目录
 

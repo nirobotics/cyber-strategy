@@ -74,17 +74,7 @@ export type DatasetSourceStatus = {
   error?: string;
 };
 
-export type TierLabel = "Elite" | "Strong" | "Mid" | "Low" | "Struggling";
-
 type CsvRow = Record<string, unknown>;
-
-export function getTier(avgTotal: number): { label: TierLabel; className: string } {
-  if (avgTotal >= 70) return { label: "Elite", className: "border-yellow-400/40 bg-yellow-400/10 text-yellow-600 dark:text-yellow-300" };
-  if (avgTotal >= 40) return { label: "Strong", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" };
-  if (avgTotal >= 20) return { label: "Mid", className: "border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-300" };
-  if (avgTotal >= 5) return { label: "Low", className: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300" };
-  return { label: "Struggling", className: "border-red-500/40 bg-red-500/10 text-red-700 dark:text-red-300" };
-}
 
 export function parseScoutingCsv(text: string): ScoutingDatasetPayload["teamData"] {
   const parsed = Papa.parse<CsvRow>(text, {

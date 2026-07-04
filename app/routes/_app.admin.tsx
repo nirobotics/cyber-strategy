@@ -4,12 +4,21 @@ import { Badge, Button, Card, Input } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
 import { activateDataset, createDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
 import { parseScoutingCsv } from "../lib/scouting";
+import { getTierPercentages, saveTierPercentages } from "../lib/settings.server";
+import {
+  DEFAULT_TIER_PERCENTAGES,
+  TIER_ORDER,
+  parseTierPercentages,
+  tierDisplayLabel,
+  validateTierPercentages,
+} from "../lib/tier-settings";
 
 type ActionData = { error?: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  return { datasets: await listDatasets() };
+  const [datasets, tierPercentages] = await Promise.all([listDatasets(), getTierPercentages()]);
+  return { datasets, tierPercentages };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
@@ -44,6 +53,19 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
 
     if (intent === "delete") {
       await deleteDataset(String(formData.get("id") || ""), user.feishuOpenId);
+      throw redirect("/admin");
+    }
+
+    if (intent === "save-tier-percentages") {
+      const percentages = parseTierPercentages((label) => formData.get(`tier_${label}`));
+      const validationError = validateTierPercentages(percentages);
+      if (validationError) return { error: validationError };
+      await saveTierPercentages(percentages, user.feishuOpenId);
+      throw redirect("/admin");
+    }
+
+    if (intent === "reset-tier-percentages") {
+      await saveTierPercentages(DEFAULT_TIER_PERCENTAGES, user.feishuOpenId);
       throw redirect("/admin");
     }
   } catch (error) {
@@ -103,6 +125,51 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
           </label>
           <Button type="submit" variant="primary" disabled={busy}>
             导入
+          </Button>
+        </Form>
+      </Card>
+
+      <Card className="p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="section-label">分档比例</p>
+            <h2 className="text-lg font-semibold">综合均分排名</h2>
+          </div>
+          <Badge className="border-line bg-surface-2 text-ink-dim">
+            合计 {TIER_ORDER.reduce((sum, label) => sum + loaderData.tierPercentages[label], 0)}%
+          </Badge>
+        </div>
+        <Form method="post" className="grid gap-3">
+          <input type="hidden" name="intent" value="save-tier-percentages" />
+          <div className="grid gap-2 sm:grid-cols-5">
+            {TIER_ORDER.map((label) => (
+              <label key={label} className="grid gap-1 text-sm">
+                <span className="font-medium text-ink-dim">{tierDisplayLabel(label)}</span>
+                <div className="flex items-center gap-1">
+                  <Input
+                    name={`tier_${label}`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    defaultValue={loaderData.tierPercentages[label]}
+                    className="h-10"
+                  />
+                  <span className="text-sm text-ink-faint">%</span>
+                </div>
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" disabled={busy}>
+              保存比例
+            </Button>
+          </div>
+        </Form>
+        <Form method="post" className="mt-2">
+          <input type="hidden" name="intent" value="reset-tier-percentages" />
+          <Button type="submit" disabled={busy}>
+            恢复默认
           </Button>
         </Form>
       </Card>

@@ -20,3 +20,10 @@ export type ScoutingDatasetRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type AppSettingRow = {
+  key: string;
+  value: unknown;
+  updated_by: string | null;
+  updated_at: string;
+};
