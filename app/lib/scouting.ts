@@ -5,6 +5,7 @@ export type ScoutingMatch = {
   totalPts: number;
   autoPts: number;
   telePts: number;
+  bps?: number;
   hubSuccess: number;
   hubFail: number;
   accuracy: number | null;
@@ -29,6 +30,7 @@ export type TeamSummary = {
   avgDriver: number;
   avgDefense?: number;
   avgFuel: number;
+  avgBps?: number;
   malfunctions: number;
   commsIssues: number;
   disabledEvents: number;
@@ -139,6 +141,7 @@ export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): Te
     avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
     avgDefense: avg(matchList.map((match) => match.defenseRating).filter((value) => value > 0)),
     avgFuel: avg(matchList.map((match) => match.fuelRating).filter((value) => value > 0)),
+    avgBps: avg(matchList.map((match) => match.bps ?? 0).filter((value) => value > 0)),
     malfunctions: matchList.filter((match) => match.botState === 3 || match.botState === 4).length,
     commsIssues: matchList.filter((match) => match.botState === 2).length,
     disabledEvents: matchList.filter((match) => match.disabled).length,
@@ -180,6 +183,7 @@ function toMatch(row: CsvRow): ScoutingMatch {
     totalPts: number(row.TotalPoints),
     autoPts: number(row.AutoPoints),
     telePts: number(row.TelePoints),
+    bps: number(row.BPS),
     hubSuccess,
     hubFail,
     accuracy: hubSuccess + hubFail > 0 ? round1((hubSuccess / (hubSuccess + hubFail)) * 100) : null,

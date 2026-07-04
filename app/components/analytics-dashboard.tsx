@@ -343,10 +343,11 @@ function TeamDetail({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
         <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
         <Stat label="自动贡献" value={team.avgAuto} sub="分" />
         <Stat label="手动贡献" value={team.avgTele} sub="分" />
+        <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} sub="Scout" />
         <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} sub="Scout" />
         <Stat label="可靠性" value={`${reliability(team)}%`} sub={`${team.malfunctions} 次故障`} />
         <Stat label="标准差" value={`±${team.stdDev}`} sub="稳定性" />
@@ -857,14 +858,18 @@ function AutoRouteModal({ team, pitInfo, onClose }: { team: string; pitInfo: Tea
 function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number]["points"] }) {
   const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
   return (
-    <div className="aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full" aria-label="自动路线预览">
-        <image href="/pit-field-map.webp" width="100" height="100" preserveAspectRatio="none" />
+    <div className="relative aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2" aria-label="自动路线预览">
+      <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
         <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        {points.map((point, index) => (
-          <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="2.6" fill="rgb(var(--brand))" stroke="white" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-        ))}
       </svg>
+      {points.map((point, index) => (
+        <span
+          key={`${point.x}-${point.y}-${index}`}
+          className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand shadow-sm"
+          style={{ left: `${point.x}%`, top: `${point.y}%` }}
+        />
+      ))}
     </div>
   );
 }

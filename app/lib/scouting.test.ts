@@ -18,6 +18,7 @@ describe("scouting data processing", () => {
       avgDriver: 3.5,
       avgDefense: 2,
       avgFuel: 3,
+      avgBps: 0,
       malfunctions: 1,
       commsIssues: 1,
       disabledEvents: 2,

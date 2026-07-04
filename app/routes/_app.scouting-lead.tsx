@@ -1,10 +1,31 @@
-import { ArrowLeft, AlertTriangle, CheckCircle2, Gauge, Target, Trophy, Users } from "lucide-react";
-import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router";
+import {
+  ArrowLeft,
+  AlertTriangle,
+  CheckCircle2,
+  ClipboardList,
+  Gauge,
+  Save,
+  ShieldCheck,
+  Target,
+  Trash2,
+  Trophy,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Form, Link, redirect, useActionData, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.scouting-lead";
-import { Badge, Card, cn } from "../components/ui";
+import { Badge, Button, Card, Input, cn } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
-import { loadScoutConfidenceForRequest } from "../lib/cyber-scout.server";
+import {
+  deleteCyberScoutAssignment,
+  deleteCyberScoutRecord,
+  loadScoutConfidenceForRequest,
+  saveCyberScoutAssignment,
+  type ScoutLeadAssignment,
+  type ScoutScheduleCell,
+} from "../lib/cyber-scout.server";
 import type {
   ScoutConfidenceCalibration,
   ScoutConfidenceMatch,
@@ -13,17 +34,78 @@ import type {
   ScoutConfidenceReviewItem,
 } from "../lib/scout-confidence";
 
+type ActionData = { error?: string };
+type LeadView = "confidence" | "records" | "assignments";
+
+const leadViews: Array<{ id: LeadView; label: string; icon: ReactNode }> = [
+  { id: "confidence", label: "信心分", icon: <Trophy className="size-4" /> },
+  { id: "records", label: "提交记录", icon: <ClipboardList className="size-4" /> },
+  { id: "assignments", label: "人员分配", icon: <UserPlus className="size-4" /> },
+];
+
+const scoutPositions = ["R1", "R2", "R3", "B1", "B2", "B3"] as const;
+
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   return loadScoutConfidenceForRequest(request);
 }
 
+export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
+  await requireAdmin(request);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") || "");
+  const event = String(formData.get("event") || "");
+
+  try {
+    if (intent === "delete-record") {
+      await deleteCyberScoutRecord(String(formData.get("recordId") || ""));
+      throw redirect(scopingLeadPath(event, "records"));
+    }
+
+    if (intent === "save-assignment") {
+      await saveCyberScoutAssignment({
+        id: String(formData.get("assignmentId") || "") || null,
+        eventKey: event,
+        startMatch: Number(formData.get("startMatch") || 0),
+        endMatch: Number(formData.get("endMatch") || 0),
+        position: String(formData.get("position") || ""),
+        userName: String(formData.get("userName") || ""),
+      });
+      throw redirect(scopingLeadPath(event, "assignments"));
+    }
+
+    if (intent === "delete-assignment") {
+      await deleteCyberScoutAssignment(String(formData.get("assignmentId") || ""));
+      throw redirect(scopingLeadPath(event, "assignments"));
+    }
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    return { error: error instanceof Error ? error.message : "操作失败。" };
+  }
+
+  return { error: `未知操作：${intent || "空"}` };
+}
+
 export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
-  const { report, events, selectedEventKey, sourceStatus } = loaderData;
+  const navigation = useNavigation();
+  const actionData = useActionData<ActionData>();
+  const [searchParams] = useSearchParams();
+  const view = readView(searchParams.get("view"));
+  const { report, events, selectedEventKey, sourceStatus, leadData } = loaderData;
+  const busy = navigation.state !== "idle";
 
   function selectEvent(eventKey: string) {
-    navigate(eventKey ? `/scouting-lead?event=${encodeURIComponent(eventKey)}` : "/scouting-lead");
+    const params = new URLSearchParams(searchParams);
+    if (eventKey) params.set("event", eventKey);
+    else params.delete("event");
+    navigate(`/scouting-lead?${params.toString()}`);
+  }
+
+  function selectView(next: LeadView) {
+    const params = new URLSearchParams(searchParams);
+    params.set("view", next);
+    navigate(`/scouting-lead?${params.toString()}`);
   }
 
   return (
@@ -31,7 +113,7 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
       <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="section-label">Scouting Lead</p>
-          <h1 className="text-2xl font-semibold text-ink">信心分排行</h1>
+          <h1 className="text-2xl font-semibold text-ink">{viewTitle(view)}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
             <Badge className="border-brand/40 bg-brand/10 text-brand">{sourceStatus.label}</Badge>
             <span>{sourceStatus.message}</span>
@@ -63,6 +145,36 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2 rounded-card border border-line bg-surface p-2">
+        {leadViews.map((item) => (
+          <Button key={item.id} type="button" variant={view === item.id ? "active" : "default"} onClick={() => selectView(item.id)}>
+            {item.icon}
+            {item.label}
+          </Button>
+        ))}
+      </div>
+
+      {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
+
+      {view === "confidence" ? <ConfidenceView report={report} /> : null}
+      {view === "records" ? <RecordsView eventKey={selectedEventKey} schedule={leadData.recordSchedule} busy={busy} /> : null}
+      {view === "assignments" ? (
+        <AssignmentsView
+          eventKey={selectedEventKey}
+          assignments={leadData.assignments}
+          users={leadData.users}
+          configEventKey={leadData.configEventKey}
+          configSavedAt={leadData.configSavedAt}
+          busy={busy}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
+  return (
+    <>
       <SummaryGrid report={report} />
 
       <Card className="overflow-hidden p-0">
@@ -71,9 +183,7 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
             <p className="section-label">个人排序</p>
             <h2 className="text-lg font-semibold text-ink">净信心分</h2>
           </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">
-            {report.people.length} 人
-          </Badge>
+          <Badge className="border-line bg-surface-2 text-ink-dim">{report.people.length} 人</Badge>
         </div>
         <PeopleTable people={report.people} />
       </Card>
@@ -99,13 +209,300 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
           <Card className="overflow-hidden p-0">
             <div className="border-b border-line p-3">
               <p className="section-label">复盘队列</p>
-              <h2 className="text-lg font-semibold text-ink">需要关注</h2>
+              <h2 className="text-lg font-semibold text-ink">大分歧比赛</h2>
             </div>
             <ReviewQueue items={report.reviewQueue} />
           </Card>
         </div>
       </div>
+    </>
+  );
+}
+
+function RecordsView({
+  eventKey,
+  schedule,
+  busy,
+}: {
+  eventKey: string | null;
+  schedule: Route.ComponentProps["loaderData"]["leadData"]["recordSchedule"];
+  busy: boolean;
+}) {
+  const [selected, setSelected] = useState<{ matchNumber: number; cell: ScoutScheduleCell } | null>(null);
+
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard icon={<ClipboardList className="size-4" />} label="全部提交" value={schedule.totalRecords} />
+        <StatCard icon={<Users className="size-4" />} label="普通 Scout" value={schedule.normalRecords} />
+        <StatCard icon={<ShieldCheck className="size-4" />} label="超级 Scout" value={schedule.superRecords} />
+      </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+          <div>
+            <p className="section-label">提交记录</p>
+            <h2 className="text-lg font-semibold text-ink">按赛程查询</h2>
+          </div>
+          <Badge className="border-line bg-surface-2 text-ink-dim">{schedule.matches.length} 场</Badge>
+        </div>
+        {!schedule.matches.length ? (
+          <EmptyState text="暂无可展示的赛程或提交记录。" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
+                <tr>
+                  <th className="w-20 px-3 py-2">比赛</th>
+                  <th className="px-3 py-2 text-danger">Red</th>
+                  <th className="px-3 py-2 text-info">Blue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {schedule.matches.map((match) => (
+                  <tr key={match.matchNumber} className="align-top">
+                    <td className="px-3 py-3 font-semibold text-ink">Q{match.matchNumber}</td>
+                    <td className="px-3 py-2">
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.red} onSelect={(cell) => setSelected({ matchNumber: match.matchNumber, cell })} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.blue} onSelect={(cell) => setSelected({ matchNumber: match.matchNumber, cell })} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {selected ? <RecordModal eventKey={eventKey} selected={selected} busy={busy} onClose={() => setSelected(null)} /> : null}
+    </>
+  );
+}
+
+function AllianceCells({
+  matchNumber,
+  cells,
+  onSelect,
+}: {
+  matchNumber: number;
+  cells: ScoutScheduleCell[];
+  onSelect: (cell: ScoutScheduleCell) => void;
+}) {
+  if (!cells.length) return <span className="text-xs text-ink-faint">暂无队伍</span>;
+  return (
+    <div className="grid gap-2 sm:grid-cols-3">
+      {cells.map((cell) => (
+        <button
+          key={`${matchNumber}-${cell.position}-${cell.team}`}
+          type="button"
+          onClick={() => onSelect(cell)}
+          className="min-w-0 rounded-md border border-line bg-surface p-2 text-left transition hover:border-brand hover:bg-brand/5"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-ink">Team {cell.team}</span>
+            <span className="text-xs text-ink-faint">{cell.position}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1">
+            <SmallBadge>普通 {cell.normalRecords.length}</SmallBadge>
+            <SmallBadge>超级 {cell.superRecords.length}</SmallBadge>
+          </div>
+        </button>
+      ))}
     </div>
+  );
+}
+
+function RecordModal({
+  eventKey,
+  selected,
+  busy,
+  onClose,
+}: {
+  eventKey: string | null;
+  selected: { matchNumber: number; cell: ScoutScheduleCell };
+  busy: boolean;
+  onClose: () => void;
+}) {
+  const records = [...selected.cell.normalRecords, ...selected.cell.superRecords];
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-3" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <Card className="max-h-[86vh] w-full max-w-2xl overflow-hidden p-0" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between gap-2 border-b border-line p-3">
+          <div className="min-w-0">
+            <p className="section-label">Q{selected.matchNumber} · {selected.cell.position}</p>
+            <h2 className="truncate text-lg font-semibold text-ink">Team {selected.cell.team} 提交记录</h2>
+          </div>
+          <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="grid max-h-[70vh] gap-3 overflow-y-auto p-3">
+          {records.length ? records.map((record) => (
+            <div key={record.id} className="rounded-md border border-line bg-surface-2 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={record.recordType === "normal_match" ? "border-info/40 bg-info/10 text-info" : "border-brand/40 bg-brand/10 text-brand"}>
+                      {record.recordType === "normal_match" ? "普通 Scout" : "超级 Scout"}
+                    </Badge>
+                    <span className="font-semibold text-ink">{record.label}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-ink-dim">上传人：{record.completedBy}</p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    上传 {formatDate(record.uploadedAt)} · 本地创建 {formatDate(record.clientCreatedAt)}
+                  </p>
+                </div>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="delete-record" />
+                  <input type="hidden" name="event" value={eventKey ?? ""} />
+                  <input type="hidden" name="view" value="records" />
+                  <input type="hidden" name="recordId" value={record.id} />
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    className="border-danger/40 text-danger hover:bg-danger/10"
+                    onClick={(event) => {
+                      if (!confirm("确认删除这条 cyber-scout 原始记录？")) event.preventDefault();
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    删除
+                  </Button>
+                </Form>
+              </div>
+            </div>
+          )) : (
+            <EmptyState text="这个队伍当前没有普通或超级 Scout 提交记录。" />
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function AssignmentsView({
+  eventKey,
+  assignments,
+  users,
+  configEventKey,
+  configSavedAt,
+  busy,
+}: {
+  eventKey: string | null;
+  assignments: ScoutLeadAssignment[];
+  users: Array<{ id: string; displayName: string }>;
+  configEventKey: string | null;
+  configSavedAt: string | null;
+  busy: boolean;
+}) {
+  return (
+    <div className="grid gap-3">
+      <Card className="p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="section-label">人员分配</p>
+            <h2 className="text-lg font-semibold text-ink">新增分配</h2>
+          </div>
+          <Badge className="border-line bg-surface-2 text-ink-dim">
+            {configEventKey || "未绑定赛事"}{configSavedAt ? ` · ${new Date(configSavedAt).toLocaleString()}` : ""}
+          </Badge>
+        </div>
+        <AssignmentForm eventKey={eventKey} users={users} busy={busy} />
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+          <div>
+            <p className="section-label">当前分配</p>
+            <h2 className="text-lg font-semibold text-ink">Qualification Scout</h2>
+          </div>
+          <Badge className="border-line bg-surface-2 text-ink-dim">{assignments.length} 条</Badge>
+        </div>
+        {!assignments.length ? (
+          <EmptyState text="暂无人员分配。" />
+        ) : (
+          <div className="divide-y divide-line">
+            {assignments.map((assignment) => (
+              <div key={assignment.id} className="grid gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                <AssignmentForm eventKey={eventKey} assignment={assignment} users={users} busy={busy} compact />
+                <Form method="post" className="flex justify-end">
+                  <input type="hidden" name="intent" value="delete-assignment" />
+                  <input type="hidden" name="event" value={eventKey ?? ""} />
+                  <input type="hidden" name="view" value="assignments" />
+                  <input type="hidden" name="assignmentId" value={assignment.id} />
+                  <Button
+                    type="submit"
+                    disabled={busy}
+                    className="border-danger/40 text-danger hover:bg-danger/10"
+                    onClick={(event) => {
+                      if (!confirm("确认删除这条人员分配？")) event.preventDefault();
+                    }}
+                  >
+                    <Trash2 className="size-4" />
+                    删除
+                  </Button>
+                </Form>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function AssignmentForm({
+  eventKey,
+  assignment,
+  users,
+  busy,
+  compact = false,
+}: {
+  eventKey: string | null;
+  assignment?: ScoutLeadAssignment;
+  users: Array<{ id: string; displayName: string }>;
+  busy: boolean;
+  compact?: boolean;
+}) {
+  const hasCurrentUser = assignment ? users.some((user) => user.displayName === assignment.userName) : true;
+  return (
+    <Form method="post" className={cn("grid gap-2", compact ? "md:grid-cols-[110px_110px_110px_minmax(160px,1fr)_auto]" : "md:grid-cols-[120px_120px_120px_minmax(180px,1fr)_auto]")}>
+      <input type="hidden" name="intent" value="save-assignment" />
+      <input type="hidden" name="event" value={eventKey ?? ""} />
+      <input type="hidden" name="view" value="assignments" />
+      {assignment ? <input type="hidden" name="assignmentId" value={assignment.id} /> : null}
+      <label className="grid gap-1 text-sm">
+        <span className="font-medium text-ink-dim">开始场次</span>
+        <Input name="startMatch" type="number" min="1" defaultValue={assignment?.startMatch ?? 1} required />
+      </label>
+      <label className="grid gap-1 text-sm">
+        <span className="font-medium text-ink-dim">结束场次</span>
+        <Input name="endMatch" type="number" min="1" defaultValue={assignment?.endMatch ?? assignment?.startMatch ?? 1} required />
+      </label>
+      <label className="grid gap-1 text-sm">
+        <span className="font-medium text-ink-dim">位置</span>
+        <select name="position" defaultValue={assignment?.position ?? "R1"} className="input h-10 font-sans">
+          {scoutPositions.map((position) => <option key={position} value={position}>{position}</option>)}
+        </select>
+      </label>
+      <label className="grid gap-1 text-sm">
+        <span className="font-medium text-ink-dim">人员</span>
+        {users.length ? (
+          <select name="userName" defaultValue={assignment?.userName ?? users[0]?.displayName ?? ""} className="input h-10 font-sans">
+            {assignment && !hasCurrentUser ? <option value={assignment.userName}>{assignment.userName}</option> : null}
+            {users.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}
+          </select>
+        ) : (
+          <Input name="userName" defaultValue={assignment?.userName ?? ""} placeholder="Scout 名字" required />
+        )}
+      </label>
+      <Button type="submit" variant={assignment ? "default" : "primary"} disabled={busy} className="self-end">
+        <Save className="size-4" />
+        {assignment ? "保存" : "新增"}
+      </Button>
+    </Form>
   );
 }
 
@@ -293,6 +690,27 @@ function SmallBadge({ children, tone = "default" }: { children: ReactNode; tone?
 
 function EmptyState({ text }: { text: string }) {
   return <div className="p-6 text-center text-sm text-ink-dim">{text}</div>;
+}
+
+function readView(value: string | null): LeadView {
+  return value === "records" || value === "assignments" ? value : "confidence";
+}
+
+function viewTitle(view: LeadView) {
+  if (view === "records") return "提交记录查询";
+  if (view === "assignments") return "人员分配";
+  return "信心分排行";
+}
+
+function scopingLeadPath(event: string, view: LeadView) {
+  const params = new URLSearchParams();
+  if (event) params.set("event", event);
+  params.set("view", view);
+  return `/scouting-lead?${params.toString()}`;
+}
+
+function formatDate(value: string | null) {
+  return value ? new Date(value).toLocaleString() : "-";
 }
 
 function signed(value: number) {

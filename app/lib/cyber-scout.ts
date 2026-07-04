@@ -18,9 +18,14 @@ export type CyberScoutEventRow = {
 export type CyberScoutRecordRow = {
   id: string;
   record_type: "normal_match" | "super_match" | "pit";
+  match_type?: string | null;
   match_number: number | null;
+  alliance?: string | null;
+  position?: string | null;
   team_number: number | null;
   payload: unknown;
+  uploaded_by?: string | null;
+  device_id?: string | null;
   uploaded_at: string | null;
   client_created_at: string | null;
   created_at: string | null;
@@ -214,6 +219,7 @@ function toScoutingMatch({
     totalPts: totalScore,
     autoPts: round1(safeAuto),
     telePts: round1(Math.max(0, totalScore - safeAuto)),
+    bps: clamp(superRecord?.bps ?? 0, 0, 35),
     hubSuccess: accuracy ?? 0,
     hubFail: accuracy == null ? 0 : round1(100 - accuracy),
     accuracy,
