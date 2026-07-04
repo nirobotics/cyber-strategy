@@ -59,3 +59,24 @@
 - 飞书后台需添加生产回调：`https://cyber-strategy.vercel.app/api/auth/callback`。
 - 首次飞书登录后，需在 Supabase 将首个管理员 `profiles.is_admin` 置为 `true`。
 - 本轮使用过的 Vercel token 与 Supabase token 已出现在对话中；部署完成后建议用户轮换。
+
+---
+
+## 2026-07-04 · Phase 2 飞书生产 env 接入
+
+**当前状态**：Vercel 已配置飞书生产/预览/开发环境变量并重新部署；登录入口已能跳转到飞书授权页。
+
+**本轮完成**：
+- Vercel env 已配置：`FEISHU_APP_ID`、`FEISHU_APP_SECRET`。
+- 生产重新部署 Ready：`https://cyber-strategy.vercel.app`。
+
+**验证**：
+- Vercel production deployment Ready：`dpl_C6gkaqg7MYBJNthtcvkppuByT1Gh`。
+- 线上 smoke：`/` 302 到登录页，`/auth/login` 返回 200。
+- `GET /api/auth/login?returnTo=%2F` 302 到飞书授权页，回调地址为 `https://cyber-strategy.vercel.app/api/auth/callback`。
+
+**风险 / 待办**：
+- 用户仍需在飞书后台添加生产回调：`https://cyber-strategy.vercel.app/api/auth/callback`。
+- 建议补充 `FEISHU_ALLOWED_TENANT_KEYS` 做组织 allow-list。
+- 首次飞书登录后，需在 Supabase 将首个管理员 `profiles.is_admin` 置为 `true`。
+- 本轮使用过的飞书 secret 已出现在对话中；上线验证完成后建议轮换。
