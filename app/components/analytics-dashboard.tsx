@@ -102,7 +102,7 @@ export function AnalyticsDashboard({
       </div>
 
       {tab === "browser" && selected ? (
-        <div className="grid min-h-0 gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
           <Card className="overflow-hidden p-0 lg:sticky lg:top-3 lg:max-h-[calc(100dvh-13rem)]">
             <div className="flex items-center gap-2 border-b border-line p-3">
               <Search className="size-4 text-ink-faint" />
@@ -137,7 +137,7 @@ export function AnalyticsDashboard({
                   }}
                   onClick={() => setSelectedTeam(team.team)}
                   className={cn(
-                    "grid w-full grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 border-l-2 border-transparent px-3 py-2 text-left text-sm transition hover:bg-surface-2",
+                    "grid w-full grid-cols-[1.75rem_minmax(3.5rem,1fr)_auto_auto_auto] items-center gap-1.5 border-l-2 border-transparent px-2.5 py-2 text-left text-sm transition hover:bg-surface-2 sm:grid-cols-[auto_2rem_minmax(3.5rem,1fr)_auto_auto_auto]",
                     selected.team === team.team && "border-brand bg-brand/10 text-brand",
                     hiddenSet.has(team.team) && "opacity-40",
                     dnpSet.has(team.team) && "opacity-45",
@@ -145,23 +145,25 @@ export function AnalyticsDashboard({
                 >
                   <GripVertical
                     className={cn(
-                      "size-4 text-ink-faint",
+                      "hidden size-4 text-ink-faint sm:block",
                       (hiddenSet.has(team.team) || dnpSet.has(team.team)) && "opacity-0",
                     )}
                   />
-                  <span className="min-w-0 font-semibold">
-                    <span className="mr-2 inline-block w-6 text-right text-xs text-ink-faint">
-                      {hiddenSet.has(team.team) || dnpSet.has(team.team) ? "" : index + 1}
-                    </span>
-                    Team {team.team}
+                  <span className="text-right text-xs tabular-nums text-ink-faint">
+                    {hiddenSet.has(team.team) || dnpSet.has(team.team) ? "" : index + 1}
                   </span>
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-dim">{team.avgTotal} avg</span>
+                  <span className="min-w-0 whitespace-nowrap font-semibold tabular-nums">
+                    {team.team}
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                    {team.avgTotal} avg
+                  </span>
                   <TierBadge team={team} />
                   <span
                     role="button"
                     tabIndex={0}
                     title={hiddenSet.has(team.team) ? "Show team" : "Hide team"}
-                    className="rounded-md p-1 text-ink-faint hover:bg-surface hover:text-ink"
+                    className="shrink-0 rounded-md p-1 text-ink-faint hover:bg-surface hover:text-ink"
                     onClick={(event) => {
                       event.stopPropagation();
                       toggleHidden(team.team);
@@ -570,7 +572,7 @@ function SegmentedTab({
 
 function TierBadge({ team, large = false }: { team: TeamSummary; large?: boolean }) {
   const tier = getTier(team.avgTotal);
-  return <Badge className={cn(tier.className, large && "px-3 py-1 text-sm")}>{tier.label}</Badge>;
+  return <Badge className={cn("shrink-0 whitespace-nowrap", tier.className, large && "px-3 py-1 text-sm")}>{tier.label}</Badge>;
 }
 
 function Stat({ label, value, sub }: { label: string; value: ReactNode; sub: ReactNode }) {
