@@ -851,10 +851,14 @@ function RatingDots({ value }: { value: number }) {
   return (
     <span className="flex gap-1">
       {[1, 2, 3, 4, 5].map((dot) => (
-        <span key={dot} className={cn("size-1.5 rounded-full bg-line", dot <= rounded && "bg-brand")} />
+        <span key={dot} className={ratingDotClassName(dot <= rounded)} />
       ))}
     </span>
   );
+}
+
+export function ratingDotClassName(active: boolean) {
+  return cn("size-1.5 rounded-full", active ? "bg-brand" : "bg-line");
 }
 
 function PointsBar({ value, max }: { value: number; max: number }) {
