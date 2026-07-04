@@ -32,6 +32,8 @@ import {
 
 type Tab = "browser" | "compare" | "match";
 
+const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
+
 export function AnalyticsDashboard({
   dataset,
   events,
@@ -67,10 +69,35 @@ export function AnalyticsDashboard({
   const selected = dataset.teamData[selectedTeam] ?? teams[0];
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const eventFromUrl = params.get("event")?.trim();
+    if (eventFromUrl) {
+      storeSelectedEvent(eventFromUrl);
+      return;
+    }
+
+    const storedEvent = readSelectedEvent();
+    if (!storedEvent) return;
+    const isKnownEvent = events.length ? events.some((event) => event.eventKey === storedEvent) : true;
+    if (!isKnownEvent) {
+      clearSelectedEvent();
+      return;
+    }
+
+    params.set("event", storedEvent);
+    navigate(`/?${params.toString()}`, { replace: true });
+  }, [events, navigate]);
+
   function selectEvent(eventKey: string) {
     const params = new URLSearchParams(window.location.search);
-    if (eventKey) params.set("event", eventKey);
-    else params.delete("event");
+    if (eventKey) {
+      storeSelectedEvent(eventKey);
+      params.set("event", eventKey);
+    } else {
+      clearSelectedEvent();
+      params.delete("event");
+    }
     const search = params.toString();
     navigate(search ? `/?${search}` : "/");
   }
@@ -728,6 +755,30 @@ function useStoredList(key: string) {
   }, [key, ready, value]);
 
   return [value, setValue] as const;
+}
+
+function readSelectedEvent() {
+  try {
+    return window.localStorage.getItem(EVENT_STORAGE_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeSelectedEvent(eventKey: string) {
+  try {
+    window.localStorage.setItem(EVENT_STORAGE_KEY, eventKey);
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
+}
+
+function clearSelectedEvent() {
+  try {
+    window.localStorage.removeItem(EVENT_STORAGE_KEY);
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
 }
 
 function toggleValue(values: string[], value: string) {
