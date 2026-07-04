@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
 import {
   BarChart3,
@@ -7,10 +7,15 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  GripVertical,
   LineChart,
+  ListChecks,
+  Plus,
+  RotateCcw,
   Search,
   Settings,
   Table2,
+  Trash2,
   X,
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router";
@@ -26,11 +31,21 @@ import {
   type ScoutingMatch,
   type TeamSummary,
 } from "../lib/scouting";
+import {
+  addPickListTeam,
+  insertPickListTeam,
+  orderPickPool,
+  removePickListTeam,
+  sanitizePickList,
+  type PickListId,
+} from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 
-type Tab = "browser" | "compare" | "match";
+type Tab = "browser" | "compare" | "match" | "picklist";
 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
+const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
+const PICK_DRAG_SOURCE_TYPE = "application/x-cyber-strategy-source";
 
 export function AnalyticsDashboard({
   dataset,
@@ -56,11 +71,13 @@ export function AnalyticsDashboard({
   const [search, setSearch] = useState("");
   const [hiddenTeams, setHiddenTeams] = useStoredList(`cyber-strategy:hidden:${dataset.id}`);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
+  const [detailTeam, setDetailTeam] = useState<string | null>(null);
 
   const hiddenSet = useMemo(() => new Set(hiddenTeams), [hiddenTeams]);
   const visibleTeams = teams.filter((team) => team.team.includes(search.trim()));
   const selected = dataset.teamData[selectedTeam] ?? teams[0];
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
+  const detail = detailTeam ? dataset.teamData[detailTeam] : null;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -150,6 +167,9 @@ export function AnalyticsDashboard({
           <SegmentedTab active={tab} value="match" onClick={setTab} icon={<Table2 className="size-4" />}>
             赛程分析
           </SegmentedTab>
+          <SegmentedTab active={tab} value="picklist" onClick={setTab} icon={<ListChecks className="size-4" />}>
+            Picklist
+          </SegmentedTab>
           {isAdmin ? (
             <NavLink to="/admin" className="btn">
               <Settings className="size-4" />
@@ -235,6 +255,25 @@ export function AnalyticsDashboard({
 
       {teams.length && tab === "compare" ? <CompareTeams teams={teams} /> : null}
       {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
+      {teams.length && tab === "picklist" ? (
+        <PicklistBoard
+          datasetId={dataset.id}
+          teams={teams}
+          tierByTeam={tierByTeam}
+          rankByTeam={rankByTeam}
+          onOpenTeam={setDetailTeam}
+        />
+      ) : null}
+
+      {detail ? (
+        <TeamDetailModal
+          team={detail}
+          tier={tierByTeam.get(detail.team)}
+          photos={dataset.teamPhotos[detail.team] ?? []}
+          onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
+          onClose={() => setDetailTeam(null)}
+        />
+      ) : null}
 
       {lightbox ? (
         <PhotoLightbox
@@ -463,6 +502,264 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   );
 }
 
+function PicklistBoard({
+  datasetId,
+  teams,
+  tierByTeam,
+  rankByTeam,
+  onOpenTeam,
+}: {
+  datasetId: string;
+  teams: TeamSummary[];
+  tierByTeam: Map<string, TierInfo>;
+  rankByTeam: Map<string, number>;
+  onOpenTeam: (team: string) => void;
+}) {
+  const [activePick, setActivePick] = useState<PickListId>("first");
+  const [crossedTeams, setCrossedTeams] = useStoredList(`cyber-strategy:picklist:${datasetId}:crossed`);
+  const [firstPick, setFirstPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:first`);
+  const [secondPick, setSecondPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:second`);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const validTeamIds = useMemo(() => teams.map((team) => team.team), [teams]);
+  const crossedSet = useMemo(() => new Set(sanitizePickList(crossedTeams, validTeamIds)), [crossedTeams, validTeamIds]);
+  const poolTeams = useMemo(() => orderPickPool(teams, crossedTeams), [teams, crossedTeams]);
+  const pickTeams = useMemo(
+    () => sanitizePickList(activePick === "first" ? firstPick : secondPick, validTeamIds),
+    [activePick, firstPick, secondPick, validTeamIds],
+  );
+  const pickTitle = activePick === "first" ? "1st Pick" : "2nd Pick";
+
+  function updateCurrentPick(updater: (current: string[]) => string[]) {
+    const apply = (current: string[]) => sanitizePickList(updater(current), validTeamIds);
+    if (activePick === "first") setFirstPick(apply);
+    else setSecondPick(apply);
+  }
+
+  function toggleCrossed(team: string) {
+    setCrossedTeams((current) => toggleValue(current, team));
+  }
+
+  function startDrag(event: DragEvent<HTMLElement>, team: string, source: "pool" | "pick") {
+    event.dataTransfer.setData(PICK_DRAG_TEAM_TYPE, team);
+    event.dataTransfer.setData(PICK_DRAG_SOURCE_TYPE, source);
+    event.dataTransfer.setData("text/plain", team);
+    event.dataTransfer.effectAllowed = source === "pick" ? "move" : "copy";
+  }
+
+  function readDraggedTeam(event: DragEvent<HTMLElement>) {
+    return event.dataTransfer.getData(PICK_DRAG_TEAM_TYPE) || event.dataTransfer.getData("text/plain");
+  }
+
+  function dropTeam(event: DragEvent<HTMLElement>, beforeTeam?: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const team = readDraggedTeam(event);
+    const source = event.dataTransfer.getData(PICK_DRAG_SOURCE_TYPE);
+    if (!team || !validTeamIds.includes(team)) {
+      setDropTarget(null);
+      return;
+    }
+    updateCurrentPick((current) => {
+      if (beforeTeam) return insertPickListTeam(current, team, beforeTeam);
+      return source === "pick" ? insertPickListTeam(current, team) : addPickListTeam(current, team);
+    });
+    setDropTarget(null);
+  }
+
+  return (
+    <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+          <div>
+            <p className="section-label">队伍池</p>
+            <h2 className="text-base font-semibold text-ink">综合分排名</h2>
+          </div>
+          <span className="text-sm text-ink-dim">{teams.length} 支队伍</span>
+        </div>
+        <div className="max-h-[68dvh] overflow-y-auto p-2">
+          {poolTeams.map((team) => {
+            const crossed = crossedSet.has(team.team);
+            return (
+              <div
+                key={team.team}
+                draggable
+                onDragStart={(event) => startDrag(event, team.team, "pool")}
+                className={cn(
+                  "mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50",
+                  crossed && "opacity-45",
+                )}
+              >
+                <GripVertical className="size-4 text-ink-faint" />
+                <span className="w-8 text-right text-xs tabular-nums text-ink-faint">{rankByTeam.get(team.team)}</span>
+                <button
+                  type="button"
+                  onClick={() => onOpenTeam(team.team)}
+                  className={cn(
+                    "w-fit shrink-0 rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+                    crossed && "line-through",
+                  )}
+                >
+                  Team {team.team}
+                </button>
+                <div className="min-w-40 flex-1">
+                  <p className={cn("truncate text-xs text-ink-dim", crossed && "line-through")}>
+                    {team.matchCount} 场 · 可靠性 {reliability(team)}% · {trendLabel(team.trend)}
+                  </p>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  {team.avgTotal} 综合均分
+                </span>
+                <TierBadge tier={tierByTeam.get(team.team)} />
+                <div className="ml-auto flex justify-end gap-1">
+                  <Button
+                    type="button"
+                    title={`加入 ${pickTitle}`}
+                    aria-label={`加入 ${pickTitle}`}
+                    className="h-8 px-2"
+                    onClick={() => updateCurrentPick((current) => addPickListTeam(current, team.team))}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    title={crossed ? "恢复队伍" : "划掉队伍"}
+                    aria-label={crossed ? "恢复队伍" : "划掉队伍"}
+                    className="h-8 px-2"
+                    onClick={() => toggleCrossed(team.team)}
+                  >
+                    {crossed ? <RotateCcw className="size-4" /> : <X className="size-4" />}
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-line p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="section-label">Picklist</p>
+              <h2 className="text-base font-semibold text-ink">{pickTitle}</h2>
+            </div>
+            <span className="text-sm text-ink-dim">{pickTeams.length} 支</span>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant={activePick === "first" ? "active" : "default"} onClick={() => setActivePick("first")}>
+              1st Pick
+            </Button>
+            <Button type="button" variant={activePick === "second" ? "active" : "default"} onClick={() => setActivePick("second")}>
+              2nd Pick
+            </Button>
+          </div>
+        </div>
+        <div
+          className={cn(
+            "min-h-80 max-h-[68dvh] overflow-y-auto p-2 transition-colors",
+            dropTarget === "end" && "bg-brand/10",
+          )}
+          onDragOver={(event) => event.preventDefault()}
+          onDragEnter={() => setDropTarget("end")}
+          onDragLeave={() => setDropTarget(null)}
+          onDrop={(event) => dropTeam(event)}
+        >
+          {!pickTeams.length ? (
+            <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-line bg-surface-2 px-4 text-center text-sm text-ink-dim">
+              从左侧拖入队伍，或点击加号加入当前列表。
+            </div>
+          ) : null}
+          {pickTeams.map((teamNumber, index) => {
+            const team = teams.find((item) => item.team === teamNumber);
+            if (!team) return null;
+            return (
+              <div
+                key={team.team}
+                draggable
+                onDragStart={(event) => startDrag(event, team.team, "pick")}
+                onDragOver={(event) => event.preventDefault()}
+                onDragEnter={() => setDropTarget(team.team)}
+                onDragLeave={() => setDropTarget(null)}
+                onDrop={(event) => dropTeam(event, team.team)}
+                className={cn(
+                  "mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50",
+                  dropTarget === team.team && "border-brand bg-brand/10",
+                )}
+              >
+                <GripVertical className="size-4 text-ink-faint" />
+                <span className="w-8 text-right text-xs font-semibold tabular-nums text-ink-faint">{index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => onOpenTeam(team.team)}
+                  className="w-fit flex-1 rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                >
+                  Team {team.team}
+                </button>
+                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  {team.avgTotal} 综合均分
+                </span>
+                <Button
+                  type="button"
+                  title="移出当前列表"
+                  aria-label="移出当前列表"
+                  className="h-8 px-2"
+                  onClick={() => updateCurrentPick((current) => removePickListTeam(current, team.team))}
+                >
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function TeamDetailModal({
+  team,
+  tier,
+  photos,
+  onOpenPhoto,
+  onClose,
+}: {
+  team: TeamSummary;
+  tier?: TierInfo;
+  photos: string[];
+  onOpenPhoto: (index: number) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/70 p-3 md:p-6" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <div
+        className="mx-auto flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-card border border-line bg-bg shadow-xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
+          <div className="min-w-0">
+            <p className="section-label">队伍详情</p>
+            <h2 className="truncate text-lg font-semibold text-ink">Team {team.team}</h2>
+          </div>
+          <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="overflow-y-auto p-3 md:p-4">
+          <TeamDetail team={team} tier={tier} photos={photos} onOpenPhoto={onOpenPhoto} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PhotoLightbox({
   photos,
   index,
@@ -599,6 +896,10 @@ function botStateLabel(match: ScoutingMatch) {
   };
   if (byText[normalized]) return byText[normalized];
   return { 1: "正常", 2: "通信问题", 3: "轻微故障", 4: "严重故障" }[match.botState] ?? match.botStateText;
+}
+
+function trendLabel(trend: TeamSummary["trend"]) {
+  return trend === "up" ? "上升" : trend === "down" ? "下降" : "稳定";
 }
 
 function useStoredList(key: string) {
