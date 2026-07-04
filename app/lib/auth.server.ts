@@ -16,7 +16,7 @@ export function requireUser(request: Request, opts: { redirectToLogin?: boolean 
       const url = new URL(request.url);
       throw redirect(`/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
     }
-    throw new Response("Unauthorized", { status: 401 });
+    throw new Response("未登录", { status: 401 });
   }
   return user;
 }
@@ -25,7 +25,7 @@ export function requireUser(request: Request, opts: { redirectToLogin?: boolean 
 export async function requireAdmin(request: Request): Promise<SessionUser> {
   const user = requireUser(request);
   if (!(await isAdmin(user.feishuOpenId))) {
-    throw new Response("Forbidden", { status: 403 });
+    throw new Response("无权限", { status: 403 });
   }
   return user;
 }

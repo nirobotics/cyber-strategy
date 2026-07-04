@@ -77,7 +77,7 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
           ? ((await teamEventsResult.value.json()) as TeamEvent[])
           : [];
         if (!matches.length && !teamEvents.length) {
-          setState({ status: "error", message: "Statbotics data is not available." });
+          setState({ status: "error", message: "Statbotics 暂无可用数据。" });
           return;
         }
         setState({ status: "ready", matches, teamEvents });
@@ -99,10 +99,10 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
         </div>
         <div className="flex gap-2">
           <Button type="button" variant={view === "matches" ? "active" : "default"} onClick={() => setView("matches")}>
-            Match Schedule
+            赛程预测
           </Button>
           <Button type="button" variant={view === "epa" ? "active" : "default"} onClick={() => setView("epa")}>
-            EPA Rankings
+            EPA 排名
           </Button>
         </div>
       </Card>
@@ -110,13 +110,13 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
       {state.status === "loading" || state.status === "idle" ? (
         <Card className="grid place-items-center p-10 text-ink-dim">
           <RefreshCw className="mb-3 size-6 animate-spin" />
-          Loading Statbotics data
+          正在加载 Statbotics 数据
         </Card>
       ) : null}
 
       {state.status === "error" ? (
         <Card className="p-6 text-danger">
-          <p className="font-semibold">Could not load match data</p>
+          <p className="font-semibold">无法加载比赛数据</p>
           <p className="mt-1 text-sm text-ink-dim">{state.message}</p>
         </Card>
       ) : null}
@@ -129,7 +129,7 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
 
 function MatchSchedule({ matches }: { matches: StatboticsMatch[] }) {
   if (!matches.length) {
-    return <Card className="p-8 text-center text-ink-dim">No match schedule available.</Card>;
+    return <Card className="p-8 text-center text-ink-dim">暂无赛程数据。</Card>;
   }
 
   const levelOrder: Record<string, number> = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
@@ -175,7 +175,7 @@ function MatchCard({ match }: { match: StatboticsMatch }) {
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase text-ink-faint">{matchLabel(match)}</span>
         <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", hasScore ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn")}>
-          {hasScore ? "Played" : "Upcoming"}
+          {hasScore ? "已完成" : "未开始"}
         </span>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
@@ -187,13 +187,13 @@ function MatchCard({ match }: { match: StatboticsMatch }) {
           predicted={!hasScore}
         />
         <div className="grid justify-items-center gap-1 text-xs text-ink-faint">
-          <span className="font-semibold uppercase">vs</span>
+          <span className="font-semibold uppercase">对阵</span>
           {winProb != null ? (
             <>
               <div className="h-1.5 w-20 overflow-hidden rounded-full bg-line">
                 <div className="h-full rounded-full bg-danger" style={{ width: `${Math.round(winProb * 100)}%` }} />
               </div>
-              <span>{Math.round(winProb * 100)}% red</span>
+              <span>红方 {Math.round(winProb * 100)}%</span>
             </>
           ) : null}
           {!hasScore && predRed != null && predBlue != null ? <span>{Math.round(predRed)} - {Math.round(predBlue)}</span> : null}
@@ -234,13 +234,13 @@ function AllianceBlock({
       <div className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
         {score == null ? "-" : predicted ? `~${Math.round(score)}` : Math.round(score)}
       </div>
-      <div className="mt-1 text-xs leading-5 text-ink-dim">{teams.length ? teams.join(" · ") : "TBD"}</div>
+      <div className="mt-1 text-xs leading-5 text-ink-dim">{teams.length ? teams.join(" · ") : "待定"}</div>
     </div>
   );
 }
 
 function EpaRankings({ teamEvents }: { teamEvents: TeamEvent[] }) {
-  if (!teamEvents.length) return <Card className="p-8 text-center text-ink-dim">No EPA data available.</Card>;
+  if (!teamEvents.length) return <Card className="p-8 text-center text-ink-dim">暂无 EPA 数据。</Card>;
 
   const sorted = [...teamEvents].sort((a, b) => epaTotal(b) - epaTotal(a));
   const max = Math.max(epaTotal(sorted[0]), 1);
@@ -254,23 +254,23 @@ function EpaRankings({ teamEvents }: { teamEvents: TeamEvent[] }) {
           <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
             <tr>
               <th className="w-12 px-3 py-2 text-center">#</th>
-              <th className="px-3 py-2 text-left">Team</th>
+              <th className="px-3 py-2 text-left">队伍</th>
               <th className="px-3 py-2 text-left">EPA</th>
               {hasBreakdown ? (
                 <>
-                  <th className="px-3 py-2 text-left">Auto</th>
-                  <th className="px-3 py-2 text-left">Teleop</th>
-                  <th className="px-3 py-2 text-left">Endgame</th>
+                  <th className="px-3 py-2 text-left">自动</th>
+                  <th className="px-3 py-2 text-left">手动</th>
+                  <th className="px-3 py-2 text-left">收尾</th>
                 </>
               ) : null}
-              {hasRecord ? <th className="px-3 py-2 text-left">W-L-T</th> : null}
+              {hasRecord ? <th className="px-3 py-2 text-left">胜-负-平</th> : null}
             </tr>
           </thead>
           <tbody>
             {sorted.map((team, index) => (
               <tr key={teamNumber(team)} className="border-t border-line">
                 <td className={cn("px-3 py-2 text-center font-semibold text-ink-faint", index < 3 && "text-brand")}>{index + 1}</td>
-                <td className="px-3 py-2 font-semibold text-brand">Team {teamNumber(team)}</td>
+                <td className="px-3 py-2 font-semibold text-brand">队伍 {teamNumber(team)}</td>
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2">
                     <span className="h-1.5 rounded-full bg-brand" style={{ width: `${Math.max(4, (epaTotal(team) / max) * 120)}px` }} />
@@ -299,7 +299,7 @@ function teams(values: Array<string | number> | undefined) {
 }
 
 function levelLabel(level: string) {
-  return { qm: "Qualification Matches", ef: "Elimination Round", qf: "Quarterfinals", sf: "Semifinals", f: "Finals" }[level] ?? level.toUpperCase();
+  return { qm: "资格赛", ef: "淘汰赛", qf: "四分之一决赛", sf: "半决赛", f: "决赛" }[level] ?? level.toUpperCase();
 }
 
 function matchLabel(match: StatboticsMatch) {

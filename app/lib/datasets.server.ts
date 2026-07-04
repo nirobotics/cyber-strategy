@@ -26,7 +26,7 @@ export async function listDatasets(): Promise<ScoutingDataset[]> {
     .select("*")
     .order("is_active", { ascending: false })
     .order("updated_at", { ascending: false });
-  if (error) throw new Response("Failed to load datasets", { status: 500 });
+  if (error) throw new Response("加载数据集失败", { status: 500 });
   return ((data as ScoutingDatasetRow[] | null) ?? []).map(rowToDataset);
 }
 
@@ -36,7 +36,7 @@ export async function createDataset(opts: {
   activate: boolean;
 }): Promise<ScoutingDataset> {
   const sb = getClient();
-  if (!sb) throw new Response("Supabase is not configured", { status: 503 });
+  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
 
   const { data, error } = await sb
     .from("scouting_datasets")
@@ -51,7 +51,7 @@ export async function createDataset(opts: {
     })
     .select("*")
     .single();
-  if (error || !data) throw new Response("Failed to create dataset", { status: 500 });
+  if (error || !data) throw new Response("创建数据集失败", { status: 500 });
 
   if (opts.activate) await activateDataset(String(data.id), opts.actorOpenId);
   await appendAudit("dataset.create", {
@@ -63,20 +63,20 @@ export async function createDataset(opts: {
 
 export async function activateDataset(id: string, actorOpenId: string): Promise<void> {
   const sb = getClient();
-  if (!sb) throw new Response("Supabase is not configured", { status: 503 });
+  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
 
   const { error: clearError } = await sb.from("scouting_datasets").update({ is_active: false }).neq("id", id);
-  if (clearError) throw new Response("Failed to clear active dataset", { status: 500 });
+  if (clearError) throw new Response("清除当前数据集失败", { status: 500 });
 
   const { error: activeError } = await sb.from("scouting_datasets").update({ is_active: true }).eq("id", id);
-  if (activeError) throw new Response("Failed to activate dataset", { status: 500 });
+  if (activeError) throw new Response("激活数据集失败", { status: 500 });
 
   await appendAudit("dataset.activate", { actorOpenId, changedFields: ["is_active"] });
 }
 
 export async function deleteDataset(id: string, actorOpenId: string): Promise<void> {
   const sb = getClient();
-  if (!sb) throw new Response("Supabase is not configured", { status: 503 });
+  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
 
   const { data: existing } = await sb
     .from("scouting_datasets")
@@ -84,7 +84,7 @@ export async function deleteDataset(id: string, actorOpenId: string): Promise<vo
     .eq("id", id)
     .maybeSingle();
   const { error } = await sb.from("scouting_datasets").delete().eq("id", id);
-  if (error) throw new Response("Failed to delete dataset", { status: 500 });
+  if (error) throw new Response("删除数据集失败", { status: 500 });
 
   if (existing?.is_active) {
     const { data: next } = await sb
@@ -102,7 +102,7 @@ async function getDataset(id: string): Promise<ScoutingDataset> {
   const sb = getClient();
   if (!sb) return SAMPLE_DATASET;
   const { data, error } = await sb.from("scouting_datasets").select("*").eq("id", id).single();
-  if (error || !data) throw new Response("Dataset not found", { status: 404 });
+  if (error || !data) throw new Response("未找到数据集", { status: 404 });
   return rowToDataset(data as ScoutingDatasetRow);
 }
 

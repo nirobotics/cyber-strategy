@@ -20,8 +20,8 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <AppShell
-      appName="Cyber Strategy"
-      appSubtitle="战术数据分析"
+      appName="战术数据分析"
+      appSubtitle="选队与比赛策略"
       centerTitle="数据分析"
       version="1.0.0"
       user={user}

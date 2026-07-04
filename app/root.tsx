@@ -53,12 +53,12 @@ export default function App() {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const title = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
-    : "Page failed to load";
-  const message = error instanceof Error ? error.message : "Refresh the page and try again.";
+    : "页面加载失败";
+  const message = error instanceof Error ? error.message : "刷新页面后重试。";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-12">
-      <p className="text-sm font-medium text-[var(--muted)]">Cyber Strategy</p>
+      <p className="text-sm font-medium text-[var(--muted)]">战术数据分析</p>
       <h1 className="mt-3 text-3xl font-semibold">{title}</h1>
       <p className="mt-4 text-[var(--muted)]">{message}</p>
       <button
@@ -66,7 +66,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         onClick={() => globalThis.location.reload()}
         className="mt-6 w-fit rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-foreground)] transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
       >
-        Reload
+        重新加载
       </button>
     </main>
   );

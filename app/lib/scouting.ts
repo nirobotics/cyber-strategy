@@ -78,7 +78,7 @@ export function parseScoutingCsv(text: string): ScoutingDatasetPayload["teamData
     transformHeader: (header) => header.trim(),
   });
   if (parsed.errors.length) {
-    throw new Error(parsed.errors[0]?.message || "CSV parse failed");
+    throw new Error(parsed.errors[0]?.message || "CSV 解析失败");
   }
   return processCsvRows(parsed.data);
 }
@@ -162,7 +162,7 @@ function toMatch(row: CsvRow): ScoutingMatch {
     accuracy: hubSuccess + hubFail > 0 ? round1((hubSuccess / (hubSuccess + hubFail)) * 100) : null,
     climbPts: number(row.TotalClimbPoints),
     botState: integer(row.BotState, 1),
-    botStateText: text(row.BotStateText).trim() || "Unknown",
+    botStateText: text(row.BotStateText).trim() || "未知",
     disabled: text(row.Disabled) === "1" || text(row.Disabled).toLowerCase() === "true",
     driverRating: number(row.DriverRating),
     fuelRating: number(row.FuelIntakeRating),

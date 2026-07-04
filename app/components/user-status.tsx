@@ -32,7 +32,7 @@ export function UserStatus({
         onClick={onLogin}
       >
         <LogIn className="size-4" aria-hidden />
-        <span className="hidden sm:inline">Login</span>
+        <span className="hidden sm:inline">登录</span>
       </button>
     );
   }
@@ -56,8 +56,8 @@ export function UserStatus({
       <NavLink
         to={logoutHref}
         className="grid size-9 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
-        aria-label="Logout"
-        title="Logout"
+        aria-label="退出登录"
+        title="退出登录"
       >
         <LogOut className="size-4" aria-hidden />
       </NavLink>

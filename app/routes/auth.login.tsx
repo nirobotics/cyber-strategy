@@ -23,14 +23,14 @@ export default function LoginPage() {
             NI
           </div>
           <div>
-            <h1 className="text-2xl font-semibold">Cyber Strategy</h1>
-            <p className="text-sm text-[var(--muted)]">Sign in with Feishu</p>
+            <h1 className="text-2xl font-semibold">战术数据分析</h1>
+            <p className="text-sm text-[var(--muted)]">使用飞书登录</p>
           </div>
         </div>
         <Form method="post" className="card grid gap-4 p-5">
           <input type="hidden" name="returnTo" value={returnTo} />
           <button type="submit" className="btn btn-primary w-full">
-            Feishu Login
+            飞书登录
           </button>
         </Form>
       </section>
