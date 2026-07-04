@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button, Card, cn } from "./ui";
+import type { TeamData } from "../lib/scouting";
 
 type View = "matches" | "epa";
 
@@ -30,6 +31,22 @@ type StatboticsMatch = {
   };
 };
 
+type TbaMatch = {
+  key?: string;
+  comp_level?: string;
+  match_number?: number;
+  set_number?: number;
+  winning_alliance?: string;
+  alliances?: {
+    red?: { team_keys?: string[]; score?: number };
+    blue?: { team_keys?: string[]; score?: number };
+  };
+};
+
+type CombinedMatch = StatboticsMatch & {
+  tba?: TbaMatch;
+};
+
 type TeamEvent = {
   team?: string | number;
   team_number?: string | number;
@@ -53,9 +70,9 @@ type TeamEvent = {
 type LoadState =
   | { status: "idle" | "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; matches: StatboticsMatch[]; teamEvents: TeamEvent[] };
+  | { status: "ready"; matches: CombinedMatch[]; teamEvents: TeamEvent[] };
 
-export function MatchAnalysis({ eventKey }: { eventKey: string }) {
+export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamData: TeamData }) {
   const [view, setView] = useState<View>("matches");
   const [state, setState] = useState<LoadState>({ status: "idle" });
 
@@ -65,22 +82,27 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
       if (alive) setState({ status: "loading" });
     });
     Promise.allSettled([
+      fetch(`/api/tba/matches?event=${encodeURIComponent(eventKey)}`),
       fetch(`https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`),
       fetch(`https://api.statbotics.io/v3/team_events?event=${encodeURIComponent(eventKey)}&limit=200`),
     ])
-      .then(async ([matchesResult, teamEventsResult]) => {
+      .then(async ([tbaResult, matchesResult, teamEventsResult]) => {
         if (!alive) return;
+        const tbaMatches = tbaResult.status === "fulfilled" && tbaResult.value.ok
+          ? (((await tbaResult.value.json()) as { matches?: TbaMatch[] }).matches ?? [])
+          : [];
         const matches = matchesResult.status === "fulfilled" && matchesResult.value.ok
           ? ((await matchesResult.value.json()) as StatboticsMatch[])
           : [];
         const teamEvents = teamEventsResult.status === "fulfilled" && teamEventsResult.value.ok
           ? ((await teamEventsResult.value.json()) as TeamEvent[])
           : [];
-        if (!matches.length && !teamEvents.length) {
-          setState({ status: "error", message: "Statbotics 暂无可用数据。" });
+        const combinedMatches = mergeMatches(matches, tbaMatches);
+        if (!combinedMatches.length && !teamEvents.length) {
+          setState({ status: "error", message: "暂无可用赛程数据。" });
           return;
         }
-        setState({ status: "ready", matches, teamEvents });
+        setState({ status: "ready", matches: combinedMatches, teamEvents });
       })
       .catch((error: Error) => {
         if (alive) setState({ status: "error", message: error.message });
@@ -94,7 +116,7 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
     <div className="space-y-3">
       <Card className="flex flex-wrap items-center justify-between gap-2 p-3">
         <div>
-          <p className="section-label">Statbotics</p>
+          <p className="section-label">TBA / Strategy / Statbotics</p>
           <h2 className="text-lg font-semibold text-ink">{eventKey}</h2>
         </div>
         <div className="flex gap-2">
@@ -110,7 +132,7 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
       {state.status === "loading" || state.status === "idle" ? (
         <Card className="grid place-items-center p-10 text-ink-dim">
           <RefreshCw className="mb-3 size-6 animate-spin" />
-          正在加载 Statbotics 数据
+          正在加载赛程数据
         </Card>
       ) : null}
 
@@ -121,13 +143,13 @@ export function MatchAnalysis({ eventKey }: { eventKey: string }) {
         </Card>
       ) : null}
 
-      {state.status === "ready" && view === "matches" ? <MatchSchedule matches={state.matches} /> : null}
+      {state.status === "ready" && view === "matches" ? <MatchSchedule matches={state.matches} teamData={teamData} /> : null}
       {state.status === "ready" && view === "epa" ? <EpaRankings teamEvents={state.teamEvents} /> : null}
     </div>
   );
 }
 
-function MatchSchedule({ matches }: { matches: StatboticsMatch[] }) {
+function MatchSchedule({ matches, teamData }: { matches: CombinedMatch[]; teamData: TeamData }) {
   if (!matches.length) {
     return <Card className="p-8 text-center text-ink-dim">暂无赛程数据。</Card>;
   }
@@ -151,7 +173,7 @@ function MatchSchedule({ matches }: { matches: StatboticsMatch[] }) {
         return (
           <div key={match.key ?? `${level}-${match.set_number ?? 0}-${match.match_number ?? 0}`}>
             {showGroup ? <h3 className="mb-2 section-label">{group}</h3> : null}
-            <MatchCard match={match} />
+            <MatchCard match={match} teamData={teamData} />
           </div>
         );
       })}
@@ -159,36 +181,32 @@ function MatchSchedule({ matches }: { matches: StatboticsMatch[] }) {
   );
 }
 
-function MatchCard({ match }: { match: StatboticsMatch }) {
-  const redTeams = teams(match.alliances?.red?.team_keys ?? match.red_alliance);
-  const blueTeams = teams(match.alliances?.blue?.team_keys ?? match.blue_alliance);
-  const redScore = match.alliances?.red?.score ?? match.red_score ?? null;
-  const blueScore = match.alliances?.blue?.score ?? match.blue_score ?? null;
-  const hasScore = redScore != null && redScore >= 0 && blueScore != null;
-  const predRed = match.pred?.red_score ?? match.epa?.red?.total ?? null;
-  const predBlue = match.pred?.blue_score ?? match.epa?.blue?.total ?? null;
+function MatchCard({ match, teamData }: { match: CombinedMatch; teamData: TeamData }) {
+  const redTeams = teams(match.tba?.alliances?.red?.team_keys ?? match.alliances?.red?.team_keys ?? match.red_alliance);
+  const blueTeams = teams(match.tba?.alliances?.blue?.team_keys ?? match.alliances?.blue?.team_keys ?? match.blue_alliance);
+  const score = resolveScore({ match, redTeams, blueTeams, teamData });
   const winProb = match.pred?.red_win_prob ?? match.pred?.win_prob ?? null;
-  const winner = match.winning_alliance || (hasScore ? (redScore > blueScore ? "red" : blueScore > redScore ? "blue" : "tie") : null);
+  const winner = score.winner;
 
   return (
     <Card className="p-3">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase text-ink-faint">{matchLabel(match)}</span>
-        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", hasScore ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn")}>
-          {hasScore ? "已完成" : "未开始"}
+        <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", score.source === "tba" ? "bg-ok/10 text-ok" : "bg-warn/10 text-warn")}>
+          {score.label}
         </span>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
         <AllianceBlock
           color="red"
           winner={winner === "red"}
-          score={hasScore ? redScore : predRed}
+          score={score.red}
           teams={redTeams}
-          predicted={!hasScore}
+          predicted={score.source !== "tba"}
         />
         <div className="grid justify-items-center gap-1 text-xs text-ink-faint">
           <span className="font-semibold uppercase">对阵</span>
-          {winProb != null ? (
+          {score.source === "statbotics" && winProb != null ? (
             <>
               <div className="h-1.5 w-20 overflow-hidden rounded-full bg-line">
                 <div className="h-full rounded-full bg-danger" style={{ width: `${Math.round(winProb * 100)}%` }} />
@@ -196,14 +214,14 @@ function MatchCard({ match }: { match: StatboticsMatch }) {
               <span>红方 {Math.round(winProb * 100)}%</span>
             </>
           ) : null}
-          {!hasScore && predRed != null && predBlue != null ? <span>{Math.round(predRed)} - {Math.round(predBlue)}</span> : null}
+          {score.source !== "tba" && score.red != null && score.blue != null ? <span>{Math.round(score.red)} - {Math.round(score.blue)}</span> : null}
         </div>
         <AllianceBlock
           color="blue"
           winner={winner === "blue"}
-          score={hasScore ? blueScore : predBlue}
+          score={score.blue}
           teams={blueTeams}
-          predicted={!hasScore}
+          predicted={score.source !== "tba"}
         />
       </div>
     </Card>
@@ -296,6 +314,108 @@ function EpaRankings({ teamEvents }: { teamEvents: TeamEvent[] }) {
 
 function teams(values: Array<string | number> | undefined) {
   return (values ?? []).map((team) => String(team).replace(/^frc/, ""));
+}
+
+function mergeMatches(statboticsMatches: StatboticsMatch[], tbaMatches: TbaMatch[]): CombinedMatch[] {
+  const byKey = new Map<string, CombinedMatch>();
+  for (const match of statboticsMatches) byKey.set(matchIdentity(match), { ...match });
+  for (const tba of tbaMatches) {
+    const key = matchIdentity(tba);
+    const existing = byKey.get(key);
+    byKey.set(key, {
+      ...existing,
+      ...copyScheduleFields(tba),
+      tba,
+      pred: existing?.pred,
+      epa: existing?.epa,
+    });
+  }
+  return [...byKey.values()];
+}
+
+function copyScheduleFields(match: TbaMatch): StatboticsMatch {
+  return {
+    key: match.key,
+    comp_level: match.comp_level,
+    set_number: match.set_number,
+    match_number: match.match_number,
+    winning_alliance: match.winning_alliance,
+    alliances: match.alliances,
+  };
+}
+
+function matchIdentity(match: Pick<StatboticsMatch, "key" | "comp_level" | "set_number" | "match_number">) {
+  return match.key ?? `${match.comp_level ?? "qm"}-${match.set_number ?? 0}-${match.match_number ?? 0}`;
+}
+
+function resolveScore({
+  match,
+  redTeams,
+  blueTeams,
+  teamData,
+}: {
+  match: CombinedMatch;
+  redTeams: string[];
+  blueTeams: string[];
+  teamData: TeamData;
+}): {
+  red: number | null;
+  blue: number | null;
+  source: "tba" | "composite" | "statbotics" | "none";
+  label: string;
+  winner: string | null;
+} {
+  const redTba = match.tba?.alliances?.red?.score ?? null;
+  const blueTba = match.tba?.alliances?.blue?.score ?? null;
+  const hasTbaScore = redTba != null && redTba >= 0 && blueTba != null && blueTba >= 0;
+  if (hasTbaScore) {
+    return {
+      red: redTba,
+      blue: blueTba,
+      source: "tba",
+      label: "已完成",
+      winner: match.tba?.winning_alliance || (redTba > blueTba ? "red" : blueTba > redTba ? "blue" : "tie"),
+    };
+  }
+
+  const redComposite = allianceCompositeScore(redTeams, teamData);
+  const blueComposite = allianceCompositeScore(blueTeams, teamData);
+  if (redComposite != null && blueComposite != null) {
+    return {
+      red: redComposite,
+      blue: blueComposite,
+      source: "composite",
+      label: "综合分预测",
+      winner: null,
+    };
+  }
+
+  const redStatbotics = match.pred?.red_score ?? match.epa?.red?.total ?? null;
+  const blueStatbotics = match.pred?.blue_score ?? match.epa?.blue?.total ?? null;
+  if (redStatbotics != null && blueStatbotics != null) {
+    return {
+      red: redStatbotics,
+      blue: blueStatbotics,
+      source: "statbotics",
+      label: "Statbotics 预测",
+      winner: null,
+    };
+  }
+
+  return {
+    red: null,
+    blue: null,
+    source: "none",
+    label: "未开始",
+    winner: null,
+  };
+}
+
+function allianceCompositeScore(teamNumbers: string[], teamData: TeamData): number | null {
+  if (teamNumbers.length !== 3) return null;
+  const values = teamNumbers.map((team) => teamData[team]?.avgTotal);
+  if (values.some((value) => value == null || !Number.isFinite(value))) return null;
+  return values.reduce((sum, value) => sum + (value ?? 0), 0);
 }
 
 function levelLabel(level: string) {

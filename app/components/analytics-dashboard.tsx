@@ -242,7 +242,7 @@ export function AnalyticsDashboard({
       ) : null}
 
       {teams.length && tab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} /> : null}
+      {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
 
       {pickModalOpen ? (
         <PickListModal
