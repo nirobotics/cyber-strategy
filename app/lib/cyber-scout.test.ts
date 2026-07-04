@@ -57,6 +57,7 @@ describe("cyber-scout dataset conversion", () => {
       avgTele: 74,
       avgAccuracy: 80,
       avgDriver: 5,
+      avgDefense: 4,
       avgFuel: 5,
       malfunctions: 0,
       disabledEvents: 0,

@@ -27,6 +27,7 @@ export type TeamSummary = {
   avgTele: number;
   avgAccuracy: number;
   avgDriver: number;
+  avgDefense?: number;
   avgFuel: number;
   malfunctions: number;
   commsIssues: number;
@@ -126,6 +127,7 @@ export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): Te
     avgTele: avg(matchList.map((match) => match.telePts)),
     avgAccuracy: avg(matchList.map((match) => match.accuracy).filter((value) => value !== null)),
     avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
+    avgDefense: avg(matchList.map((match) => match.defenseRating).filter((value) => value > 0)),
     avgFuel: avg(matchList.map((match) => match.fuelRating).filter((value) => value > 0)),
     malfunctions: matchList.filter((match) => match.botState === 3 || match.botState === 4).length,
     commsIssues: matchList.filter((match) => match.botState === 2).length,

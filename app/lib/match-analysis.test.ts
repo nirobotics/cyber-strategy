@@ -142,6 +142,7 @@ function summary(team: string, avgTotal: number): TeamSummary {
     avgTele: avgTotal * 0.75,
     avgAccuracy: 80,
     avgDriver: 4,
+    avgDefense: 2,
     avgFuel: 3,
     malfunctions: 0,
     commsIssues: 0,

@@ -318,7 +318,7 @@ function TeamDetail({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
         <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
         <Stat label="自动贡献" value={team.avgAuto} sub="分" />
         <Stat label="手动贡献" value={team.avgTele} sub="分" />
@@ -326,7 +326,8 @@ function TeamDetail({
         <Stat label="可靠性" value={`${reliability(team)}%`} sub={`${team.malfunctions} 次故障`} />
         <Stat label="标准差" value={`±${team.stdDev}`} sub="稳定性" />
         <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} sub="最低 / 最高" />
-        <Stat label="驾驶" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
+        <Stat label="Drive score" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
+        <Stat label="Defence score" value={defenceScore(team)} sub={<RatingDots value={defenceScore(team)} />} />
       </div>
 
       {photos.length ? (
@@ -861,6 +862,15 @@ export function ratingDotClassName(active: boolean) {
   return cn("size-1.5 rounded-full", active ? "bg-brand" : "bg-line");
 }
 
+function defenceScore(team: TeamSummary) {
+  return team.avgDefense || averagePositive(team.matches.map((match) => match.defenseRating));
+}
+
+function averagePositive(values: number[]) {
+  const positive = values.filter((value) => value > 0);
+  return positive.length ? Math.round((positive.reduce((sum, value) => sum + value, 0) / positive.length) * 10) / 10 : 0;
+}
+
 function PointsBar({ value, max }: { value: number; max: number }) {
   return (
     <div className="flex min-w-32 items-center gap-2">
@@ -1093,12 +1103,12 @@ function compareRadarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
   return {
     type: "radar",
     data: {
-      labels: ["驾驶", "BPS", "命中率", "可靠性", "稳定性"],
+      labels: ["Drive score", "Defence score", "BPS", "命中率", "可靠性", "稳定性"],
       datasets: teams.map((team, index) => {
         const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
         return {
           label: `Team ${team.team}`,
-          data: [team.avgDriver, team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency],
+          data: [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency],
           borderColor: palette.colors[index],
           backgroundColor: `${palette.colors[index]}22`,
           pointBackgroundColor: palette.colors[index],
