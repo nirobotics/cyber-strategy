@@ -120,8 +120,15 @@ export function sortedMatches(matches: CombinedMatch[]): CombinedMatch[] {
   return [...matches].sort((a, b) => {
     const levelDiff = (levelOrder[a.comp_level ?? "qm"] ?? 0) - (levelOrder[b.comp_level ?? "qm"] ?? 0);
     if (levelDiff) return levelDiff;
-    return (a.match_number ?? a.set_number ?? 0) - (b.match_number ?? b.set_number ?? 0);
+    const [aPrimary, aSecondary] = matchSortNumbers(a);
+    const [bPrimary, bSecondary] = matchSortNumbers(b);
+    return aPrimary - bPrimary || aSecondary - bSecondary;
   });
+}
+
+function matchSortNumbers(match: Pick<CombinedMatch, "comp_level" | "match_number" | "set_number">): [number, number] {
+  if ((match.comp_level ?? "qm") === "qm") return [match.match_number ?? 0, match.set_number ?? 0];
+  return [match.set_number ?? match.match_number ?? 0, match.match_number ?? 0];
 }
 
 export function matchTeams(match: CombinedMatch, color: "red" | "blue"): string[] {

@@ -4,6 +4,7 @@ import {
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
+  sortedMatches,
   strategyScoreSd,
   strategyWinProbability,
   type CombinedMatch,
@@ -125,6 +126,26 @@ describe("match analysis calculations", () => {
       auto: 12,
       tele: 30,
     });
+  });
+
+  it("sorts playoff matches by set number before match number", () => {
+    const sorted = sortedMatches([
+      { comp_level: "ef", set_number: 10, match_number: 1 },
+      { comp_level: "ef", set_number: 13, match_number: 1 },
+      { comp_level: "ef", set_number: 1, match_number: 1 },
+      { comp_level: "ef", set_number: 9, match_number: 1 },
+      { comp_level: "qm", match_number: 2 },
+      { comp_level: "qm", match_number: 1 },
+    ]);
+
+    expect(sorted.map((match) => `${match.comp_level}:${match.set_number ?? match.match_number}`)).toEqual([
+      "qm:1",
+      "qm:2",
+      "ef:1",
+      "ef:9",
+      "ef:10",
+      "ef:13",
+    ]);
   });
 });
 
