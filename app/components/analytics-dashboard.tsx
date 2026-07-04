@@ -859,15 +859,10 @@ function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number
   return (
     <div className="aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2">
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full" aria-label="自动路线预览">
-        <defs>
-          <pattern id="auto-route-grid" width="10" height="10" patternUnits="userSpaceOnUse">
-            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.4" className="text-line" />
-          </pattern>
-        </defs>
-        <rect width="100" height="100" fill="url(#auto-route-grid)" />
-        <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        <image href="/pit-field-map.webp" width="100" height="100" preserveAspectRatio="none" />
+        <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         {points.map((point, index) => (
-          <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="2.6" fill="rgb(var(--brand))" vectorEffect="non-scaling-stroke" />
+          <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="2.6" fill="rgb(var(--brand))" stroke="white" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
         ))}
       </svg>
     </div>
