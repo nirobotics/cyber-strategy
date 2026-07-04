@@ -1,4 +1,5 @@
 import { Outlet, useLocation, useNavigation } from "react-router";
+import { Route as StrategyIcon } from "lucide-react";
 import type { Route } from "./+types/_app";
 import { AppShell } from "../components/app-shell";
 import { useAuth } from "../hooks/useAuth";
@@ -29,6 +30,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
       allowGuest={AUTH_MODE === "guest-compatible"}
       busy={busy}
       onLogin={() => startFeishuLogin(location.pathname)}
+      Icon={StrategyIcon}
     >
       <Outlet context={{ user }} />
     </AppShell>
