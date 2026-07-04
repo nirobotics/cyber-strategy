@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Search,
   Settings,
+  ShieldCheck,
   Table2,
   Trash2,
   X,
@@ -171,10 +172,19 @@ export function AnalyticsDashboard({
             Picklist
           </SegmentedTab>
           {isAdmin ? (
-            <NavLink to="/admin" className="btn">
-              <Settings className="size-4" />
-              管理
-            </NavLink>
+            <>
+              <NavLink
+                to={`/scouting-lead?event=${encodeURIComponent(selectedEventKey ?? dataset.eventKey)}`}
+                className="btn"
+              >
+                <ShieldCheck className="size-4" />
+                Scouting Lead
+              </NavLink>
+              <NavLink to="/admin" className="btn">
+                <Settings className="size-4" />
+                管理
+              </NavLink>
+            </>
           ) : null}
         </div>
       </div>
