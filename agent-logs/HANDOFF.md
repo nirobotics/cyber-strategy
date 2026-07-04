@@ -34,3 +34,28 @@
 - 飞书后台需配置本地和生产 OAuth callback。
 - 生产应设置 `FEISHU_ALLOWED_TENANT_KEYS`。
 - 需要用户提供 Vercel/Supabase 登录态或 token 后，才能完成个人组织项目创建、迁移、env 配置和生产部署。
+
+---
+
+## 2026-07-04 · Phase 1 个人组织 Supabase / Vercel 接入
+
+**当前状态**：GitHub、Supabase、Vercel 已接入用户个人组织/账号；生产部署 Ready。飞书 app id/secret 仍待用户在 Vercel 中补齐。
+
+**本轮完成**：
+- GitHub 仓库：`dbdangyi/cyber-strategy`，`main` 已推送。
+- Supabase 项目：`cyber-strategy` / `gxsxtwcbmfpdpcrpfdhk` / `https://gxsxtwcbmfpdpcrpfdhk.supabase.co`。
+- 通过 Supabase Management API 应用 `supabase/migrations/0001_init.sql`。
+- Vercel 项目：`dbdang-yi-s-projects/cyber-strategy`，已连接 GitHub。
+- Vercel env 已配置：`SESSION_SECRET`、`SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`APP_BASE_URL`。
+- 生产部署 Ready：`https://cyber-strategy.vercel.app`。
+
+**验证**：
+- Supabase 表存在：`profiles`、`scouting_datasets`、`audit_logs`。
+- Vercel production deployment Ready：`dpl_9cozvLVN59N6CrNoUuyK9WNCisKp`。
+- 线上 smoke：`/` 302 到 `/auth/login?returnTo=%2F`，`/auth/login` 返回 200。
+
+**风险 / 待办**：
+- 用户仍需在 Vercel 配置 `FEISHU_APP_ID`、`FEISHU_APP_SECRET`，建议同时配置 `FEISHU_ALLOWED_TENANT_KEYS`。
+- 飞书后台需添加生产回调：`https://cyber-strategy.vercel.app/api/auth/callback`。
+- 首次飞书登录后，需在 Supabase 将首个管理员 `profiles.is_admin` 置为 `true`。
+- 本轮使用过的 Vercel token 与 Supabase token 已出现在对话中；部署完成后建议用户轮换。
