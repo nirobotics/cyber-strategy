@@ -63,7 +63,7 @@ export type ScoutConfidenceCalibration = {
 };
 
 export type ScoutConfidenceReviewItem = {
-  kind: "high-confidence-wrong" | "low-confidence" | "disagreement";
+  kind: "disagreement";
   matchNumber: number;
   scoutName: string | null;
   team: string | null;
@@ -267,31 +267,8 @@ function buildCalibration(predictions: ScoutConfidencePrediction[]): ScoutConfid
 
 function buildReviewQueue(predictions: ScoutConfidencePrediction[]): ScoutConfidenceReviewItem[] {
   const items: ScoutConfidenceReviewItem[] = [];
-  for (const prediction of predictions) {
-    if (prediction.outcome === "wrong" && (prediction.confidence ?? 0) >= 4) {
-      items.push({
-        kind: "high-confidence-wrong",
-        matchNumber: prediction.matchNumber,
-        scoutName: prediction.scoutName,
-        team: prediction.team,
-        confidence: prediction.confidence,
-        message: `高信心预测错误：Q${prediction.matchNumber} Team ${prediction.team}`,
-      });
-    }
-    if (prediction.outcome !== "incomplete" && (prediction.confidence ?? 0) <= 2) {
-      items.push({
-        kind: "low-confidence",
-        matchNumber: prediction.matchNumber,
-        scoutName: prediction.scoutName,
-        team: prediction.team,
-        confidence: prediction.confidence,
-        message: `低信心记录：Q${prediction.matchNumber} Team ${prediction.team}`,
-      });
-    }
-  }
-
   for (const match of buildMatches(predictions)) {
-    if (!match.hasDisagreement) continue;
+    if (Math.min(match.redPredictions, match.bluePredictions) < 2) continue;
     items.push({
       kind: "disagreement",
       matchNumber: match.matchNumber,
@@ -302,7 +279,7 @@ function buildReviewQueue(predictions: ScoutConfidencePrediction[]): ScoutConfid
     });
   }
 
-  return items.sort((a, b) => a.matchNumber - b.matchNumber || kindOrder(a.kind) - kindOrder(b.kind));
+  return items.sort((a, b) => a.matchNumber - b.matchNumber);
 }
 
 function buildActualWinnerMap(matches: ConfidenceTbaMatch[]): Map<number, ActualWinner> {
@@ -364,8 +341,4 @@ function average(values: number[]): number | null {
   const finite = values.filter((value) => Number.isFinite(value));
   if (!finite.length) return null;
   return finite.reduce((sum, value) => sum + value, 0) / finite.length;
-}
-
-function kindOrder(kind: ScoutConfidenceReviewItem["kind"]) {
-  return { "high-confidence-wrong": 0, disagreement: 1, "low-confidence": 2 }[kind];
 }

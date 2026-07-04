@@ -260,14 +260,14 @@ function CalibrationList({ rows }: { rows: ScoutConfidenceCalibration[] }) {
 }
 
 function ReviewQueue({ items }: { items: ScoutConfidenceReviewItem[] }) {
-  if (!items.length) return <EmptyState text="暂无需要复盘的信心分记录。" />;
+  if (!items.length) return <EmptyState text="暂无大分歧比赛。" />;
 
   return (
     <div className="max-h-[420px] divide-y divide-line overflow-auto">
       {items.slice(0, 40).map((item, index) => (
         <div key={`${item.kind}-${item.matchNumber}-${item.scoutName ?? "match"}-${item.team ?? index}`} className="p-3 text-sm">
           <div className="flex items-center gap-2">
-            <AlertTriangle className={cn("size-4", item.kind === "high-confidence-wrong" ? "text-danger" : "text-warn")} />
+            <AlertTriangle className="size-4 text-warn" />
             <span className="font-semibold text-ink">{item.message}</span>
           </div>
           <p className="mt-1 text-xs text-ink-faint">
