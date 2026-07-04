@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cyber Apps"
+  short_description: "NI 内部 Cyber App 与统一视觉系统规范"
+  default_prompt: "使用 $cyber-apps 创建一个只允许内部飞书组织成员登录、符合统一 Cyber App 视觉系统的 NI Robotics 内部 Web App。"
