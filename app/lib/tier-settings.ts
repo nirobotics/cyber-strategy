@@ -1,15 +1,16 @@
-export const TIER_ORDER = ["Elite", "Strong", "Mid", "Low", "Struggling"] as const;
+export const RANKED_TIER_ORDER = ["Elite", "Strong", "Mid", "Low"] as const;
+export const TIER_ORDER = [...RANKED_TIER_ORDER, "Struggling"] as const;
 
 export type TierLabel = (typeof TIER_ORDER)[number];
-export type TierPercentages = Record<TierLabel, number>;
+export type RankedTierLabel = (typeof RANKED_TIER_ORDER)[number];
+export type TierPercentages = Record<RankedTierLabel, number>;
 export type TierInfo = { label: TierLabel; className: string };
 
 export const DEFAULT_TIER_PERCENTAGES: TierPercentages = {
   Elite: 10,
   Strong: 20,
   Mid: 40,
-  Low: 20,
-  Struggling: 10,
+  Low: 30,
 };
 
 const TIER_CLASS_NAMES: Record<TierLabel, string> = {
@@ -37,18 +38,29 @@ export function getTierForRank(rankIndex: number, totalTeams: number, percentage
   const percentile = (Math.max(rankIndex, 0) / total) * 100;
   let cumulative = 0;
 
-  for (const label of TIER_ORDER) {
+  for (const label of RANKED_TIER_ORDER) {
     cumulative += Math.max(0, percentages[label]);
-    if (percentile < cumulative || label === "Struggling") {
+    if (percentile < cumulative || label === "Low") {
       return { label, className: TIER_CLASS_NAMES[label] };
     }
   }
 
-  return { label: "Struggling", className: TIER_CLASS_NAMES.Struggling };
+  return { label: "Low", className: TIER_CLASS_NAMES.Low };
 }
 
-export function buildTierAssignments<T extends { team: string }>(teams: T[], percentages: TierPercentages = DEFAULT_TIER_PERCENTAGES) {
-  return new Map(teams.map((team, index) => [team.team, getTierForRank(index, teams.length, percentages)]));
+export function buildTierAssignments<T extends { team: string; avgTotal: number }>(teams: T[], percentages: TierPercentages = DEFAULT_TIER_PERCENTAGES) {
+  const rankedTeams = teams.filter((team) => team.avgTotal > 0);
+  const assignments = new Map<string, TierInfo>();
+
+  rankedTeams.forEach((team, index) => {
+    assignments.set(team.team, getTierForRank(index, rankedTeams.length, percentages));
+  });
+
+  for (const team of teams) {
+    if (team.avgTotal <= 0) assignments.set(team.team, { label: "Struggling", className: TIER_CLASS_NAMES.Struggling });
+  }
+
+  return assignments;
 }
 
 export function normalizeTierPercentages(raw: unknown): TierPercentages {
@@ -56,32 +68,37 @@ export function normalizeTierPercentages(raw: unknown): TierPercentages {
   const source = raw as Record<string, unknown>;
   const next = { ...DEFAULT_TIER_PERCENTAGES };
 
-  for (const label of TIER_ORDER) {
+  for (const label of RANKED_TIER_ORDER) {
     const value = Number(source[label]);
     if (Number.isFinite(value) && value >= 0 && value <= 100) {
       next[label] = round1(value);
     }
   }
 
+  const oldWatchValue = Number(source.Struggling);
+  if (validateTierPercentages(next) && Number.isFinite(oldWatchValue) && oldWatchValue >= 0 && oldWatchValue <= 100) {
+    next.Low = round1(next.Low + oldWatchValue);
+  }
+
   return validateTierPercentages(next) ? DEFAULT_TIER_PERCENTAGES : next;
 }
 
 export function validateTierPercentages(percentages: TierPercentages): string | null {
-  for (const label of TIER_ORDER) {
+  for (const label of RANKED_TIER_ORDER) {
     const value = percentages[label];
     if (!Number.isFinite(value) || value < 0 || value > 100) {
       return `${tierDisplayLabel(label)} 比例必须在 0 到 100 之间。`;
     }
   }
 
-  const total = round1(TIER_ORDER.reduce((sum, label) => sum + percentages[label], 0));
+  const total = round1(RANKED_TIER_ORDER.reduce((sum, label) => sum + percentages[label], 0));
   if (Math.abs(total - 100) > 0.01) return `比例总和必须等于 100%，当前为 ${total}%。`;
   return null;
 }
 
-export function parseTierPercentages(values: (label: TierLabel) => FormDataEntryValue | null): TierPercentages {
+export function parseTierPercentages(values: (label: RankedTierLabel) => FormDataEntryValue | null): TierPercentages {
   const next = { ...DEFAULT_TIER_PERCENTAGES };
-  for (const label of TIER_ORDER) {
+  for (const label of RANKED_TIER_ORDER) {
     const value = Number(values(label));
     next[label] = Number.isFinite(value) ? round1(value) : Number.NaN;
   }

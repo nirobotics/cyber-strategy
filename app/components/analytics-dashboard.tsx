@@ -7,9 +7,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  GripVertical,
   LineChart,
-  ListChecks,
   Search,
   Settings,
   Table2,
@@ -52,23 +50,15 @@ export function AnalyticsDashboard({
   const navigate = useNavigate();
   const teams = useMemo(() => sortedTeams(dataset.teamData), [dataset.teamData]);
   const tierByTeam = useMemo(() => buildTierAssignments(teams, tierPercentages), [teams, tierPercentages]);
+  const rankByTeam = useMemo(() => new Map(teams.map((team, index) => [team.team, index + 1])), [teams]);
   const [tab, setTab] = useState<Tab>("browser");
   const [selectedTeam, setSelectedTeam] = useState(() => teams[0]?.team ?? "");
   const [search, setSearch] = useState("");
   const [hiddenTeams, setHiddenTeams] = useStoredList(`cyber-strategy:hidden:${dataset.id}`);
-  const [dnpTeams, setDnpTeams] = useStoredList(`cyber-strategy:dnp:${dataset.id}`);
-  const [pickList, setPickList] = useStoredList(`cyber-strategy:pick:${dataset.id}`);
-  const [pickModalOpen, setPickModalOpen] = useState(false);
-  const [draggedTeam, setDraggedTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
 
   const hiddenSet = useMemo(() => new Set(hiddenTeams), [hiddenTeams]);
-  const dnpSet = useMemo(() => new Set(dnpTeams), [dnpTeams]);
-  const orderedTeams = useMemo(
-    () => orderTeams(teams, pickList, dnpSet, hiddenSet),
-    [teams, pickList, dnpSet, hiddenSet],
-  );
-  const visibleTeams = orderedTeams.filter((team) => team.team.includes(search.trim()));
+  const visibleTeams = teams.filter((team) => team.team.includes(search.trim()));
   const selected = dataset.teamData[selectedTeam] ?? teams[0];
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
 
@@ -107,16 +97,6 @@ export function AnalyticsDashboard({
 
   function toggleHidden(team: string) {
     setHiddenTeams((current) => toggleValue(current, team));
-  }
-
-  function reorder(from: string, to: string) {
-    if (from === to || dnpSet.has(from) || hiddenSet.has(from) || dnpSet.has(to) || hiddenSet.has(to)) return;
-    const active = orderedTeams.filter((team) => !dnpSet.has(team.team) && !hiddenSet.has(team.team)).map((team) => team.team);
-    const fromIndex = active.indexOf(from);
-    const toIndex = active.indexOf(to);
-    if (fromIndex === -1 || toIndex === -1) return;
-    active.splice(toIndex, 0, active.splice(fromIndex, 1)[0]);
-    setPickList(active);
   }
 
   return (
@@ -197,44 +177,21 @@ export function AnalyticsDashboard({
                 inputMode="numeric"
                 className="h-9"
               />
-              <Button
-                type="button"
-                variant={pickList.length || dnpTeams.length ? "active" : "default"}
-                onClick={() => setPickModalOpen(true)}
-                title="选队名单"
-                className="h-9 px-2"
-              >
-                <ListChecks className="size-4" />
-              </Button>
             </div>
             <div className="max-h-[460px] overflow-y-auto lg:max-h-[calc(100dvh-18rem)]">
-              {visibleTeams.map((team, index) => (
+              {visibleTeams.map((team) => (
                 <button
                   key={team.team}
                   type="button"
-                  draggable={!dnpSet.has(team.team) && !hiddenSet.has(team.team)}
-                  onDragStart={() => setDraggedTeam(team.team)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggedTeam) reorder(draggedTeam, team.team);
-                    setDraggedTeam(null);
-                  }}
                   onClick={() => setSelectedTeam(team.team)}
                   className={cn(
-                    "grid w-full grid-cols-[1.75rem_minmax(3.5rem,1fr)_auto_auto_auto] items-center gap-1.5 border-l-2 border-transparent px-2.5 py-2 text-left text-sm transition hover:bg-surface-2 sm:grid-cols-[auto_2rem_minmax(3.5rem,1fr)_auto_auto_auto]",
+                    "grid w-full grid-cols-[2rem_minmax(3.5rem,1fr)_auto_auto_auto] items-center gap-1.5 border-l-2 border-transparent px-2.5 py-2 text-left text-sm transition hover:bg-surface-2",
                     selected.team === team.team && "border-brand bg-brand/10 text-brand",
                     hiddenSet.has(team.team) && "opacity-40",
-                    dnpSet.has(team.team) && "opacity-45",
                   )}
                 >
-                  <GripVertical
-                    className={cn(
-                      "hidden size-4 text-ink-faint sm:block",
-                      (hiddenSet.has(team.team) || dnpSet.has(team.team)) && "opacity-0",
-                    )}
-                  />
                   <span className="text-right text-xs tabular-nums text-ink-faint">
-                    {hiddenSet.has(team.team) || dnpSet.has(team.team) ? "" : index + 1}
+                    {rankByTeam.get(team.team)}
                   </span>
                   <span className="min-w-0 whitespace-nowrap font-semibold tabular-nums">
                     {team.team}
@@ -278,20 +235,6 @@ export function AnalyticsDashboard({
 
       {teams.length && tab === "compare" ? <CompareTeams teams={teams} /> : null}
       {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
-
-      {pickModalOpen ? (
-        <PickListModal
-          teams={teams}
-          pickList={pickList}
-          dnpTeams={dnpTeams}
-          onClose={() => setPickModalOpen(false)}
-          onSave={(nextPickList, nextDnpTeams) => {
-            setPickList(nextPickList);
-            setDnpTeams(nextDnpTeams);
-            setPickModalOpen(false);
-          }}
-        />
-      ) : null}
 
       {lightbox ? (
         <PhotoLightbox
@@ -520,76 +463,6 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   );
 }
 
-function PickListModal({
-  teams,
-  pickList,
-  dnpTeams,
-  onClose,
-  onSave,
-}: {
-  teams: TeamSummary[];
-  pickList: string[];
-  dnpTeams: string[];
-  onClose: () => void;
-  onSave: (pickList: string[], dnpTeams: string[]) => void;
-}) {
-  const validTeams = useMemo(() => new Set(teams.map((team) => team.team)), [teams]);
-  const [pickText, setPickText] = useState((pickList.length ? pickList : teams.map((team) => team.team)).join("\n"));
-  const [dnpText, setDnpText] = useState(dnpTeams.join("\n"));
-
-  function parseList(value: string) {
-    return value
-      .split(/[\n,\s]+/)
-      .map((item) => item.trim())
-      .filter((item, index, items) => item && validTeams.has(item) && items.indexOf(item) === index);
-  }
-
-  return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-black/60 p-4" onMouseDown={onClose}>
-      <Card className="w-full max-w-lg p-4 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">选队名单</h2>
-          <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
-            <X className="size-4" />
-          </Button>
-        </div>
-        <div className="grid gap-3">
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-ink-dim">排序</span>
-            <textarea
-              value={pickText}
-              onChange={(event) => setPickText(event.target.value)}
-              className="input h-44 resize-none font-mono"
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-ink-dim">不选队伍</span>
-            <textarea
-              value={dnpText}
-              onChange={(event) => setDnpText(event.target.value)}
-              className="input h-24 resize-none font-mono"
-            />
-          </label>
-          <div className="flex gap-2">
-            <Button type="button" variant="primary" onClick={() => onSave(parseList(pickText), parseList(dnpText))}>
-              保存
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setPickText("");
-                setDnpText("");
-              }}
-            >
-              清空
-            </Button>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
 function PhotoLightbox({
   photos,
   index,
@@ -783,18 +656,6 @@ function clearSelectedEvent() {
 
 function toggleValue(values: string[], value: string) {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
-}
-
-function orderTeams(teams: TeamSummary[], pickList: string[], dnpSet: Set<string>, hiddenSet: Set<string>) {
-  const byTeam = new Map(teams.map((team) => [team.team, team]));
-  const base = pickList.length
-    ? [...pickList.filter((team) => byTeam.has(team)), ...teams.map((team) => team.team).filter((team) => !pickList.includes(team))]
-    : teams.map((team) => team.team);
-  const ordered = base.map((team) => byTeam.get(team)).filter(Boolean) as TeamSummary[];
-  const active = ordered.filter((team) => !dnpSet.has(team.team) && !hiddenSet.has(team.team));
-  const dnp = ordered.filter((team) => dnpSet.has(team.team) && !hiddenSet.has(team.team));
-  const hidden = ordered.filter((team) => hiddenSet.has(team.team));
-  return [...active, ...dnp, ...hidden];
 }
 
 function baseScales(palette: { muted: string; grid: string }) {

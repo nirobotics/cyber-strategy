@@ -183,9 +183,9 @@ function MatchCard({
         <AllianceBlock
           color="red"
           winner={score.winner === "red"}
-          score={score.displayRed}
+          actualScore={score.actualRed}
+          predictedScore={score.predictedRed}
           teams={redTeams}
-          predicted={score.source !== "tba"}
         />
         <div className="grid justify-items-center gap-1 text-xs text-ink-faint">
           <span className="font-semibold uppercase">对阵</span>
@@ -204,9 +204,9 @@ function MatchCard({
         <AllianceBlock
           color="blue"
           winner={score.winner === "blue"}
-          score={score.displayBlue}
+          actualScore={score.actualBlue}
+          predictedScore={score.predictedBlue}
           teams={blueTeams}
-          predicted={score.source !== "tba"}
         />
       </div>
     </button>
@@ -216,16 +216,18 @@ function MatchCard({
 function AllianceBlock({
   color,
   winner,
-  score,
+  actualScore,
+  predictedScore,
   teams,
-  predicted,
 }: {
   color: "red" | "blue";
   winner: boolean;
-  score: number | null;
+  actualScore: number | null;
+  predictedScore: number | null;
   teams: string[];
-  predicted: boolean;
 }) {
+  const hasActual = actualScore != null;
+  const primaryScore = hasActual ? actualScore : predictedScore;
   return (
     <div
       className={cn(
@@ -235,8 +237,11 @@ function AllianceBlock({
       )}
     >
       <div className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
-        {score == null ? "-" : predicted ? `~${Math.round(score)}` : Math.round(score)}
+        {primaryScore == null ? "-" : hasActual ? Math.round(primaryScore) : `~${Math.round(primaryScore)}`}
       </div>
+      {hasActual && predictedScore != null ? (
+        <div className="mt-0.5 text-[11px] font-medium text-ink-faint">预测 {Math.round(predictedScore)}</div>
+      ) : null}
       <div className="mt-1 text-xs leading-5 text-ink-dim">{teams.length ? teams.join(" · ") : "待定"}</div>
     </div>
   );

@@ -7,7 +7,7 @@ import { parseScoutingCsv } from "../lib/scouting";
 import { getTierPercentages, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
-  TIER_ORDER,
+  RANKED_TIER_ORDER,
   parseTierPercentages,
   tierDisplayLabel,
   validateTierPercentages,
@@ -134,15 +134,16 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
           <div>
             <p className="section-label">分档比例</p>
             <h2 className="text-lg font-semibold">综合均分排名</h2>
+            <p className="mt-1 text-sm text-ink-dim">综合分为 0 的队伍固定为待观察，不参与比例分档。</p>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">
-            合计 {TIER_ORDER.reduce((sum, label) => sum + loaderData.tierPercentages[label], 0)}%
+            合计 {RANKED_TIER_ORDER.reduce((sum, label) => sum + loaderData.tierPercentages[label], 0)}%
           </Badge>
         </div>
         <Form method="post" className="grid gap-3">
           <input type="hidden" name="intent" value="save-tier-percentages" />
-          <div className="grid gap-2 sm:grid-cols-5">
-            {TIER_ORDER.map((label) => (
+          <div className="grid gap-2 sm:grid-cols-4">
+            {RANKED_TIER_ORDER.map((label) => (
               <label key={label} className="grid gap-1 text-sm">
                 <span className="font-medium text-ink-dim">{tierDisplayLabel(label)}</span>
                 <div className="flex items-center gap-1">

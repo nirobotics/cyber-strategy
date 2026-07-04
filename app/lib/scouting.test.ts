@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseScoutingCsv, processCsvRows, reliability } from "./scouting";
-import { DEFAULT_TIER_PERCENTAGES, getTierForRank, validateTierPercentages } from "./tier-settings";
+import { buildTierAssignments, DEFAULT_TIER_PERCENTAGES, getTierForRank, normalizeTierPercentages, validateTierPercentages } from "./tier-settings";
 
 describe("scouting data processing", () => {
   it("computes Advantalytics team summaries from CSV rows", () => {
@@ -48,12 +48,33 @@ describe("scouting data processing", () => {
     expect(getTierForRank(1, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Strong");
     expect(getTierForRank(3, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Mid");
     expect(getTierForRank(7, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Low");
-    expect(getTierForRank(9, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Struggling");
+    expect(getTierForRank(9, 10, DEFAULT_TIER_PERCENTAGES).label).toBe("Low");
+  });
+
+  it("keeps zero-score teams in the watch tier outside percentages", () => {
+    const tiers = buildTierAssignments([
+      { team: "1", avgTotal: 100 },
+      { team: "2", avgTotal: 80 },
+      { team: "3", avgTotal: 0 },
+    ]);
+
+    expect(tiers.get("1")?.label).toBe("Elite");
+    expect(tiers.get("2")?.label).not.toBe("Struggling");
+    expect(tiers.get("3")?.label).toBe("Struggling");
   });
 
   it("validates editable tier percentages", () => {
     expect(validateTierPercentages(DEFAULT_TIER_PERCENTAGES)).toBeNull();
     expect(validateTierPercentages({ ...DEFAULT_TIER_PERCENTAGES, Elite: 11 })).toContain("100%");
+  });
+
+  it("converts old watch-tier percentages into the low tier", () => {
+    expect(normalizeTierPercentages({ Elite: 10, Strong: 20, Mid: 40, Low: 20, Struggling: 10 })).toEqual({
+      Elite: 10,
+      Strong: 20,
+      Mid: 40,
+      Low: 30,
+    });
   });
 });
 
