@@ -15,7 +15,7 @@ import {
   Table2,
   X,
 } from "lucide-react";
-import { NavLink } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import { MatchAnalysis } from "./match-analysis";
@@ -23,7 +23,9 @@ import {
   getTier,
   reliability,
   sortedTeams,
+  type DatasetSourceStatus,
   type ScoutingDataset,
+  type ScoutingEventOption,
   type ScoutingMatch,
   type TeamSummary,
 } from "../lib/scouting";
@@ -32,11 +34,18 @@ type Tab = "browser" | "compare" | "match";
 
 export function AnalyticsDashboard({
   dataset,
+  events,
+  selectedEventKey,
+  sourceStatus,
   isAdmin,
 }: {
   dataset: ScoutingDataset;
+  events: ScoutingEventOption[];
+  selectedEventKey: string | null;
+  sourceStatus: DatasetSourceStatus;
   isAdmin: boolean;
 }) {
+  const navigate = useNavigate();
   const teams = useMemo(() => sortedTeams(dataset.teamData), [dataset.teamData]);
   const [tab, setTab] = useState<Tab>("browser");
   const [selectedTeam, setSelectedTeam] = useState(() => teams[0]?.team ?? "");
@@ -58,6 +67,14 @@ export function AnalyticsDashboard({
   const selected = dataset.teamData[selectedTeam] ?? teams[0];
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
 
+  function selectEvent(eventKey: string) {
+    const params = new URLSearchParams(window.location.search);
+    if (eventKey) params.set("event", eventKey);
+    else params.delete("event");
+    const search = params.toString();
+    navigate(search ? `/?${search}` : "/");
+  }
+
   function toggleHidden(team: string) {
     setHiddenTeams((current) => toggleValue(current, team));
   }
@@ -74,15 +91,46 @@ export function AnalyticsDashboard({
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-      <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <p className="section-label">当前数据集</p>
           <h1 className="truncate text-xl font-semibold text-ink">{dataset.title}</h1>
-          <p className="truncate text-sm text-ink-dim">
-            {dataset.eventKey} · {teams.length} 支队伍 · {teams.reduce((sum, team) => sum + team.matchCount, 0)} 条记录
-          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-dim">
+            <span>{dataset.eventKey} · {teams.length} 支队伍 · {teams.reduce((sum, team) => sum + team.matchCount, 0)} 条记录</span>
+            <Badge
+              className={cn(
+                sourceStatus.source === "cyber-scout" && "border-ok/40 bg-ok/10 text-ok",
+                sourceStatus.source === "fallback" && "border-warn/40 bg-warn/10 text-warn",
+              )}
+            >
+              {sourceStatus.label}
+            </Badge>
+            <span className="text-xs text-ink-faint">
+              {sourceStatus.updatedAt ? new Date(sourceStatus.updatedAt).toLocaleString() : sourceStatus.message}
+            </span>
+          </div>
+          {sourceStatus.error ? <p className="mt-1 truncate text-xs text-danger">{sourceStatus.error}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="grid min-w-[170px] gap-1 text-sm">
+            <span className="sr-only">赛事</span>
+            <select
+              value={selectedEventKey ?? dataset.eventKey}
+              onChange={(event) => selectEvent(event.target.value)}
+              className="input h-9 font-sans"
+              disabled={!events.length}
+              title="选择 cyber-scout 赛事"
+            >
+              {!events.some((event) => event.eventKey === (selectedEventKey ?? dataset.eventKey)) ? (
+                <option value={selectedEventKey ?? dataset.eventKey}>{selectedEventKey ?? dataset.eventKey}</option>
+              ) : null}
+              {events.map((event) => (
+                <option key={event.eventKey} value={event.eventKey}>
+                  {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
           <SegmentedTab active={tab} value="browser" onClick={setTab} icon={<Bot className="size-4" />}>
             队伍浏览
           </SegmentedTab>
@@ -101,7 +149,13 @@ export function AnalyticsDashboard({
         </div>
       </div>
 
-      {tab === "browser" && selected ? (
+      {!teams.length ? (
+        <Card className="p-6 text-sm text-ink-dim">
+          当前赛事还没有可分析的队伍记录。请确认 cyber-scout 已上传普通/超级侦察记录，或在管理页保留备用 CSV 数据集。
+        </Card>
+      ) : null}
+
+      {teams.length && tab === "browser" && selected ? (
         <div className="grid min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
           <Card className="overflow-hidden p-0 lg:sticky lg:top-3 lg:max-h-[calc(100dvh-13rem)]">
             <div className="flex items-center gap-2 border-b border-line p-3">
@@ -156,7 +210,7 @@ export function AnalyticsDashboard({
                     {team.team}
                   </span>
                   <span className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                    {team.avgTotal} 均分
+                    {team.avgTotal} 综合均分
                   </span>
                   <TierBadge team={team} />
                   <span
@@ -187,7 +241,7 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
 
-      {tab === "compare" ? <CompareTeams teams={teams} /> : null}
+      {teams.length && tab === "compare" ? <CompareTeams teams={teams} /> : null}
       {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} /> : null}
 
       {pickModalOpen ? (
@@ -246,13 +300,13 @@ function TeamDetail({
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-        <Stat label="平均分" value={team.avgTotal} sub="每场" />
-        <Stat label="自动均分" value={team.avgAuto} sub="分" />
-        <Stat label="手动均分" value={team.avgTele} sub="分" />
-        <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} sub="得分球" />
+        <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
+        <Stat label="自动贡献" value={team.avgAuto} sub="分" />
+        <Stat label="手动贡献" value={team.avgTele} sub="分" />
+        <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} sub="Scout" />
         <Stat label="可靠性" value={`${reliability(team)}%`} sub={`${team.malfunctions} 次故障`} />
         <Stat label="标准差" value={`±${team.stdDev}`} sub="稳定性" />
-        <Stat label="分数范围" value={`${team.minPts}–${team.maxPts}`} sub="最低 / 最高" />
+        <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} sub="最低 / 最高" />
         <Stat label="驾驶" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
       </div>
 
@@ -281,10 +335,10 @@ function TeamDetail({
         <Card className="p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-dim">
             <LineChart className="size-4" />
-            逐场得分
+            逐场综合分
           </h3>
           <ChartCanvas
-            label={`队伍 ${team.team} 逐场得分`}
+            label={`队伍 ${team.team} 逐场综合分`}
             configKey={`team-line:${team.team}:${team.matches.map((match) => match.totalPts).join(",")}`}
             buildConfig={(palette) => teamLineConfig(team, palette)}
           />
@@ -292,10 +346,10 @@ function TeamDetail({
         <Card className="p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-dim">
             <BarChart3 className="size-4" />
-            自动 / 手动拆分
+            自动 / 手动贡献
           </h3>
           <ChartCanvas
-            label={`队伍 ${team.team} 自动和手动得分拆分`}
+            label={`队伍 ${team.team} 自动和手动贡献拆分`}
             configKey={`team-bars:${team.team}:${team.matches.map((match) => `${match.autoPts}/${match.telePts}`).join(",")}`}
             buildConfig={(palette) => teamBarConfig(team, palette)}
           />
@@ -311,9 +365,9 @@ function TeamDetail({
             <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
               <tr>
                 <th className="px-3 py-2 text-left">场次</th>
-                <th className="px-3 py-2 text-left">总分</th>
-                <th className="px-3 py-2 text-left">自动</th>
-                <th className="px-3 py-2 text-left">手动</th>
+                <th className="px-3 py-2 text-left">综合分</th>
+                <th className="px-3 py-2 text-left">自动贡献</th>
+                <th className="px-3 py-2 text-left">手动贡献</th>
                 <th className="px-3 py-2 text-left">命中率</th>
                 <th className="px-3 py-2 text-left">状态</th>
                 <th className="px-3 py-2 text-left">备注</th>
@@ -370,7 +424,7 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
               >
                 {teams.map((team) => (
                   <option key={team.team} value={team.team}>
-                    队伍 {team.team}（{team.avgTotal} 均分）
+                    队伍 {team.team}（{team.avgTotal} 综合均分）
                   </option>
                 ))}
               </select>
@@ -384,26 +438,26 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
 
       <div className="grid gap-3 xl:grid-cols-2">
         <Card className="p-4 xl:col-span-2">
-          <h3 className="mb-3 text-sm font-semibold text-ink-dim">逐场得分</h3>
+          <h3 className="mb-3 text-sm font-semibold text-ink-dim">逐场综合分</h3>
           <ChartCanvas
-            label="队伍逐场得分对比"
+            label="队伍逐场综合分对比"
             className="h-80"
             configKey={`cmp-line:${selectedTeams.join(",")}`}
             buildConfig={(palette) => compareLineConfig(compared, palette)}
           />
         </Card>
         <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink-dim">自动 / 手动均分</h3>
+          <h3 className="mb-3 text-sm font-semibold text-ink-dim">自动 / 手动贡献</h3>
           <ChartCanvas
-            label="自动和手动均分对比"
+            label="自动和手动贡献对比"
             configKey={`cmp-bar:${selectedTeams.join(",")}`}
             buildConfig={(palette) => compareBarConfig(compared, palette)}
           />
         </Card>
         <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink-dim">得分球命中率</h3>
+          <h3 className="mb-3 text-sm font-semibold text-ink-dim">Scout 命中率</h3>
           <ChartCanvas
-            label="得分球命中率对比"
+            label="Scout 命中率对比"
             configKey={`cmp-accuracy:${selectedTeams.join(",")}`}
             buildConfig={(palette) => compareAccuracyConfig(compared, palette)}
           />
@@ -417,9 +471,9 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
           />
         </Card>
         <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink-dim">分数范围</h3>
+          <h3 className="mb-3 text-sm font-semibold text-ink-dim">综合分范围</h3>
           <ChartCanvas
-            label="队伍分数范围对比"
+            label="队伍综合分范围对比"
             configKey={`cmp-range:${selectedTeams.join(",")}`}
             buildConfig={(palette) => compareRangeConfig(compared, palette)}
           />
@@ -589,7 +643,7 @@ function RatingDots({ value }: { value: number }) {
   const rounded = Math.round(value);
   return (
     <span className="flex gap-1">
-      {[1, 2, 3, 4].map((dot) => (
+      {[1, 2, 3, 4, 5].map((dot) => (
         <span key={dot} className={cn("size-1.5 rounded-full bg-line", dot <= rounded && "bg-brand")} />
       ))}
     </span>
@@ -639,6 +693,8 @@ function botStateLabel(match: ScoutingMatch) {
     "comms issue": "通信问题",
     "minor malfunction": "轻微故障",
     "major malfunction": "严重故障",
+    "no show": "未到场",
+    incap: "宕机",
     unknown: "未知",
   };
   if (byText[normalized]) return byText[normalized];
@@ -704,7 +760,7 @@ function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: str
       labels: team.matches.map((match) => `M${match.match}`),
       datasets: [
         {
-          label: "总分",
+          label: "综合分",
           data: team.matches.map((match) => match.totalPts),
           borderColor: palette.accent,
           backgroundColor: `${palette.accent}18`,
@@ -733,8 +789,8 @@ function teamBarConfig(team: TeamSummary, palette: { accent: string; muted: stri
     data: {
       labels: team.matches.map((match) => `M${match.match}`),
       datasets: [
-        { label: "自动", data: team.matches.map((match) => match.autoPts), backgroundColor: palette.accent, stack: "points" },
-        { label: "手动", data: team.matches.map((match) => match.telePts), backgroundColor: "#16a34a", stack: "points" },
+        { label: "自动贡献", data: team.matches.map((match) => match.autoPts), backgroundColor: palette.accent, stack: "points" },
+        { label: "手动贡献", data: team.matches.map((match) => match.telePts), backgroundColor: "#16a34a", stack: "points" },
       ],
     },
     options: {
@@ -771,7 +827,7 @@ function compareLineConfig(teams: TeamSummary[], palette: ChartPaletteLike): Cha
       plugins: { legend: { labels: { color: palette.muted, boxWidth: 10 } }, tooltip: tooltipOptions(palette) },
       scales: {
         x: { type: "linear", title: { display: true, text: "场次", color: palette.muted }, ticks: { color: palette.muted }, grid: { color: palette.grid } },
-        y: { title: { display: true, text: "得分", color: palette.muted }, ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
+        y: { title: { display: true, text: "综合分", color: palette.muted }, ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
       },
     },
   } as ChartConfiguration;
@@ -783,8 +839,8 @@ function compareBarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Char
     data: {
       labels: teams.map((team) => `队伍 ${team.team}`),
       datasets: [
-        { label: "自动均分", data: teams.map((team) => team.avgAuto), backgroundColor: teams.map((_, index) => palette.colors[index]) },
-        { label: "手动均分", data: teams.map((team) => team.avgTele), backgroundColor: teams.map((_, index) => `${palette.colors[index]}66`) },
+        { label: "自动贡献", data: teams.map((team) => team.avgAuto), backgroundColor: teams.map((_, index) => palette.colors[index]) },
+        { label: "手动贡献", data: teams.map((team) => team.avgTele), backgroundColor: teams.map((_, index) => `${palette.colors[index]}66`) },
       ],
     },
     options: {
@@ -801,7 +857,7 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
     type: "bar",
     data: {
       labels: teams.map((team) => `队伍 ${team.team}`),
-      datasets: [{ label: "得分球命中率 %", data: teams.map((team) => team.avgAccuracy), backgroundColor: teams.map((_, index) => palette.colors[index]) }],
+      datasets: [{ label: "Scout 命中率 %", data: teams.map((team) => team.avgAccuracy), backgroundColor: teams.map((_, index) => palette.colors[index]) }],
     },
     options: {
       indexAxis: "y",
@@ -820,12 +876,12 @@ function compareRadarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
   return {
     type: "radar",
     data: {
-      labels: ["驾驶", "取球", "命中率", "可靠性", "稳定性"],
+      labels: ["驾驶", "BPS", "命中率", "可靠性", "稳定性"],
       datasets: teams.map((team, index) => {
-        const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 4);
+        const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
         return {
           label: `队伍 ${team.team}`,
-          data: [team.avgDriver, team.avgFuel, team.avgAccuracy / 25, (reliability(team) / 100) * 4, consistency],
+          data: [team.avgDriver, team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency],
           borderColor: palette.colors[index],
           backgroundColor: `${palette.colors[index]}22`,
           pointBackgroundColor: palette.colors[index],
@@ -839,7 +895,7 @@ function compareRadarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
       scales: {
         r: {
           min: 0,
-          max: 4,
+          max: 5,
           ticks: { display: false },
           pointLabels: { color: palette.muted },
           grid: { color: palette.grid },

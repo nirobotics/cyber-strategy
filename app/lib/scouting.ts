@@ -59,6 +59,21 @@ export type ScoutingDataset = ScoutingDatasetPayload & {
   updatedAt: string | null;
 };
 
+export type ScoutingEventOption = {
+  eventKey: string;
+  name: string;
+  isActive: boolean;
+  updatedAt: string | null;
+};
+
+export type DatasetSourceStatus = {
+  source: "cyber-scout" | "fallback";
+  label: string;
+  message: string;
+  updatedAt: string | null;
+  error?: string;
+};
+
 export type TierLabel = "Elite" | "Strong" | "Mid" | "Low" | "Struggling";
 
 type CsvRow = Record<string, unknown>;
@@ -97,37 +112,43 @@ export function processCsvRows(rows: CsvRow[]): TeamData {
   for (const [team, matches] of byTeam.entries()) {
     matches.sort((a, b) => integer(a.Match) - integer(b.Match));
     const matchList = matches.map(toMatch);
-    if (!matchList.length) continue;
-
-    const pts = matchList.map((match) => match.totalPts);
-    const avgTotal = avg(pts);
-    const half = Math.floor(matchList.length / 2);
-    const firstHalfAvg = half > 0 ? avg(pts.slice(0, half)) : avgTotal;
-    const secondHalfAvg = avg(pts.slice(half));
-    const variance = pts.reduce((sum, value) => sum + (value - avgTotal) ** 2, 0) / matchList.length;
-
-    result[team] = {
-      team,
-      avgTotal,
-      avgAuto: avg(matchList.map((match) => match.autoPts)),
-      avgTele: avg(matchList.map((match) => match.telePts)),
-      avgAccuracy: avg(matchList.map((match) => match.accuracy).filter((value) => value !== null)),
-      avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
-      avgFuel: avg(matchList.map((match) => match.fuelRating).filter((value) => value > 0)),
-      malfunctions: matchList.filter((match) => match.botState === 3 || match.botState === 4).length,
-      commsIssues: matchList.filter((match) => match.botState === 2).length,
-      disabledEvents: matchList.filter((match) => match.disabled).length,
-      matchCount: matchList.length,
-      trend: secondHalfAvg > firstHalfAvg + 5 ? "up" : secondHalfAvg < firstHalfAvg - 5 ? "down" : "stable",
-      firstHalfAvg,
-      secondHalfAvg,
-      stdDev: round1(Math.sqrt(variance)),
-      minPts: Math.min(...pts),
-      maxPts: Math.max(...pts),
-      matches: matchList,
-    };
+    const summary = summarizeTeamMatches(team, matchList);
+    if (summary) result[team] = summary;
   }
   return result;
+}
+
+export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): TeamSummary | null {
+  const matchList = [...matches].sort((a, b) => a.match - b.match);
+  if (!matchList.length) return null;
+
+  const pts = matchList.map((match) => match.totalPts);
+  const avgTotal = avg(pts);
+  const half = Math.floor(matchList.length / 2);
+  const firstHalfAvg = half > 0 ? avg(pts.slice(0, half)) : avgTotal;
+  const secondHalfAvg = avg(pts.slice(half));
+  const variance = pts.reduce((sum, value) => sum + (value - avgTotal) ** 2, 0) / matchList.length;
+
+  return {
+    team,
+    avgTotal,
+    avgAuto: avg(matchList.map((match) => match.autoPts)),
+    avgTele: avg(matchList.map((match) => match.telePts)),
+    avgAccuracy: avg(matchList.map((match) => match.accuracy).filter((value) => value !== null)),
+    avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
+    avgFuel: avg(matchList.map((match) => match.fuelRating).filter((value) => value > 0)),
+    malfunctions: matchList.filter((match) => match.botState === 3 || match.botState === 4).length,
+    commsIssues: matchList.filter((match) => match.botState === 2).length,
+    disabledEvents: matchList.filter((match) => match.disabled).length,
+    matchCount: matchList.length,
+    trend: secondHalfAvg > firstHalfAvg + 5 ? "up" : secondHalfAvg < firstHalfAvg - 5 ? "down" : "stable",
+    firstHalfAvg,
+    secondHalfAvg,
+    stdDev: round1(Math.sqrt(variance)),
+    minPts: Math.min(...pts),
+    maxPts: Math.max(...pts),
+    matches: matchList,
+  };
 }
 
 export function sortedTeams(teamData: TeamData): TeamSummary[] {
