@@ -44,6 +44,15 @@ export type TeamSummary = {
 
 export type TeamData = Record<string, TeamSummary>;
 export type TeamPhotos = Record<string, string[]>;
+export type AutoRoutePoint = { x: number; y: number };
+export type TeamPitInfo = {
+  canCrossTrench: boolean;
+  isSwerve: boolean;
+  drivetrain: string;
+  swerveModule: string;
+  autoRoutes: Array<{ id: string; points: AutoRoutePoint[] }>;
+};
+export type TeamPitData = Record<string, TeamPitInfo>;
 
 export type ScoutingDatasetPayload = {
   title: string;
@@ -51,6 +60,7 @@ export type ScoutingDatasetPayload = {
   sourceFilename?: string | null;
   teamData: TeamData;
   teamPhotos: TeamPhotos;
+  teamPitData?: TeamPitData;
 };
 
 export type ScoutingDataset = ScoutingDatasetPayload & {

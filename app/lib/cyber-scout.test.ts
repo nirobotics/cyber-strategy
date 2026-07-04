@@ -44,13 +44,25 @@ describe("cyber-scout dataset conversion", () => {
           accuracy: [80, 50, 0],
           comments: ["clean", "fine", ""],
         }, "2026-07-04T00:10:00.000Z"),
-        pit(8214, ["event-1/pit-8214/1.jpg"]),
+        pit(8214, ["event-1/pit-8214/1.jpg"], {
+          drivetrain: "Swerve",
+          swerveModule: "SDS MK5i",
+          canCrossTrench: true,
+          autoRoutes: [{ id: "route-a", points: [{ x: 10, y: 20 }, { x: 90, y: 80 }] }],
+        }),
       ],
     });
 
     expect(dataset.id).toBe("cyber-scout-2026test");
     expect(dataset.updatedAt).toBe("2026-07-04T00:10:00.000Z");
     expect(dataset.teamPhotos["8214"]).toEqual(["/api/cyber-scout/photos?path=event-1%2Fpit-8214%2F1.jpg"]);
+    expect(dataset.teamPitData?.["8214"]).toMatchObject({
+      canCrossTrench: true,
+      isSwerve: true,
+      drivetrain: "Swerve",
+      swerveModule: "SDS MK5i",
+      autoRoutes: [{ id: "route-a", points: [{ x: 10, y: 20 }, { x: 90, y: 80 }] }],
+    });
     expect(dataset.teamData["8214"]).toMatchObject({
       avgTotal: 84,
       avgAuto: 10,
@@ -164,13 +176,13 @@ function superRecord(
   };
 }
 
-function pit(team: number, photoPaths: string[]): CyberScoutRecordRow {
+function pit(team: number, photoPaths: string[], payload: Record<string, unknown> = {}): CyberScoutRecordRow {
   return {
     id: `pit-${team}`,
     record_type: "pit",
     match_number: null,
     team_number: team,
-    payload: { teamNumber: team, photoPaths },
+    payload: { teamNumber: team, photoPaths, ...payload },
     uploaded_at: "2026-07-04T00:05:00.000Z",
     client_created_at: null,
     created_at: null,

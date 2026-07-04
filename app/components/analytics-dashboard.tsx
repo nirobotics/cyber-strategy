@@ -10,6 +10,7 @@ import {
   GripVertical,
   LineChart,
   ListChecks,
+  Map as MapIcon,
   Plus,
   RotateCcw,
   Search,
@@ -30,6 +31,7 @@ import {
   type ScoutingDataset,
   type ScoutingEventOption,
   type ScoutingMatch,
+  type TeamPitInfo,
   type TeamSummary,
 } from "../lib/scouting";
 import {
@@ -258,6 +260,7 @@ export function AnalyticsDashboard({
             team={selected}
             tier={tierByTeam.get(selected.team)}
             photos={photos}
+            pitInfo={dataset.teamPitData?.[selected.team]}
             onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
           />
         </div>
@@ -280,6 +283,7 @@ export function AnalyticsDashboard({
           team={detail}
           tier={tierByTeam.get(detail.team)}
           photos={dataset.teamPhotos[detail.team] ?? []}
+          pitInfo={dataset.teamPitData?.[detail.team]}
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
         />
@@ -301,13 +305,16 @@ function TeamDetail({
   team,
   tier,
   photos,
+  pitInfo,
   onOpenPhoto,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
   photos: string[];
+  pitInfo?: TeamPitInfo;
   onOpenPhoto: (index: number) => void;
 }) {
+  const [routeOpen, setRouteOpen] = useState(false);
   const trendText = team.trend === "up" ? "上升" : team.trend === "down" ? "下降" : "稳定";
   return (
     <div className="min-w-0 space-y-3">
@@ -323,6 +330,14 @@ function TeamDetail({
         >
           {trendText}
         </Badge>
+        {pitInfo?.canCrossTrench ? <Badge className="border-info/40 bg-info/10 text-info">trench</Badge> : null}
+        {pitInfo?.isSwerve ? <Badge className="border-brand/40 bg-brand/10 text-brand">swerve</Badge> : null}
+        {pitInfo?.autoRoutes.length ? (
+          <Button type="button" className="h-8 px-2" onClick={() => setRouteOpen(true)}>
+            <MapIcon className="size-4" />
+            自动路线
+          </Button>
+        ) : null}
         <span className="text-sm text-ink-dim">
           前半程 {team.firstHalfAvg} → 后半程 {team.secondHalfAvg}
         </span>
@@ -426,6 +441,7 @@ function TeamDetail({
           </table>
         </div>
       </Card>
+      {routeOpen && pitInfo ? <AutoRouteModal team={team.team} pitInfo={pitInfo} onClose={() => setRouteOpen(false)} /> : null}
     </div>
   );
 }
@@ -743,12 +759,14 @@ function TeamDetailModal({
   team,
   tier,
   photos,
+  pitInfo,
   onOpenPhoto,
   onClose,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
   photos: string[];
+  pitInfo?: TeamPitInfo;
   onOpenPhoto: (index: number) => void;
   onClose: () => void;
 }) {
@@ -776,9 +794,82 @@ function TeamDetailModal({
           </Button>
         </div>
         <div className="overflow-y-auto p-3 md:p-4">
-          <TeamDetail team={team} tier={tier} photos={photos} onOpenPhoto={onOpenPhoto} />
+          <TeamDetail team={team} tier={tier} photos={photos} pitInfo={pitInfo} onOpenPhoto={onOpenPhoto} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function AutoRouteModal({ team, pitInfo, onClose }: { team: string; pitInfo: TeamPitInfo; onClose: () => void }) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 p-3 md:p-6" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <div
+        className="mx-auto flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-card border border-line bg-bg shadow-xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
+          <div className="min-w-0">
+            <p className="section-label">Pit 自动路线</p>
+            <h2 className="truncate text-lg font-semibold text-ink">Team {team}</h2>
+          </div>
+          <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="grid gap-3 overflow-y-auto p-3 md:p-4">
+          <div className="flex flex-wrap gap-2 text-sm text-ink-dim">
+            {pitInfo.drivetrain ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.drivetrain}</Badge> : null}
+            {pitInfo.swerveModule ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.swerveModule}</Badge> : null}
+            {pitInfo.canCrossTrench ? <Badge className="border-info/40 bg-info/10 text-info">trench</Badge> : null}
+            {pitInfo.isSwerve ? <Badge className="border-brand/40 bg-brand/10 text-brand">swerve</Badge> : null}
+          </div>
+          {pitInfo.autoRoutes.map((route, index) => (
+            <div key={route.id} className="rounded-md border border-line bg-surface p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-ink">路线 {index + 1}</h3>
+                <span className="text-xs text-ink-faint">{route.points.length} 个点</span>
+              </div>
+              <AutoRoutePreview points={route.points} />
+              <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
+                {route.points.map((point, pointIndex) => (
+                  <span key={`${point.x}-${point.y}-${pointIndex}`} className="rounded-full bg-surface-2 px-2 py-0.5 tabular-nums">
+                    P{pointIndex + 1} {round1(point.x)}, {round1(point.y)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number]["points"] }) {
+  const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+  return (
+    <div className="aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full" aria-label="自动路线预览">
+        <defs>
+          <pattern id="auto-route-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.4" className="text-line" />
+          </pattern>
+        </defs>
+        <rect width="100" height="100" fill="url(#auto-route-grid)" />
+        <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {points.map((point, index) => (
+          <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="2.6" fill="rgb(var(--brand))" vectorEffect="non-scaling-stroke" />
+        ))}
+      </svg>
     </div>
   );
 }
@@ -886,6 +977,10 @@ export function ratingDotClassName(active: boolean) {
 
 function defenceScore(team: TeamSummary) {
   return team.avgDefense || averagePositive(team.matches.map((match) => match.defenseRating));
+}
+
+function round1(value: number) {
+  return Math.round(value * 10) / 10;
 }
 
 function averagePositive(values: number[]) {

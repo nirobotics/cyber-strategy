@@ -2,6 +2,7 @@ import {
   summarizeTeamMatches,
   type ScoutingDataset,
   type ScoutingMatch,
+  type TeamPitData,
   type TeamData,
   type TeamPhotos,
 } from "./scouting";
@@ -53,6 +54,11 @@ type SuperRecord = {
 type PitRecord = {
   team: string;
   photoPaths: string[];
+  canCrossTrench: boolean;
+  isSwerve: boolean;
+  drivetrain: string;
+  swerveModule: string;
+  autoRoutes: Array<{ id: string; points: Array<{ x: number; y: number }> }>;
   sourceAt: number;
 };
 
@@ -101,6 +107,7 @@ export function buildCyberScoutDataset({
     sourceFilename: "cyber-scout realtime",
     teamData,
     teamPhotos: buildTeamPhotos(pitByTeam),
+    teamPitData: buildTeamPitData(pitByTeam),
     isActive: event.is_active,
     createdAt: null,
     updatedAt: latestTimestamp(records) ?? event.updated_at,
@@ -167,9 +174,21 @@ function addPitRecord(map: Map<string, PitRecord>, row: CyberScoutRecordRow) {
   const photoPaths = arrayValue(payload.photoPaths).filter((value): value is string =>
     typeof value === "string" && isSafeCyberScoutPhotoPath(value),
   );
-  if (!photoPaths.length) return;
+  const drivetrain = drivetrainValue(payload.drivetrain ?? payload.dt);
+  const autoRoutes = autoRouteArray(payload.autoRoutes ?? payload.ar);
+  const record = {
+    team,
+    photoPaths,
+    canCrossTrench: booleanValue(payload.canCrossTrench ?? payload.ct),
+    isSwerve: drivetrain === "Swerve",
+    drivetrain,
+    swerveModule: stringValue(payload.swerveModule ?? payload.sm),
+    autoRoutes,
+    sourceAt: rowTimestamp(row),
+  };
+  if (!photoPaths.length && !record.drivetrain && !record.canCrossTrench && !record.autoRoutes.length) return;
 
-  upsertLatest(map, team, { team, photoPaths, sourceAt: rowTimestamp(row) });
+  upsertLatest(map, team, record);
 }
 
 function toScoutingMatch({
@@ -247,6 +266,20 @@ function buildTeamPhotos(pitByTeam: Map<string, PitRecord>): TeamPhotos {
   return photos;
 }
 
+function buildTeamPitData(pitByTeam: Map<string, PitRecord>): TeamPitData {
+  const pitData: TeamPitData = {};
+  for (const [team, record] of pitByTeam.entries()) {
+    pitData[team] = {
+      canCrossTrench: record.canCrossTrench,
+      isSwerve: record.isSwerve,
+      drivetrain: record.drivetrain,
+      swerveModule: record.swerveModule,
+      autoRoutes: record.autoRoutes,
+    };
+  }
+  return pitData;
+}
+
 function latestTimestamp(rows: CyberScoutRecordRow[]) {
   return rows
     .map((row) => row.uploaded_at ?? row.client_created_at ?? row.created_at)
@@ -294,6 +327,31 @@ function timedPeriodsMs(value: unknown): number {
     const end = numberValue(item.endMs);
     return sum + Math.max(0, end - start);
   }, 0);
+}
+
+function autoRouteArray(value: unknown): Array<{ id: string; points: Array<{ x: number; y: number }> }> {
+  return arrayValue(value)
+    .map((route, index) => {
+      const item = objectPayload(route);
+      const points = arrayValue(item.points ?? item.pts)
+        .map((point) => {
+          const value = objectPayload(point);
+          const x = numberValue(value.x, Number.NaN);
+          const y = numberValue(value.y, Number.NaN);
+          return Number.isFinite(x) && Number.isFinite(y) ? { x: clamp(x, 0, 100), y: clamp(y, 0, 100) } : null;
+        })
+        .filter((point): point is { x: number; y: number } => Boolean(point));
+      return points.length ? { id: stringValue(item.id) || `route-${index + 1}`, points } : null;
+    })
+    .filter((route): route is { id: string; points: Array<{ x: number; y: number }> } => Boolean(route));
+}
+
+function drivetrainValue(value: unknown): string {
+  if (value === "sw") return "Swerve";
+  if (value === "tk") return "坦克";
+  if (value === "mc") return "麦克纳母轮";
+  if (value === "ot") return "其他";
+  return stringValue(value);
 }
 
 function normalizeAccuracy(value: number | null | undefined) {
