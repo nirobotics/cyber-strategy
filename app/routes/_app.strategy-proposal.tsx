@@ -21,11 +21,13 @@ import { reliability, type ScoutingDataset, type TeamSummary } from "../lib/scou
 import {
   listStrategyProposals,
   reviewStrategyProposal,
+  restoreApprovedStrategyProposal,
   saveStrategyProposal,
 } from "../lib/strategy-proposals.server";
 import {
   autoWinners,
-  canEditProposal,
+  canEditProposalAs,
+  canRestoreApprovedSnapshot,
   canReviewProposal,
   normalizeProposalPayload,
   ownStrategyTeams,
@@ -94,6 +96,7 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
       const proposal = await saveStrategyProposal({
         id: String(formData.get("id") || "") || null,
         actorOpenId: user.feishuOpenId,
+        isAdmin: admin,
         submit: intent === "submit",
         eventKey,
         matchKey: String(formData.get("matchKey") || ""),
@@ -102,6 +105,15 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
         proposalType: String(formData.get("proposalType") || ""),
         title: String(formData.get("title") || ""),
         payload: parsePayload(String(formData.get("payload") || "{}")),
+      });
+      throw redirect(proposalPath(eventKey, proposal.id));
+    }
+
+    if (intent === "restore") {
+      const proposal = await restoreApprovedStrategyProposal({
+        id: String(formData.get("id") || ""),
+        actorOpenId: user.feishuOpenId,
+        isAdmin: admin,
       });
       throw redirect(proposalPath(eventKey, proposal.id));
     }
@@ -157,8 +169,11 @@ function StrategyProposalPage({
   const selectedMatch = loaderData.matches.find((match) => match.key === editor.matchKey) ?? loaderData.matches[0] ?? null;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
-  const editable = canEditProposal(selected, loaderData.user.feishuOpenId);
+  const editable = canEditProposalAs(selected, loaderData.user.feishuOpenId, loaderData.isAdmin);
   const reviewer = canReviewProposal(selected, loaderData.isAdmin);
+  const restorable = canRestoreApprovedSnapshot(selected, loaderData.user.feishuOpenId, loaderData.isAdmin);
+  const creatorEditingApproved = Boolean(selected?.status === "approved" && selected.createdBy === loaderData.user.feishuOpenId && !loaderData.isAdmin);
+  const adminEditingApproved = Boolean(selected?.status === "approved" && loaderData.isAdmin);
   const filteredProposals = loaderData.proposals.filter((proposal) =>
     (typeFilter === "all" || proposal.proposalType === typeFilter) &&
     (statusFilter === "all" || proposal.status === statusFilter)
@@ -388,17 +403,32 @@ function StrategyProposalPage({
             />
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
+              {restorable ? (
+                <Button type="submit" name="intent" value="restore" disabled={busy}>
+                  <Undo2 className="size-4" />
+                  恢复到已通过版本
+                </Button>
+              ) : null}
               {editable ? (
-                <>
-                  <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
-                    <Save className="size-4" />
-                    保存草稿
-                  </Button>
+                creatorEditingApproved ? (
                   <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
                     <Send className="size-4" />
-                    提交审核
+                    修改并提交审核
                   </Button>
-                </>
+                ) : (
+                  <>
+                    <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
+                      <Save className="size-4" />
+                      {adminEditingApproved ? "保存并保持通过" : "保存草稿"}
+                    </Button>
+                    {!adminEditingApproved ? (
+                      <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
+                        <Send className="size-4" />
+                        提交审核
+                      </Button>
+                    ) : null}
+                  </>
+                )
               ) : (
                 <span className="text-sm text-ink-dim">当前状态不可编辑。</span>
               )}

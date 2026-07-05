@@ -34,6 +34,18 @@ export type PartnerStrategyPayload = {
 
 export type StrategyProposalPayload = AutoProposalPayload | SelfStrategyPayload | PartnerStrategyPayload;
 
+export type StrategyProposalSnapshot = {
+  matchKey: string;
+  matchLabel: string;
+  ownTeam: OwnStrategyTeam;
+  proposalType: StrategyProposalType;
+  title: string;
+  payload: StrategyProposalPayload;
+  reviewedBy: string | null;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+};
+
 export type StrategyProposal = {
   id: string;
   eventKey: string;
@@ -50,6 +62,7 @@ export type StrategyProposal = {
   reviewNote: string | null;
   submittedAt: string | null;
   reviewedAt: string | null;
+  lastApprovedSnapshot: StrategyProposalSnapshot | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -104,6 +117,22 @@ export function normalizeProposalPayload(type: StrategyProposalType, value: unkn
   };
 }
 
+export function normalizeProposalSnapshot(value: unknown): StrategyProposalSnapshot | null {
+  const record = objectValue(value);
+  if (!isProposalType(record.proposalType)) return null;
+  return {
+    matchKey: stringValue(record.matchKey),
+    matchLabel: stringValue(record.matchLabel),
+    ownTeam: normalizeOwnTeam(record.ownTeam),
+    proposalType: record.proposalType,
+    title: stringValue(record.title),
+    payload: normalizeProposalPayload(record.proposalType, record.payload),
+    reviewedBy: typeof record.reviewedBy === "string" ? record.reviewedBy : null,
+    reviewNote: typeof record.reviewNote === "string" ? record.reviewNote : null,
+    reviewedAt: typeof record.reviewedAt === "string" ? record.reviewedAt : null,
+  };
+}
+
 export function normalizeRouteMap(value: unknown): RouteMap {
   const record = objectValue(value);
   const routes: RouteMap = {};
@@ -116,8 +145,17 @@ export function normalizeRouteMap(value: unknown): RouteMap {
 }
 
 export function canEditProposal(proposal: Pick<StrategyProposal, "createdBy" | "status"> | null, openId: string) {
+  return canEditProposalAs(proposal, openId, false);
+}
+
+export function canEditProposalAs(
+  proposal: Pick<StrategyProposal, "createdBy" | "status"> | null,
+  openId: string,
+  isAdmin: boolean,
+) {
   if (!proposal) return true;
-  return proposal.createdBy === openId && (proposal.status === "draft" || proposal.status === "rejected");
+  if (isAdmin) return true;
+  return proposal.createdBy === openId && (proposal.status === "draft" || proposal.status === "rejected" || proposal.status === "approved");
 }
 
 export function canSubmitProposal(proposal: Pick<StrategyProposal, "createdBy" | "status"> | null, openId: string) {
@@ -126,6 +164,36 @@ export function canSubmitProposal(proposal: Pick<StrategyProposal, "createdBy" |
 
 export function canReviewProposal(proposal: Pick<StrategyProposal, "status"> | null, isAdmin: boolean) {
   return Boolean(isAdmin && proposal?.status === "submitted");
+}
+
+export function canRestoreApprovedSnapshot(
+  proposal: Pick<StrategyProposal, "createdBy" | "status" | "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload"> | null,
+  openId: string,
+  isAdmin: boolean,
+) {
+  return Boolean(proposal?.lastApprovedSnapshot && (isAdmin || proposal.createdBy === openId) && !proposalMatchesSnapshot(proposal));
+}
+
+export function proposalMatchesSnapshot(
+  proposal: Pick<StrategyProposal, "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload">,
+) {
+  const snapshot = proposal.lastApprovedSnapshot;
+  if (!snapshot) return false;
+  return JSON.stringify({
+    matchKey: proposal.matchKey,
+    matchLabel: proposal.matchLabel,
+    ownTeam: proposal.ownTeam,
+    proposalType: proposal.proposalType,
+    title: proposal.title,
+    payload: proposal.payload,
+  }) === JSON.stringify({
+    matchKey: snapshot.matchKey,
+    matchLabel: snapshot.matchLabel,
+    ownTeam: snapshot.ownTeam,
+    proposalType: snapshot.proposalType,
+    title: snapshot.title,
+    payload: snapshot.payload,
+  });
 }
 
 function normalizePoints(value: unknown): RoutePoint[] {

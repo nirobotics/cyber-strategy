@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canEditProposal,
+  canEditProposalAs,
+  canRestoreApprovedSnapshot,
   canReviewProposal,
   normalizeOwnTeam,
   normalizeProposalPayload,
@@ -76,10 +78,40 @@ describe("strategy proposal helpers", () => {
     expect(canEditProposal(proposal("draft"), "u1")).toBe(true);
     expect(canEditProposal(proposal("rejected"), "u1")).toBe(true);
     expect(canEditProposal(proposal("submitted"), "u1")).toBe(false);
-    expect(canEditProposal(proposal("approved"), "u1")).toBe(false);
+    expect(canEditProposal(proposal("approved"), "u1")).toBe(true);
+    expect(canEditProposalAs(proposal("submitted"), "u2", true)).toBe(true);
     expect(canReviewProposal(proposal("submitted"), true)).toBe(true);
     expect(canReviewProposal(proposal("draft"), true)).toBe(false);
     expect(canReviewProposal(proposal("submitted"), false)).toBe(false);
+  });
+
+  it("allows restoring a changed proposal to the last approved snapshot", () => {
+    const changed = {
+      ...proposal("submitted"),
+      matchKey: "qm1",
+      matchLabel: "Q1",
+      ownTeam: "8214" as const,
+      proposalType: "auto" as const,
+      title: "Changed",
+      payload: normalizeProposalPayload("auto", { note: "new" }),
+      lastApprovedSnapshot: {
+        matchKey: "qm1",
+        matchLabel: "Q1",
+        ownTeam: "8214" as const,
+        proposalType: "auto" as const,
+        title: "Approved",
+        payload: normalizeProposalPayload("auto", { note: "old" }),
+        reviewedBy: "admin",
+        reviewNote: null,
+        reviewedAt: "2026-07-05T00:00:00.000Z",
+      },
+    };
+    const unchanged = { ...changed, title: "Approved", payload: normalizeProposalPayload("auto", { note: "old" }) };
+
+    expect(canRestoreApprovedSnapshot(changed, "u1", false)).toBe(true);
+    expect(canRestoreApprovedSnapshot(changed, "u2", false)).toBe(false);
+    expect(canRestoreApprovedSnapshot(changed, "u2", true)).toBe(true);
+    expect(canRestoreApprovedSnapshot(unchanged, "u1", false)).toBe(false);
   });
 });
 
