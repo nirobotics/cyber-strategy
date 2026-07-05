@@ -73,6 +73,11 @@ export function normalizeOwnTeam(value: unknown): OwnStrategyTeam {
   return value === "9635" ? "9635" : "8214";
 }
 
+export function proposalMatchesOwnTeamQuery(proposal: Pick<StrategyProposal, "ownTeam">, query: string) {
+  const teamQuery = query.replace(/\D/g, "");
+  return !teamQuery || proposal.ownTeam.includes(teamQuery);
+}
+
 export function isProposalType(value: unknown): value is StrategyProposalType {
   return proposalTypes.includes(value as StrategyProposalType);
 }

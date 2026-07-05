@@ -7,6 +7,7 @@ import {
   canReviewProposal,
   normalizeOwnTeam,
   normalizeProposalPayload,
+  proposalMatchesOwnTeamQuery,
   proposalMatchesSnapshot,
   strategyProposalTitle,
   type StrategyProposal,
@@ -151,6 +152,12 @@ describe("strategy proposal helpers", () => {
         reviewedAt: "2026-07-05T00:00:00.000Z",
       },
     })).toBe(true);
+  });
+
+  it("searches proposals by own team, not every team in the match", () => {
+    expect(proposalMatchesOwnTeamQuery({ ownTeam: "8214" }, "9635")).toBe(false);
+    expect(proposalMatchesOwnTeamQuery({ ownTeam: "9635" }, "9635")).toBe(true);
+    expect(proposalMatchesOwnTeamQuery({ ownTeam: "8214" }, "Team 82")).toBe(true);
   });
 });
 

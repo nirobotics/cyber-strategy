@@ -29,6 +29,7 @@ import {
   canRestoreApprovedSnapshot,
   canReviewProposal,
   proposalMatchesSnapshot,
+  proposalMatchesOwnTeamQuery,
   normalizeProposalPayload,
   ownStrategyTeams,
   proposalStatuses,
@@ -101,7 +102,6 @@ export function StrategyProposalPanel({
   const reviewer = canReviewProposal(selected, data.isAdmin);
   const restorable = canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && data.isAdmin);
-  const matchByKey = new Map(data.matches.map((match) => [match.key, match]));
   const teamFilterDigits = teamFilter.replace(/\D/g, "");
   const matchFilterOptions = data.matches.filter((match) => proposalMatchMatchesTeamQuery(match, teamFilter));
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
@@ -116,7 +116,7 @@ export function StrategyProposalPanel({
     (typeFilter === "all" || proposal.proposalType === typeFilter) &&
     (statusFilter === "all" || proposal.status === statusFilter) &&
     (matchFilter === "all" || proposal.matchKey === matchFilter) &&
-    (!teamFilterDigits || proposal.ownTeam.includes(teamFilterDigits) || proposalMatchMatchesTeamQuery(matchByKey.get(proposal.matchKey) ?? emptyProposalMatch(proposal), teamFilter))
+    proposalMatchesOwnTeamQuery(proposal, teamFilterDigits)
   );
   const teamDetail = detailTeam ? data.dataset.teamData[detailTeam] : null;
 
@@ -268,8 +268,8 @@ export function StrategyProposalPanel({
               onChange={(event) => updateTeamFilter(event.target.value)}
               inputMode="numeric"
               className="input h-9 font-sans"
-              placeholder="按队号查找"
-              aria-label="按队号查找 proposal"
+              placeholder="按己方队号查找"
+              aria-label="按己方队号查找 proposal"
             />
             <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value)} className="input h-9 font-sans">
               <option value="all">所有己方比赛</option>
@@ -545,10 +545,6 @@ function PayloadEditor({
       onChange={onChange}
     />
   );
-}
-
-function emptyProposalMatch(proposal: StrategyProposal): ProposalMatch {
-  return { key: proposal.matchKey, label: proposal.matchLabel, redTeams: [proposal.ownTeam], blueTeams: [] };
 }
 
 function AutoProposalEditor({
