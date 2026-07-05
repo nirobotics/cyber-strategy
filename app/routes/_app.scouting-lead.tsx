@@ -13,8 +13,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { Form, Link, redirect, useActionData, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.scouting-lead";
 import { Badge, Button, Card, Input, cn } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
@@ -34,7 +34,7 @@ import type {
   ScoutConfidenceReviewItem,
 } from "../lib/scout-confidence";
 
-type ActionData = { error?: string };
+type ActionData = { error?: string; ok?: boolean; view?: LeadView };
 type LeadView = "confidence" | "records" | "assignments";
 
 const leadViews: Array<{ id: LeadView; label: string; icon: ReactNode }> = [
@@ -50,7 +50,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return loadScoutConfidenceForRequest(request);
 }
 
-export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
+export async function action({ request }: Route.ActionArgs): Promise<ActionData> {
   await requireAdmin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
@@ -59,7 +59,7 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
   try {
     if (intent === "delete-record") {
       await deleteCyberScoutRecord(String(formData.get("recordId") || ""));
-      throw redirect(scopingLeadPath(event, "records"));
+      return { ok: true, view: "records" };
     }
 
     if (intent === "save-assignment") {
@@ -71,12 +71,12 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
         position: String(formData.get("position") || ""),
         userName: String(formData.get("userName") || ""),
       });
-      throw redirect(scopingLeadPath(event, "assignments"));
+      return { ok: true, view: "assignments" };
     }
 
     if (intent === "delete-assignment") {
       await deleteCyberScoutAssignment(String(formData.get("assignmentId") || ""));
-      throw redirect(scopingLeadPath(event, "assignments"));
+      return { ok: true, view: "assignments" };
     }
   } catch (error) {
     if (error instanceof Response) throw error;
@@ -89,9 +89,8 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
 export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const navigation = useNavigation();
-  const actionData = useActionData<ActionData>();
   const [searchParams] = useSearchParams();
-  const view = readView(searchParams.get("view"));
+  const [view, setView] = useState<LeadView>(() => readView(searchParams.get("view")));
   const { report, events, selectedEventKey, sourceStatus, leadData } = loaderData;
   const busy = navigation.state !== "idle";
 
@@ -103,9 +102,8 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
   }
 
   function selectView(next: LeadView) {
-    const params = new URLSearchParams(searchParams);
-    params.set("view", next);
-    navigate(`/scouting-lead?${params.toString()}`);
+    setView(next);
+    replaceLeadViewUrl(searchParams, next);
   }
 
   return (
@@ -153,8 +151,6 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
           </Button>
         ))}
       </div>
-
-      {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
 
       {view === "confidence" ? <ConfidenceView report={report} /> : null}
       {view === "records" ? <RecordsView eventKey={selectedEventKey} schedule={leadData.recordSchedule} busy={busy} /> : null}
@@ -325,7 +321,14 @@ function RecordModal({
   busy: boolean;
   onClose: () => void;
 }) {
+  const recordFetcher = useFetcher<ActionData>();
   const records = [...selected.cell.normalRecords, ...selected.cell.superRecords];
+  const deleting = busy || recordFetcher.state !== "idle";
+
+  useEffect(() => {
+    if (recordFetcher.data?.ok) onClose();
+  }, [recordFetcher.data, onClose]);
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-3" role="dialog" aria-modal="true" onMouseDown={onClose}>
       <Card className="max-h-[86vh] w-full max-w-2xl overflow-hidden p-0" onMouseDown={(event) => event.stopPropagation()}>
@@ -339,6 +342,7 @@ function RecordModal({
           </Button>
         </div>
         <div className="grid max-h-[70vh] gap-3 overflow-y-auto p-3">
+          {recordFetcher.data?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{recordFetcher.data.error}</Card> : null}
           {records.length ? records.map((record) => (
             <div key={record.id} className="rounded-md border border-line bg-surface-2 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
@@ -354,14 +358,14 @@ function RecordModal({
                     上传 {formatDate(record.uploadedAt)} · 本地创建 {formatDate(record.clientCreatedAt)}
                   </p>
                 </div>
-                <Form method="post">
+                <recordFetcher.Form method="post">
                   <input type="hidden" name="intent" value="delete-record" />
                   <input type="hidden" name="event" value={eventKey ?? ""} />
                   <input type="hidden" name="view" value="records" />
                   <input type="hidden" name="recordId" value={record.id} />
                   <Button
                     type="submit"
-                    disabled={busy}
+                    disabled={deleting}
                     className="border-danger/40 text-danger hover:bg-danger/10"
                     onClick={(event) => {
                       if (!confirm("确认删除这条 cyber-scout 原始记录？")) event.preventDefault();
@@ -370,7 +374,7 @@ function RecordModal({
                     <Trash2 className="size-4" />
                     删除
                   </Button>
-                </Form>
+                </recordFetcher.Form>
               </div>
             </div>
           )) : (
@@ -427,23 +431,7 @@ function AssignmentsView({
             {assignments.map((assignment) => (
               <div key={assignment.id} className="grid gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                 <AssignmentForm eventKey={eventKey} assignment={assignment} users={users} busy={busy} compact />
-                <Form method="post" className="flex justify-end">
-                  <input type="hidden" name="intent" value="delete-assignment" />
-                  <input type="hidden" name="event" value={eventKey ?? ""} />
-                  <input type="hidden" name="view" value="assignments" />
-                  <input type="hidden" name="assignmentId" value={assignment.id} />
-                  <Button
-                    type="submit"
-                    disabled={busy}
-                    className="border-danger/40 text-danger hover:bg-danger/10"
-                    onClick={(event) => {
-                      if (!confirm("确认删除这条人员分配？")) event.preventDefault();
-                    }}
-                  >
-                    <Trash2 className="size-4" />
-                    删除
-                  </Button>
-                </Form>
+                <AssignmentDeleteForm eventKey={eventKey} assignmentId={assignment.id} busy={busy} />
               </div>
             ))}
           </div>
@@ -466,9 +454,11 @@ function AssignmentForm({
   busy: boolean;
   compact?: boolean;
 }) {
+  const assignmentFetcher = useFetcher<ActionData>();
+  const saving = busy || assignmentFetcher.state !== "idle";
   const hasCurrentUser = assignment ? users.some((user) => user.displayName === assignment.userName) : true;
   return (
-    <Form method="post" className={cn("grid gap-2", compact ? "md:grid-cols-[110px_110px_110px_minmax(160px,1fr)_auto]" : "md:grid-cols-[120px_120px_120px_minmax(180px,1fr)_auto]")}>
+    <assignmentFetcher.Form method="post" className={cn("grid gap-2", compact ? "md:grid-cols-[110px_110px_110px_minmax(160px,1fr)_auto]" : "md:grid-cols-[120px_120px_120px_minmax(180px,1fr)_auto]")}>
       <input type="hidden" name="intent" value="save-assignment" />
       <input type="hidden" name="event" value={eventKey ?? ""} />
       <input type="hidden" name="view" value="assignments" />
@@ -498,11 +488,36 @@ function AssignmentForm({
           <Input name="userName" defaultValue={assignment?.userName ?? ""} placeholder="Scout 名字" required />
         )}
       </label>
-      <Button type="submit" variant={assignment ? "default" : "primary"} disabled={busy} className="self-end">
+      {assignmentFetcher.data?.error ? <p className="text-sm text-danger md:col-span-full">{assignmentFetcher.data.error}</p> : null}
+      <Button type="submit" variant={assignment ? "default" : "primary"} disabled={saving} className="self-end">
         <Save className="size-4" />
         {assignment ? "保存" : "新增"}
       </Button>
-    </Form>
+    </assignmentFetcher.Form>
+  );
+}
+
+function AssignmentDeleteForm({ eventKey, assignmentId, busy }: { eventKey: string | null; assignmentId: string; busy: boolean }) {
+  const deleteFetcher = useFetcher<ActionData>();
+  const deleting = busy || deleteFetcher.state !== "idle";
+  return (
+    <deleteFetcher.Form method="post" className="flex justify-end">
+      <input type="hidden" name="intent" value="delete-assignment" />
+      <input type="hidden" name="event" value={eventKey ?? ""} />
+      <input type="hidden" name="view" value="assignments" />
+      <input type="hidden" name="assignmentId" value={assignmentId} />
+      <Button
+        type="submit"
+        disabled={deleting}
+        className="border-danger/40 text-danger hover:bg-danger/10"
+        onClick={(event) => {
+          if (!confirm("确认删除这条人员分配？")) event.preventDefault();
+        }}
+      >
+        <Trash2 className="size-4" />
+        删除
+      </Button>
+    </deleteFetcher.Form>
   );
 }
 
@@ -702,11 +717,10 @@ function viewTitle(view: LeadView) {
   return "信心分排行";
 }
 
-function scopingLeadPath(event: string, view: LeadView) {
-  const params = new URLSearchParams();
-  if (event) params.set("event", event);
+function replaceLeadViewUrl(searchParams: URLSearchParams, view: LeadView) {
+  const params = new URLSearchParams(searchParams);
   params.set("view", view);
-  return `/scouting-lead?${params.toString()}`;
+  window.history.replaceState(null, "", `/scouting-lead?${params.toString()}`);
 }
 
 function formatDate(value: string | null) {

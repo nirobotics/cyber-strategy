@@ -9,8 +9,8 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { Form, Link, redirect, useActionData, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { Link, useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.strategy-proposal";
 import { PhotoLightbox, TeamDetailModal } from "../components/analytics-dashboard";
 import { Badge, Button, Card, Input, cn } from "../components/ui";
@@ -49,7 +49,7 @@ import {
 } from "../lib/strategy-proposals";
 import { fetchTbaMatches } from "../lib/tba.server";
 
-type ActionData = { error?: string };
+type ActionData = { error?: string; ok?: boolean; proposalId?: string };
 type ProposalMatch = { key: string; label: string; redTeams: string[]; blueTeams: string[] };
 type EditorState = {
   id: string | null;
@@ -85,7 +85,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
+export async function action({ request }: Route.ActionArgs): Promise<ActionData> {
   const user = requireUser(request);
   const admin = await isAdmin(user.feishuOpenId);
   const formData = await request.formData();
@@ -107,7 +107,7 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
         title: String(formData.get("title") || ""),
         payload: parsePayload(String(formData.get("payload") || "{}")),
       });
-      throw redirect(proposalPath(eventKey, proposal.id));
+      return { ok: true, proposalId: proposal.id };
     }
 
     if (intent === "restore") {
@@ -116,7 +116,7 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
         actorOpenId: user.feishuOpenId,
         isAdmin: admin,
       });
-      throw redirect(proposalPath(eventKey, proposal.id));
+      return { ok: true, proposalId: proposal.id };
     }
 
     if (intent === "review") {
@@ -127,10 +127,9 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
         decision: String(formData.get("decision") || ""),
         note: String(formData.get("reviewNote") || ""),
       });
-      throw redirect(proposalPath(eventKey, String(formData.get("id") || "")));
+      return { ok: true, proposalId: String(formData.get("id") || "") };
     }
   } catch (error) {
-    if (error instanceof Response && error.status >= 300 && error.status < 400) throw error;
     if (error instanceof Response) return { error: await error.text() || "操作失败。" };
     return { error: error instanceof Error ? error.message : "操作失败。" };
   }
@@ -140,34 +139,35 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
 
 export default function StrategyProposalRoute({ loaderData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
-  const selectedId = searchParams.get("proposal");
-  const selected = loaderData.proposals.find((proposal) => proposal.id === selectedId) ?? null;
   return (
     <StrategyProposalPage
-      key={`${loaderData.selectedEventKey}:${selected?.id ?? "new"}:${loaderData.dataset.id}`}
+      key={`${loaderData.selectedEventKey}:${loaderData.dataset.id}`}
       loaderData={loaderData}
-      selected={selected}
+      initialSelectedId={searchParams.get("proposal")}
     />
   );
 }
 
 function StrategyProposalPage({
   loaderData,
-  selected,
+  initialSelectedId,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
-  selected: StrategyProposal | null;
+  initialSelectedId: string | null;
 }) {
   const navigate = useNavigate();
   const navigation = useNavigation();
+  const proposalFetcher = useFetcher<ActionData>();
   const [searchParams] = useSearchParams();
-  const actionData = useActionData<ActionData>();
+  const actionData = proposalFetcher.data;
   const [typeFilter, setTypeFilter] = useState<StrategyProposalType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
+  const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
+  const selected = loaderData.proposals.find((proposal) => proposal.id === selectedId) ?? null;
   const [editor, setEditor] = useState(() => initialEditorState(selected, loaderData.matches, loaderData.dataset));
-  const busy = navigation.state !== "idle";
+  const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const selectedMatch = loaderData.matches.find((match) => match.key === editor.matchKey) ?? loaderData.matches[0] ?? null;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
@@ -182,6 +182,17 @@ function StrategyProposalPage({
   );
   const teamDetail = detailTeam ? loaderData.dataset.teamData[detailTeam] : null;
 
+  useEffect(() => {
+    if (!proposalFetcher.data?.ok || !proposalFetcher.data.proposalId) return;
+    const proposalId = proposalFetcher.data.proposalId;
+    const timeout = window.setTimeout(() => {
+      setSelectedId(proposalId);
+      setEditor((current) => ({ ...current, id: proposalId }));
+      replaceProposalUrl(searchParams, proposalId);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [proposalFetcher.data, searchParams]);
+
   function selectEvent(eventKey: string) {
     const params = new URLSearchParams(searchParams);
     params.set("event", eventKey);
@@ -190,15 +201,16 @@ function StrategyProposalPage({
   }
 
   function newProposal() {
-    const params = new URLSearchParams(searchParams);
-    params.delete("proposal");
-    navigate(`/strategy-proposal?${params.toString()}`);
+    setSelectedId(null);
+    setEditor(initialEditorState(null, loaderData.matches, loaderData.dataset));
+    replaceProposalUrl(searchParams, null);
   }
 
   function openProposal(id: string) {
-    const params = new URLSearchParams(searchParams);
-    params.set("proposal", id);
-    navigate(`/strategy-proposal?${params.toString()}`);
+    const proposal = loaderData.proposals.find((item) => item.id === id) ?? null;
+    setSelectedId(id);
+    setEditor(initialEditorState(proposal, loaderData.matches, loaderData.dataset));
+    replaceProposalUrl(searchParams, id);
   }
 
   function updateType(type: StrategyProposalType) {
@@ -328,7 +340,7 @@ function StrategyProposalPage({
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
           </div>
 
-          <Form method="post" className="grid gap-4 p-3 md:p-4">
+          <proposalFetcher.Form method="post" className="grid gap-4 p-3 md:p-4">
             <input type="hidden" name="id" value={editor.id ?? ""} />
             <input type="hidden" name="eventKey" value={loaderData.selectedEventKey} />
             <input type="hidden" name="matchLabel" value={matchLabelValue} />
@@ -434,10 +446,10 @@ function StrategyProposalPage({
                 <span className="text-sm text-ink-dim">当前状态不可编辑。</span>
               )}
             </div>
-          </Form>
+          </proposalFetcher.Form>
 
           {reviewer && selected ? (
-            <Form method="post" className="grid gap-3 border-t border-line bg-surface-2 p-3 md:p-4">
+            <proposalFetcher.Form method="post" className="grid gap-3 border-t border-line bg-surface-2 p-3 md:p-4">
               <input type="hidden" name="intent" value="review" />
               <input type="hidden" name="id" value={selected.id} />
               <input type="hidden" name="eventKey" value={loaderData.selectedEventKey} />
@@ -455,7 +467,7 @@ function StrategyProposalPage({
                   通过
                 </Button>
               </div>
-            </Form>
+            </proposalFetcher.Form>
           ) : null}
         </Card>
       </div>
@@ -957,11 +969,12 @@ function parsePayload(value: string) {
   }
 }
 
-function proposalPath(eventKey: string, id: string) {
-  const params = new URLSearchParams();
-  params.set("event", eventKey);
-  params.set("proposal", id);
-  return `/strategy-proposal?${params.toString()}`;
+function replaceProposalUrl(searchParams: URLSearchParams, id: string | null) {
+  const params = new URLSearchParams(searchParams);
+  if (id) params.set("proposal", id);
+  else params.delete("proposal");
+  const search = params.toString();
+  window.history.replaceState(null, "", search ? `/strategy-proposal?${search}` : "/strategy-proposal");
 }
 
 function defaultTitle(type: StrategyProposalType, match: string) {
