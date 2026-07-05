@@ -307,7 +307,6 @@ export function StrategyProposalPanel({
         <Card className="overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
             <div>
-              <p className="section-label">{selected ? "编辑 / 审核" : "新建"}</p>
               <h2 className="text-lg font-semibold text-ink">{selected ? "编辑 Proposal" : "新建 Proposal"}</h2>
             </div>
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
@@ -412,15 +411,15 @@ export function StrategyProposalPanel({
               ) : null}
               {editable ? (
                 selected?.status === "approved" ? (
-                  approvedEditorChanged ? (
-                    <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
-                      <Send className="size-4" />
-                      需要重新审核
-                    </Button>
-                  ) : adminEditingApproved ? (
+                  adminEditingApproved && approvedEditorChanged ? (
                     <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
                       <Save className="size-4" />
                       保存并保持通过
+                    </Button>
+                  ) : approvedEditorChanged ? (
+                    <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
+                      <Send className="size-4" />
+                      需要重新审核
                     </Button>
                   ) : (
                     <span className="text-sm text-ink-dim">已通过版本未修改。</span>
