@@ -351,7 +351,7 @@ function TeamDetail({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
         <Stat label="自动贡献" value={team.avgAuto} sub="分" />
         <Stat label="手动贡献" value={team.avgTele} sub="分" />
@@ -962,7 +962,7 @@ function Stat({ label, value, sub }: { label: string; value: ReactNode; sub: Rea
   return (
     <Card className="p-3">
       <p className="text-[11px] font-semibold uppercase text-ink-faint">{label}</p>
-      <p className="mt-1 truncate text-xl font-semibold text-ink">{value}</p>
+      <p className="mt-1 break-words text-xl font-semibold text-ink">{value}</p>
       <div className="mt-1 text-xs text-ink-dim">{sub}</div>
     </Card>
   );
