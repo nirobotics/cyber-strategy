@@ -12,7 +12,7 @@ import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode
 import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { PhotoLightbox, TeamDetailModal } from "./analytics-dashboard";
 import { StrategyNavigation } from "./strategy-navigation";
-import { Badge, Button, Card, Input, cn } from "./ui";
+import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
 import { type ScoutingDataset, type ScoutingEventOption } from "../lib/scouting";
 import type { ProposalMatch } from "../lib/strategy-proposal-matches";
@@ -27,6 +27,7 @@ import {
   proposalStatuses,
   proposalTypes,
   strategyShifts,
+  strategyProposalTitle,
   type AutoProposalPayload,
   type AutoWinner,
   type OwnStrategyTeam,
@@ -58,7 +59,6 @@ type EditorState = {
   proposalType: StrategyProposalType;
   ownTeam: OwnStrategyTeam;
   matchKey: string;
-  title: string;
   payload: StrategyProposalPayload;
 };
 
@@ -87,6 +87,7 @@ export function StrategyProposalPanel({
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const selectedMatch = data.matches.find((match) => match.key === editor.matchKey) ?? data.matches[0] ?? null;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
+  const generatedTitle = strategyProposalTitle(editor.proposalType, matchLabelValue || "Match");
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
   const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
   const deletable = canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
@@ -146,7 +147,6 @@ export function StrategyProposalPanel({
     setEditor((current) => ({
       ...current,
       proposalType: type,
-      title: defaultTitle(type, matchLabelValue),
       payload: emptyPayload(type, current.ownTeam, allMatchTeams, partnerTeams(selectedMatch, current.ownTeam)),
     }));
   }
@@ -169,7 +169,6 @@ export function StrategyProposalPanel({
     setEditor((current) => ({
       ...current,
       matchKey,
-      title: current.id ? current.title : defaultTitle(current.proposalType, match?.label ?? matchKey),
       payload: current.payload.kind === "partner_strategy"
         ? ensurePartnerPayload(current.payload, partnerTeams(match, current.ownTeam))
         : current.payload.kind === "auto"
@@ -269,7 +268,7 @@ export function StrategyProposalPanel({
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
             <div>
               <p className="section-label">{selected ? "编辑 / 审核" : "新建"}</p>
-              <h2 className="text-lg font-semibold text-ink">{selected ? selected.title : "新的 Strategy Proposal"}</h2>
+              <h2 className="text-lg font-semibold text-ink">{generatedTitle}</h2>
             </div>
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
           </div>
@@ -278,22 +277,17 @@ export function StrategyProposalPanel({
             <input type="hidden" name="id" value={editor.id ?? ""} />
             <input type="hidden" name="eventKey" value={data.selectedEventKey} />
             <input type="hidden" name="matchLabel" value={matchLabelValue} />
+            <input type="hidden" name="proposalType" value={editor.proposalType} />
             <input type="hidden" name="payload" value={JSON.stringify(editor.payload)} />
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px_160px_220px]">
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-ink-dim">标题</span>
-                <Input
-                  name="title"
-                  value={editor.title}
-                  disabled={!editable}
-                  onChange={(event) => setEditor((current) => ({ ...current, title: event.target.value }))}
-                />
-              </label>
+              <div className="grid min-w-0 gap-1 rounded-md border border-line bg-surface-2 px-3 py-2">
+                <span className="text-sm font-medium text-ink-dim">自动标题</span>
+                <p className="truncate text-sm font-semibold text-ink">{generatedTitle}</p>
+              </div>
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-ink-dim">类型</span>
                 <select
-                  name="proposalType"
                   value={editor.proposalType}
                   disabled={!editable || Boolean(editor.id)}
                   onChange={(event) => updateType(event.target.value as StrategyProposalType)}
@@ -870,7 +864,6 @@ function initialEditorState(proposal: StrategyProposal | null, matches: Proposal
     proposalType,
     ownTeam,
     matchKey: proposal?.matchKey ?? match?.key ?? "",
-    title: proposal?.title ?? defaultTitle(proposalType, match?.label ?? "Match"),
     payload: proposal?.payload ?? emptyPayload(proposalType, ownTeam, teams, partnerTeams(match ?? null, ownTeam)),
   };
 }
@@ -949,10 +942,6 @@ function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, em
   const search = params.toString();
   const path = embedded ? "/" : "/strategy-proposal";
   window.history.replaceState(null, "", search ? `${path}?${search}` : path);
-}
-
-function defaultTitle(type: StrategyProposalType, match: string) {
-  return `${match} · ${proposalTypeLabel(type)}`;
 }
 
 function proposalTypeLabel(type: StrategyProposalType) {

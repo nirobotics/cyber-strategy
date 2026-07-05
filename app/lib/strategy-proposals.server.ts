@@ -10,6 +10,7 @@ import {
   normalizeOwnTeam,
   normalizeProposalPayload,
   normalizeProposalSnapshot,
+  strategyProposalTitle,
   type StrategyProposal,
   type StrategyProposalSnapshot,
   type StrategyProposalStatus,
@@ -61,7 +62,6 @@ export async function saveStrategyProposal(opts: {
   matchLabel: string;
   ownTeam: string;
   proposalType: string;
-  title: string;
   payload: unknown;
 }): Promise<StrategyProposal> {
   const sb = getClient();
@@ -87,7 +87,7 @@ export async function saveStrategyProposal(opts: {
     matchLabel: cleanText(opts.matchLabel) || cleanText(opts.matchKey),
     ownTeam: normalizeOwnTeam(opts.ownTeam),
     proposalType: normalizedType,
-    title: cleanText(opts.title) || defaultTitle(opts.proposalType, opts.matchLabel),
+    title: strategyProposalTitle(normalizedType, cleanText(opts.matchLabel) || cleanText(opts.matchKey)),
     payload: normalizeProposalPayload(normalizedType, opts.payload),
   };
   const nextReviewedBy = nextStatus === "approved" ? opts.actorOpenId : nextStatus === "submitted" ? null : existing?.reviewedBy ?? null;
@@ -267,11 +267,6 @@ async function hydrateCreatorNames(proposals: StrategyProposal[]) {
     ...proposal,
     createdByName: proposal.createdBy ? names.get(proposal.createdBy) || proposal.createdBy : "未知",
   }));
-}
-
-function defaultTitle(type: StrategyProposalType, matchLabel: string) {
-  const label = type === "auto" ? "Auto Proposal" : type === "self_strategy" ? "我们自己的策略" : "队友策略";
-  return `${matchLabel || "Match"} · ${label}`;
 }
 
 function snapshotFromProposal(proposal: Pick<StrategyProposal, "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload" | "reviewedBy" | "reviewNote" | "reviewedAt">): StrategyProposalSnapshot {

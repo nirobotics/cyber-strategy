@@ -59,7 +59,6 @@ export async function action({ request }: Route.ActionArgs): Promise<StrategyPro
         matchLabel: String(formData.get("matchLabel") || ""),
         ownTeam: String(formData.get("ownTeam") || ""),
         proposalType: String(formData.get("proposalType") || ""),
-        title: String(formData.get("title") || ""),
         payload: parsePayload(String(formData.get("payload") || "{}")),
       });
       return { ok: true, proposalId: proposal.id };

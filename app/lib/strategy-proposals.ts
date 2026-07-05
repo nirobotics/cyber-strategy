@@ -79,6 +79,11 @@ export function isProposalStatus(value: unknown): value is StrategyProposalStatu
   return proposalStatuses.includes(value as StrategyProposalStatus);
 }
 
+export function strategyProposalTitle(type: StrategyProposalType, matchLabel: string) {
+  const label = type === "auto" ? "Auto" : type === "self_strategy" ? "我们自己" : "队友策略";
+  return `${String(matchLabel || "Match").trim() || "Match"} · ${label}`;
+}
+
 export function normalizeProposalPayload(type: StrategyProposalType, value: unknown): StrategyProposalPayload {
   const record = objectValue(value);
   if (type === "self_strategy") {

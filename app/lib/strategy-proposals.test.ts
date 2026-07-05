@@ -7,10 +7,17 @@ import {
   canReviewProposal,
   normalizeOwnTeam,
   normalizeProposalPayload,
+  strategyProposalTitle,
   type StrategyProposal,
 } from "./strategy-proposals";
 
 describe("strategy proposal helpers", () => {
+  it("generates proposal titles from match and type", () => {
+    expect(strategyProposalTitle("auto", "Q9")).toBe("Q9 · Auto");
+    expect(strategyProposalTitle("self_strategy", "Q12")).toBe("Q12 · 我们自己");
+    expect(strategyProposalTitle("partner_strategy", "Q15")).toBe("Q15 · 队友策略");
+  });
+
   it("normalizes auto proposal payload and manual winner", () => {
     expect(normalizeProposalPayload("auto", {
       autoWinner: "red",
