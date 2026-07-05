@@ -15,7 +15,7 @@ import { StrategyNavigation } from "./strategy-navigation";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
 import { type ScoutingDataset, type ScoutingEventOption } from "../lib/scouting";
-import type { ProposalMatch } from "../lib/strategy-proposal-matches";
+import { firstProposalMatchForTeam, proposalMatchIncludesTeam, proposalMatchesForTeam, type ProposalMatch } from "../lib/strategy-proposal-matches";
 import {
   autoWinners,
   canDeleteProposalAs,
@@ -85,7 +85,8 @@ export function StrategyProposalPanel({
   const selected = data.proposals.find((proposal) => proposal.id === selectedId) ?? null;
   const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset));
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
-  const selectedMatch = data.matches.find((match) => match.key === editor.matchKey) ?? data.matches[0] ?? null;
+  const editorMatches = proposalMatchesForTeam(data.matches, editor.ownTeam);
+  const selectedMatch = editorMatches.find((match) => match.key === editor.matchKey) ?? null;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
   const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
@@ -158,15 +159,23 @@ export function StrategyProposalPanel({
   }
 
   function updateOwnTeam(ownTeam: OwnStrategyTeam) {
-    setEditor((current) => ({
-      ...current,
-      ownTeam,
-      payload: current.payload.kind === "partner_strategy"
-        ? ensurePartnerPayload(current.payload, partnerTeams(selectedMatch, ownTeam))
-        : current.payload.kind === "auto"
-          ? ensureAutoPayload(current.payload, selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [])
-          : current.payload,
-    }));
+    setEditor((current) => {
+      const currentMatch = data.matches.find((item) => item.key === current.matchKey) ?? null;
+      const nextMatch = currentMatch && proposalMatchIncludesTeam(currentMatch, ownTeam)
+        ? currentMatch
+        : firstProposalMatchForTeam(data.matches, ownTeam);
+      const teams = nextMatch ? [...nextMatch.redTeams, ...nextMatch.blueTeams] : [];
+      return {
+        ...current,
+        ownTeam,
+        matchKey: nextMatch?.key ?? "",
+        payload: current.payload.kind === "partner_strategy"
+          ? ensurePartnerPayload(current.payload, partnerTeams(nextMatch, ownTeam))
+          : current.payload.kind === "auto"
+            ? ensureAutoPayload(current.payload, teams)
+            : current.payload,
+      };
+    });
   }
 
   function updateMatch(matchKey: string) {
@@ -322,12 +331,13 @@ export function StrategyProposalPanel({
                 <span className="text-sm font-medium text-ink-dim">比赛</span>
                 <select
                   name="matchKey"
-                  value={editor.matchKey}
-                  disabled={!editable || !data.matches.length}
+                  value={selectedMatch?.key ?? ""}
+                  disabled={!editable || !editorMatches.length}
                   onChange={(event) => updateMatch(event.target.value)}
                   className="input h-10 font-sans"
                 >
-                  {data.matches.map((match) => (
+                  {!editorMatches.length ? <option value="">没有 Team {editor.ownTeam} 的比赛</option> : null}
+                  {editorMatches.map((match) => (
                     <option key={match.key} value={match.key}>{match.label} · R {match.redTeams.join("/")} · B {match.blueTeams.join("/")}</option>
                   ))}
                 </select>
@@ -336,7 +346,7 @@ export function StrategyProposalPanel({
 
             {!selectedMatch ? (
               <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
-                当前赛事没有 TBA 赛程，暂不能创建 proposal。
+                当前赛事没有 Team {editor.ownTeam} 的 TBA 赛程，暂不能创建 proposal。
               </div>
             ) : (
               <MatchTeamsBar match={selectedMatch} activeTeam={editor.ownTeam} onOpenTeam={setDetailTeam} dataset={data.dataset} />
@@ -872,9 +882,9 @@ function StatusBadge({ status }: { status: StrategyProposalStatus }) {
 }
 
 function initialEditorState(proposal: StrategyProposal | null, matches: ProposalMatch[], dataset: ScoutingDataset): EditorState {
-  const match = proposal ? matches.find((item) => item.key === proposal.matchKey) : matches[0];
   const proposalType = proposal?.proposalType ?? "auto";
   const ownTeam = proposal?.ownTeam ?? "8214";
+  const match = proposal ? matches.find((item) => item.key === proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
   const teams = match ? [...match.redTeams, ...match.blueTeams] : Object.keys(dataset.teamData).slice(0, 6);
   return {
     id: proposal?.id ?? null,

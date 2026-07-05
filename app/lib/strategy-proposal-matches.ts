@@ -14,7 +14,18 @@ export function toProposalMatches(matches: CombinedMatch[]): ProposalMatch[] {
     .filter((match) => match.redTeams.length === 3 && match.blueTeams.length === 3 && matchHasOwnTeam(match));
 }
 
+export function proposalMatchesForTeam(matches: ProposalMatch[], team: string) {
+  return matches.filter((match) => proposalMatchIncludesTeam(match, team));
+}
+
+export function firstProposalMatchForTeam(matches: ProposalMatch[], team: string) {
+  return matches.find((match) => proposalMatchIncludesTeam(match, team)) ?? null;
+}
+
+export function proposalMatchIncludesTeam(match: ProposalMatch, team: string) {
+  return match.redTeams.includes(team) || match.blueTeams.includes(team);
+}
+
 function matchHasOwnTeam(match: ProposalMatch) {
-  const teams = [...match.redTeams, ...match.blueTeams];
-  return ownStrategyTeams.some((team) => teams.includes(team));
+  return ownStrategyTeams.some((team) => proposalMatchIncludesTeam(match, team));
 }
