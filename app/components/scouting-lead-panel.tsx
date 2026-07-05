@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   CheckCircle2,
   ClipboardList,
   Gauge,
@@ -26,7 +25,6 @@ import type {
   ScoutConfidenceMatch,
   ScoutConfidencePerson,
   ScoutConfidenceReport,
-  ScoutConfidenceReviewItem,
 } from "../lib/scout-confidence";
 
 export type ScoutingLeadActionData = { error?: string; ok?: boolean; view?: LeadView };
@@ -159,14 +157,6 @@ function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
               <h2 className="text-lg font-semibold text-ink">按信心值</h2>
             </div>
             <CalibrationList rows={report.calibration} />
-          </Card>
-
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-line p-3">
-              <p className="section-label">复盘队列</p>
-              <h2 className="text-lg font-semibold text-ink">大分歧比赛</h2>
-            </div>
-            <ReviewQueue items={report.reviewQueue} />
           </Card>
         </div>
       </div>
@@ -621,26 +611,6 @@ function CalibrationList({ rows }: { rows: ScoutConfidenceCalibration[] }) {
           <div className={cn("text-right font-semibold tabular-nums", row.netScore >= 0 ? "text-ok" : "text-danger")}>
             {signed(row.netScore)}
           </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ReviewQueue({ items }: { items: ScoutConfidenceReviewItem[] }) {
-  if (!items.length) return <EmptyState text="暂无大分歧比赛。" />;
-
-  return (
-    <div className="max-h-[420px] divide-y divide-line overflow-auto">
-      {items.slice(0, 40).map((item, index) => (
-        <div key={`${item.kind}-${item.matchNumber}-${item.scoutName ?? "match"}-${item.team ?? index}`} className="p-3 text-sm">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="size-4 text-warn" />
-            <span className="font-semibold text-ink">{item.message}</span>
-          </div>
-          <p className="mt-1 text-xs text-ink-faint">
-            {item.scoutName ?? "比赛整体"}{item.confidence == null ? "" : ` · 信心 ${round1(item.confidence)}`}
-          </p>
         </div>
       ))}
     </div>

@@ -78,30 +78,6 @@ describe("scout confidence scoring", () => {
     expect(report.people.map((person) => person.scoutName)).toEqual(["Bea", "Ada", "Cal"]);
   });
 
-  it("puts only large match disagreements in the review queue", () => {
-    const report = buildScoutConfidenceReport({
-      records: [
-        normal("small-red-1", "Ada", 1, 1, "red", 5),
-        normal("small-red-2", "Bea", 1, 2, "red", 5),
-        normal("small-blue-1", "Cal", 1, 3, "blue", 5),
-        normal("big-red-1", "Ada", 2, 1, "red", 5),
-        normal("big-red-2", "Bea", 2, 2, "red", 5),
-        normal("big-blue-1", "Cal", 2, 3, "blue", 5),
-        normal("big-blue-2", "Dee", 2, 4, "blue", 5),
-      ],
-      tbaMatches: [
-        tba(1, "blue"),
-        tba(2, "red"),
-      ],
-    });
-
-    expect(report.reviewQueue).toHaveLength(1);
-    expect(report.reviewQueue[0]).toMatchObject({
-      kind: "disagreement",
-      matchNumber: 2,
-      message: "预测分歧：Q2 红 2 / 蓝 2",
-    });
-  });
 });
 
 function normal(

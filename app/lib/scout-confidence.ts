@@ -62,15 +62,6 @@ export type ScoutConfidenceCalibration = {
   accuracy: number | null;
 };
 
-export type ScoutConfidenceReviewItem = {
-  kind: "disagreement";
-  matchNumber: number;
-  scoutName: string | null;
-  team: string | null;
-  confidence: number | null;
-  message: string;
-};
-
 export type ScoutConfidenceReport = {
   summary: {
     totalRecords: number;
@@ -83,7 +74,6 @@ export type ScoutConfidenceReport = {
   people: ScoutConfidencePerson[];
   matches: ScoutConfidenceMatch[];
   calibration: ScoutConfidenceCalibration[];
-  reviewQueue: ScoutConfidenceReviewItem[];
 };
 
 export function emptyScoutConfidenceReport(): ScoutConfidenceReport {
@@ -106,7 +96,6 @@ export function emptyScoutConfidenceReport(): ScoutConfidenceReport {
       netScore: 0,
       accuracy: null,
     })),
-    reviewQueue: [],
   };
 }
 
@@ -127,7 +116,6 @@ export function buildScoutConfidenceReport({
     people: buildPeople(predictions),
     matches: buildMatches(predictions),
     calibration: buildCalibration(predictions),
-    reviewQueue: buildReviewQueue(predictions),
   };
 }
 
@@ -263,23 +251,6 @@ function buildCalibration(predictions: ScoutConfidencePrediction[]): ScoutConfid
       accuracy: scoredCount ? correctCount / scoredCount : null,
     };
   });
-}
-
-function buildReviewQueue(predictions: ScoutConfidencePrediction[]): ScoutConfidenceReviewItem[] {
-  const items: ScoutConfidenceReviewItem[] = [];
-  for (const match of buildMatches(predictions)) {
-    if (Math.min(match.redPredictions, match.bluePredictions) < 2) continue;
-    items.push({
-      kind: "disagreement",
-      matchNumber: match.matchNumber,
-      scoutName: null,
-      team: null,
-      confidence: match.averageConfidence,
-      message: `预测分歧：Q${match.matchNumber} 红 ${match.redPredictions} / 蓝 ${match.bluePredictions}`,
-    });
-  }
-
-  return items.sort((a, b) => a.matchNumber - b.matchNumber);
 }
 
 function buildActualWinnerMap(matches: ConfidenceTbaMatch[]): Map<number, ActualWinner> {
