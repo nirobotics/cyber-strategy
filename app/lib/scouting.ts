@@ -13,6 +13,7 @@ export type ScoutingMatch = {
   botState: number;
   botStateText: string;
   disabled: boolean;
+  downtimeMs?: number;
   driverRating: number;
   fuelRating: number;
   defenseRating: number;
@@ -89,6 +90,8 @@ export type DatasetSourceStatus = {
 
 type CsvRow = Record<string, unknown>;
 
+export const MATCH_TOTAL_DURATION_MS = 135_000;
+
 export function parseScoutingCsv(text: string): ScoutingDatasetPayload["teamData"] {
   const parsed = Papa.parse<CsvRow>(text, {
     header: true,
@@ -162,7 +165,10 @@ export function sortedTeams(teamData: TeamData): TeamSummary[] {
 
 export function reliability(team: TeamSummary): number {
   if (!team.matchCount) return 0;
-  return Math.round((1 - team.malfunctions / team.matchCount) * 100);
+  return avg(team.matches.map((match) => {
+    const downtimeMs = Math.min(Math.max(0, match.downtimeMs ?? 0), MATCH_TOTAL_DURATION_MS);
+    return (downtimeMs / MATCH_TOTAL_DURATION_MS) * 100;
+  }));
 }
 
 export function normalizeTeamPhotos(raw: unknown): TeamPhotos {
@@ -191,6 +197,7 @@ function toMatch(row: CsvRow): ScoutingMatch {
     botState: integer(row.BotState, 1),
     botStateText: text(row.BotStateText).trim() || "未知",
     disabled: text(row.Disabled) === "1" || text(row.Disabled).toLowerCase() === "true",
+    downtimeMs: csvDowntimeMs(row),
     driverRating: number(row.DriverRating),
     fuelRating: number(row.FuelIntakeRating),
     defenseRating: number(row.DefenseRating),
@@ -216,6 +223,19 @@ function number(value: unknown, fallback = 0): number {
 function integer(value: unknown, fallback = 0): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(text(value), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function csvDowntimeMs(row: CsvRow): number {
+  const ms = optionalNumber(row.DowntimeMs ?? row.IncapMs ?? row.DisabledMs);
+  if (ms !== null) return ms;
+
+  const seconds = optionalNumber(row.DowntimeSeconds ?? row.IncapSeconds ?? row.DisabledSeconds);
+  return seconds === null ? 0 : seconds * 1000;
+}
+
+function optionalNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(text(value));
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function text(value: unknown): string {

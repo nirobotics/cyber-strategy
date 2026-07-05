@@ -6,8 +6,8 @@ describe("scouting data processing", () => {
   it("computes Advantalytics team summaries from CSV rows", () => {
     const result = processCsvRows([
       row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2),
-      row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3),
-      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4),
+      row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3, 67_500),
+      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4, 135_000),
     ]);
 
     expect(result["8214"]).toMatchObject({
@@ -30,7 +30,7 @@ describe("scouting data processing", () => {
       minPts: 10,
       maxPts: 50,
     });
-    expect(reliability(result["8214"])).toBe(67);
+    expect(reliability(result["8214"])).toBe(50);
   });
 
   it("parses CSV text and treats empty hub attempts as null accuracy", () => {
@@ -92,6 +92,7 @@ function row(
   Disabled: boolean,
   DriverRating: number,
   FuelIntakeRating: number,
+  DowntimeMs = 0,
 ) {
   return {
     Team,
@@ -107,6 +108,7 @@ function row(
     Disabled: String(Disabled),
     DriverRating,
     FuelIntakeRating,
+    DowntimeMs,
     DefenseRating: 2,
     Comment: "",
     StartPosition: "1",

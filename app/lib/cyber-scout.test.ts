@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCyberScoutDataset, isSafeCyberScoutPhotoPath, type CyberScoutRecordRow } from "./cyber-scout";
 import { __resetCyberScoutClientForTests, loadCyberScoutDataset } from "./cyber-scout.server";
+import { reliability } from "./scouting";
 
 const event = {
   id: "event-1",
@@ -110,12 +111,15 @@ describe("cyber-scout dataset conversion", () => {
       botState: 4,
       disabled: true,
     });
+    expect(reliability(dataset.teamData["6328"])).toBe(100);
     expect(dataset.teamData["157"].matches[0]).toMatchObject({
       totalPts: 75,
       climbPts: 0,
       botState: 3,
       disabled: false,
+      downtimeMs: 135_000,
     });
+    expect(reliability(dataset.teamData["157"])).toBe(100);
   });
 
   it("rejects unsafe cyber-scout photo paths", () => {
