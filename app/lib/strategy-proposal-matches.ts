@@ -22,6 +22,10 @@ export function firstProposalMatchForTeam(matches: ProposalMatch[], team: string
   return matches.find((match) => proposalMatchIncludesTeam(match, team)) ?? null;
 }
 
+export function proposalMatchForKeyOrFirst(matches: ProposalMatch[], key: string) {
+  return matches.find((match) => match.key === key) ?? matches[0] ?? null;
+}
+
 export function proposalMatchIncludesTeam(match: ProposalMatch, team: string) {
   return match.redTeams.includes(team) || match.blueTeams.includes(team);
 }

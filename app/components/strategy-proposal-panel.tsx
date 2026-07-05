@@ -17,6 +17,7 @@ import type { SessionUser } from "../lib/auth-types";
 import { type ScoutingDataset, type ScoutingEventOption } from "../lib/scouting";
 import {
   firstProposalMatchForTeam,
+  proposalMatchForKeyOrFirst,
   proposalMatchIncludesTeam,
   proposalMatchesForTeam,
   proposalMatchMatchesTeamQuery,
@@ -94,7 +95,8 @@ export function StrategyProposalPanel({
   const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset));
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const editorMatches = proposalMatchesForTeam(data.matches, editor.ownTeam);
-  const selectedMatch = editorMatches.find((match) => match.key === editor.matchKey) ?? null;
+  const selectedMatch = proposalMatchForKeyOrFirst(editorMatches, editor.matchKey);
+  const matchKeyValue = selectedMatch?.key ?? editor.matchKey;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
   const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
@@ -106,7 +108,7 @@ export function StrategyProposalPanel({
   const matchFilterOptions = data.matches.filter((match) => proposalMatchMatchesTeamQuery(match, teamFilter));
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
     ...selected,
-    matchKey: editor.matchKey,
+    matchKey: matchKeyValue,
     matchLabel: matchLabelValue,
     ownTeam: editor.ownTeam,
     proposalType: editor.proposalType,
@@ -355,7 +357,7 @@ export function StrategyProposalPanel({
                 <span className="text-sm font-medium text-ink-dim">比赛</span>
                 <select
                   name="matchKey"
-                  value={selectedMatch?.key ?? ""}
+                  value={matchKeyValue}
                   disabled={!editable || !editorMatches.length}
                   onChange={(event) => updateMatch(event.target.value)}
                   className="input h-10 font-sans"
@@ -957,13 +959,14 @@ function StatusBadge({ status }: { status: StrategyProposalStatus }) {
 function initialEditorState(proposal: StrategyProposal | null, matches: ProposalMatch[], dataset: ScoutingDataset): EditorState {
   const proposalType = proposal?.proposalType ?? "auto";
   const ownTeam = proposal?.ownTeam ?? "8214";
-  const match = proposal ? matches.find((item) => item.key === proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
+  const ownMatches = proposalMatchesForTeam(matches, ownTeam);
+  const match = proposal ? proposalMatchForKeyOrFirst(ownMatches, proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
   const teams = match ? [...match.redTeams, ...match.blueTeams] : Object.keys(dataset.teamData).slice(0, 6);
   return {
     id: proposal?.id ?? null,
     proposalType,
     ownTeam,
-    matchKey: proposal?.matchKey ?? match?.key ?? "",
+    matchKey: match?.key ?? proposal?.matchKey ?? "",
     payload: proposal?.payload ?? emptyPayload(proposalType, ownTeam, teams, partnerTeams(match ?? null, ownTeam)),
   };
 }

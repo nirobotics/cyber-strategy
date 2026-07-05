@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   firstProposalMatchForTeam,
+  proposalMatchForKeyOrFirst,
   proposalMatchIncludesTeam,
   proposalMatchesForTeam,
   proposalMatchMatchesTeamQuery,
@@ -25,5 +26,11 @@ describe("strategy proposal matches", () => {
     expect(proposalMatchMatchesTeamQuery(matches[0], "82")).toBe(true);
     expect(proposalMatchMatchesTeamQuery(matches[0], "Team 333")).toBe(true);
     expect(proposalMatchMatchesTeamQuery(matches[0], "9635")).toBe(false);
+  });
+
+  it("falls back to the first selectable match when a stored match key is stale", () => {
+    expect(proposalMatchForKeyOrFirst(matches, "missing")?.key).toBe("qm1");
+    expect(proposalMatchForKeyOrFirst(matches, "qm2")?.key).toBe("qm2");
+    expect(proposalMatchForKeyOrFirst([], "missing")).toBeNull();
   });
 });
