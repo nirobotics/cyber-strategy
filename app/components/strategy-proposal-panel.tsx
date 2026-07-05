@@ -765,7 +765,7 @@ function RoutePlanner({
                       className={cn("px-2 py-1 text-sm font-semibold text-ink", active && "text-brand")}
                       onClick={() => onActiveTeam(team)}
                     >
-                      <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(team, index) }} />
+                      <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(index) }} />
                       Team {team}
                     </button>
                     <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)} disabled={!teamData[team]}>
@@ -794,7 +794,7 @@ function RoutePlanner({
                   key={team}
                   points={points.map((point) => `${point.x},${point.y}`).join(" ")}
                   fill="none"
-                  stroke={routeColor(team, index)}
+                  stroke={routeColor(index)}
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -807,7 +807,7 @@ function RoutePlanner({
             <span
               key={`${team}-${point.x}-${point.y}-${pointIndex}`}
               className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm"
-              style={{ left: `${point.x}%`, top: `${point.y}%`, backgroundColor: routeColor(team, teamIndex) }}
+              style={{ left: `${point.x}%`, top: `${point.y}%`, backgroundColor: routeColor(teamIndex) }}
             >
               {pointIndex + 1}
             </span>
@@ -987,8 +987,7 @@ function autoWinnerLabel(value: AutoWinner) {
   return "未知";
 }
 
-function routeColor(team: string, index: number) {
+function routeColor(index: number) {
   const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
-  const parsed = Number(team);
-  return colors[(Number.isFinite(parsed) ? parsed : index) % colors.length];
+  return colors[((index % colors.length) + colors.length) % colors.length];
 }
