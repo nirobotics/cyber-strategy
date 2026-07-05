@@ -27,7 +27,6 @@ import {
   proposalStatuses,
   proposalTypes,
   strategyShifts,
-  strategyProposalTitle,
   type AutoProposalPayload,
   type AutoWinner,
   type OwnStrategyTeam,
@@ -87,7 +86,6 @@ export function StrategyProposalPanel({
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const selectedMatch = data.matches.find((match) => match.key === editor.matchKey) ?? data.matches[0] ?? null;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
-  const generatedTitle = strategyProposalTitle(editor.proposalType, matchLabelValue || "Match");
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
   const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
   const deletable = canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
@@ -268,7 +266,7 @@ export function StrategyProposalPanel({
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
             <div>
               <p className="section-label">{selected ? "编辑 / 审核" : "新建"}</p>
-              <h2 className="text-lg font-semibold text-ink">{generatedTitle}</h2>
+              <h2 className="text-lg font-semibold text-ink">{selected ? "编辑 Proposal" : "新建 Proposal"}</h2>
             </div>
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
           </div>
@@ -280,11 +278,7 @@ export function StrategyProposalPanel({
             <input type="hidden" name="proposalType" value={editor.proposalType} />
             <input type="hidden" name="payload" value={JSON.stringify(editor.payload)} />
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_160px_160px_220px]">
-              <div className="grid min-w-0 gap-1 rounded-md border border-line bg-surface-2 px-3 py-2">
-                <span className="text-sm font-medium text-ink-dim">自动标题</span>
-                <p className="truncate text-sm font-semibold text-ink">{generatedTitle}</p>
-              </div>
+            <div className="grid gap-3 lg:grid-cols-[160px_160px_minmax(0,1fr)]">
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-ink-dim">类型</span>
                 <select
