@@ -107,7 +107,7 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-3">
+    <div className="mx-auto grid w-full max-w-[1500px] gap-3">
       <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="section-label">Scouting Lead</p>
@@ -136,10 +136,8 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
               </option>
             ))}
           </select>
+          <StrategyNavigation active="lead" eventKey={selectedEventKey} isAdmin />
         </div>
-      </div>
-      <div className="rounded-card border border-line bg-surface p-2">
-        <StrategyNavigation active="lead" eventKey={selectedEventKey} isAdmin />
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-card border border-line bg-surface p-2">

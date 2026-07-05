@@ -20,6 +20,7 @@ import { matchIdentity, matchLabel, matchTeams, sortedMatches, type CombinedMatc
 import { isAdmin } from "../lib/profiles.server";
 import { type ScoutingDataset } from "../lib/scouting";
 import {
+  deleteStrategyProposal,
   listStrategyProposals,
   reviewStrategyProposal,
   restoreApprovedStrategyProposal,
@@ -27,6 +28,7 @@ import {
 } from "../lib/strategy-proposals.server";
 import {
   autoWinners,
+  canDeleteProposalAs,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
@@ -49,8 +51,9 @@ import {
 } from "../lib/strategy-proposals";
 import { fetchTbaMatches } from "../lib/tba.server";
 
-type ActionData = { error?: string; ok?: boolean; proposalId?: string };
+type ActionData = { error?: string; ok?: boolean; proposalId?: string; deleted?: boolean };
 type ProposalMatch = { key: string; label: string; redTeams: string[]; blueTeams: string[] };
+type TeamGroup = { label: string; tone: "red" | "blue" | "neutral"; teams: string[] };
 type EditorState = {
   id: string | null;
   proposalType: StrategyProposalType;
@@ -129,6 +132,15 @@ export async function action({ request }: Route.ActionArgs): Promise<ActionData>
       });
       return { ok: true, proposalId: String(formData.get("id") || "") };
     }
+
+    if (intent === "delete") {
+      await deleteStrategyProposal({
+        id: String(formData.get("id") || ""),
+        actorOpenId: user.feishuOpenId,
+        isAdmin: admin,
+      });
+      return { ok: true, deleted: true };
+    }
   } catch (error) {
     if (error instanceof Response) return { error: await error.text() || "操作失败。" };
     return { error: error instanceof Error ? error.message : "操作失败。" };
@@ -162,6 +174,7 @@ function StrategyProposalPage({
   const actionData = proposalFetcher.data;
   const [typeFilter, setTypeFilter] = useState<StrategyProposalType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
+  const [matchFilter, setMatchFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
@@ -172,18 +185,29 @@ function StrategyProposalPage({
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
   const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
   const editable = canEditProposalAs(selected, loaderData.user.feishuOpenId, loaderData.isAdmin);
+  const deletable = canDeleteProposalAs(selected, loaderData.user.feishuOpenId, loaderData.isAdmin);
   const reviewer = canReviewProposal(selected, loaderData.isAdmin);
   const restorable = canRestoreApprovedSnapshot(selected, loaderData.user.feishuOpenId, loaderData.isAdmin);
   const creatorEditingApproved = Boolean(selected?.status === "approved" && selected.createdBy === loaderData.user.feishuOpenId && !loaderData.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && loaderData.isAdmin);
   const filteredProposals = loaderData.proposals.filter((proposal) =>
     (typeFilter === "all" || proposal.proposalType === typeFilter) &&
-    (statusFilter === "all" || proposal.status === statusFilter)
+    (statusFilter === "all" || proposal.status === statusFilter) &&
+    (matchFilter === "all" || proposal.matchKey === matchFilter)
   );
   const teamDetail = detailTeam ? loaderData.dataset.teamData[detailTeam] : null;
 
   useEffect(() => {
-    if (!proposalFetcher.data?.ok || !proposalFetcher.data.proposalId) return;
+    if (!proposalFetcher.data?.ok) return;
+    if (proposalFetcher.data.deleted) {
+      const timeout = window.setTimeout(() => {
+        setSelectedId(null);
+        setEditor(initialEditorState(null, loaderData.matches, loaderData.dataset));
+        replaceProposalUrl(searchParams, null);
+      }, 0);
+      return () => window.clearTimeout(timeout);
+    }
+    if (!proposalFetcher.data.proposalId) return;
     const proposalId = proposalFetcher.data.proposalId;
     const timeout = window.setTimeout(() => {
       setSelectedId(proposalId);
@@ -191,7 +215,7 @@ function StrategyProposalPage({
       replaceProposalUrl(searchParams, proposalId);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [proposalFetcher.data, searchParams]);
+  }, [proposalFetcher.data, searchParams, loaderData.matches, loaderData.dataset]);
 
   function selectEvent(eventKey: string) {
     const params = new URLSearchParams(searchParams);
@@ -228,7 +252,9 @@ function StrategyProposalPage({
       ownTeam,
       payload: current.payload.kind === "partner_strategy"
         ? ensurePartnerPayload(current.payload, partnerTeams(selectedMatch, ownTeam))
-        : current.payload,
+        : current.payload.kind === "auto"
+          ? ensureAutoPayload(current.payload, selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [])
+          : current.payload,
     }));
   }
 
@@ -273,10 +299,8 @@ function StrategyProposalPage({
               </option>
             ))}
           </select>
+          <StrategyNavigation active="proposal" eventKey={loaderData.selectedEventKey} isAdmin={loaderData.isAdmin} />
         </div>
-      </div>
-      <div className="rounded-card border border-line bg-surface p-2">
-        <StrategyNavigation active="proposal" eventKey={loaderData.selectedEventKey} isAdmin={loaderData.isAdmin} />
       </div>
 
       {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
@@ -302,6 +326,12 @@ function StrategyProposalPage({
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StrategyProposalStatus | "all")} className="input h-9 font-sans">
               <option value="all">所有状态</option>
               {proposalStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
+            </select>
+            <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value)} className="input h-9 font-sans">
+              <option value="all">所有己方比赛</option>
+              {loaderData.matches.map((match) => (
+                <option key={match.key} value={match.key}>{match.label} · R {match.redTeams.join("/")} · B {match.blueTeams.join("/")}</option>
+              ))}
             </select>
           </div>
           <div className="max-h-[72dvh] overflow-y-auto">
@@ -415,6 +445,21 @@ function StrategyProposalPage({
             />
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
+              {deletable ? (
+                <Button
+                  type="submit"
+                  name="intent"
+                  value="delete"
+                  disabled={busy}
+                  className="border-danger/40 text-danger hover:bg-danger/10"
+                  onClick={(event) => {
+                    if (!confirm("确认删除这个 Strategy Proposal？")) event.preventDefault();
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                  删除
+                </Button>
+              ) : null}
               {restorable ? (
                 <Button type="submit" name="intent" value="restore" disabled={busy}>
                   <Undo2 className="size-4" />
@@ -542,7 +587,7 @@ function PayloadEditor({
   return (
     <AutoProposalEditor
       payload={payload.kind === "auto" ? ensureAutoPayload(payload, matchTeamList) : emptyAutoPayload(matchTeamList)}
-      teams={matchTeamList}
+      match={match}
       teamData={teamData}
       disabled={disabled}
       onOpenTeam={onOpenTeam}
@@ -553,19 +598,21 @@ function PayloadEditor({
 
 function AutoProposalEditor({
   payload,
-  teams,
+  match,
   teamData,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: AutoProposalPayload;
-  teams: string[];
+  match: ProposalMatch | null;
   teamData: ScoutingDataset["teamData"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: AutoProposalPayload) => void;
 }) {
+  const teams = match ? [...match.redTeams, ...match.blueTeams] : [];
+  const teamGroups = match ? allianceGroups(match) : undefined;
   const [activeAutoTeam, setActiveAutoTeam] = useState(teams[0] ?? "");
   const [activeTransitionTeam, setActiveTransitionTeam] = useState(teams[0] ?? "");
   const resolvedAutoTeam = teams.includes(activeAutoTeam) ? activeAutoTeam : teams[0] ?? "";
@@ -587,6 +634,7 @@ function AutoProposalEditor({
       <RoutePlanner
         title="Auto 路线"
         teams={teams}
+        teamGroups={teamGroups}
         activeTeam={resolvedAutoTeam}
         routes={payload.autoRoutes}
         disabled={disabled}
@@ -598,6 +646,7 @@ function AutoProposalEditor({
       <RoutePlanner
         title="Transition 路线"
         teams={teams}
+        teamGroups={teamGroups}
         activeTeam={resolvedTransitionTeam}
         routes={payload.transitionRoutes}
         disabled={disabled}
@@ -710,6 +759,7 @@ function ShiftSection({ activeShift, onShift, children }: { activeShift: Strateg
 function RoutePlanner({
   title,
   teams,
+  teamGroups,
   activeTeam,
   routes,
   disabled,
@@ -720,6 +770,7 @@ function RoutePlanner({
 }: {
   title: string;
   teams: string[];
+  teamGroups?: TeamGroup[];
   activeTeam: string;
   routes: RouteMap;
   disabled: boolean;
@@ -728,6 +779,8 @@ function RoutePlanner({
   onOpenTeam: (team: string) => void;
   onRoutesChange: (routes: RouteMap) => void;
 }) {
+  const displayGroups = teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }];
+  const orderedTeams = displayGroups.flatMap((group) => group.teams);
   const activePoints = routes[activeTeam] ?? [];
 
   function addPoint(event: ReactMouseEvent<HTMLButtonElement>) {
@@ -768,16 +821,43 @@ function RoutePlanner({
         </div>
       </div>
       <div className="grid gap-3 p-3">
-        <div className="flex flex-wrap gap-2">
-          {teams.map((team, index) => (
-            <div key={team} className={cn("flex items-center overflow-hidden rounded-md border border-line bg-surface-2", activeTeam === team && "border-brand")}>
-              <button type="button" className="px-2 py-1 text-sm font-semibold text-ink" onClick={() => onActiveTeam(team)}>
-                <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(team, index) }} />
-                Team {team}
-              </button>
-              <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)} disabled={!teamData[team]}>
-                <Eye className="size-4" />
-              </button>
+        <div className="grid gap-2">
+          {displayGroups.map((group) => (
+            <div key={group.label} className="flex flex-wrap items-center gap-2">
+              <Badge
+                className={cn(
+                  group.tone === "red" && "border-danger/40 bg-danger/10 text-danger",
+                  group.tone === "blue" && "border-info/40 bg-info/10 text-info",
+                  group.tone === "neutral" && "border-line bg-surface-2 text-ink-dim",
+                )}
+              >
+                {group.label}
+              </Badge>
+              {group.teams.map((team) => {
+                const index = orderedTeams.indexOf(team);
+                const active = activeTeam === team;
+                return (
+                  <div
+                    key={team}
+                    className={cn(
+                      "flex items-center overflow-hidden rounded-md border border-line bg-surface-2 transition",
+                      active && "border-brand bg-brand/10 text-brand ring-2 ring-brand/30",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className={cn("px-2 py-1 text-sm font-semibold text-ink", active && "text-brand")}
+                      onClick={() => onActiveTeam(team)}
+                    >
+                      <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(team, index) }} />
+                      Team {team}
+                    </button>
+                    <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)} disabled={!teamData[team]}>
+                      <Eye className="size-4" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           ))}
         </div>
@@ -790,7 +870,7 @@ function RoutePlanner({
         >
           <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
-            {teams.map((team, index) => {
+            {orderedTeams.map((team, index) => {
               const points = routes[team] ?? [];
               if (points.length < 2) return null;
               return (
@@ -807,7 +887,7 @@ function RoutePlanner({
               );
             })}
           </svg>
-          {teams.flatMap((team, teamIndex) => (routes[team] ?? []).map((point, pointIndex) => (
+          {orderedTeams.flatMap((team, teamIndex) => (routes[team] ?? []).map((point, pointIndex) => (
             <span
               key={`${team}-${point.x}-${point.y}-${pointIndex}`}
               className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm"
@@ -949,6 +1029,13 @@ function partnerTeams(match: ProposalMatch | null, ownTeam: string) {
   return [];
 }
 
+function allianceGroups(match: ProposalMatch): TeamGroup[] {
+  return [
+    { label: "Red", tone: "red", teams: match.redTeams },
+    { label: "Blue", tone: "blue", teams: match.blueTeams },
+  ];
+}
+
 function toProposalMatches(matches: CombinedMatch[]): ProposalMatch[] {
   return sortedMatches(matches)
     .map((match) => ({
@@ -957,7 +1044,12 @@ function toProposalMatches(matches: CombinedMatch[]): ProposalMatch[] {
       redTeams: matchTeams(match, "red"),
       blueTeams: matchTeams(match, "blue"),
     }))
-    .filter((match) => match.redTeams.length === 3 && match.blueTeams.length === 3);
+    .filter((match) => match.redTeams.length === 3 && match.blueTeams.length === 3 && matchHasOwnTeam(match));
+}
+
+function matchHasOwnTeam(match: ProposalMatch) {
+  const teams = [...match.redTeams, ...match.blueTeams];
+  return ownStrategyTeams.some((team) => teams.includes(team));
 }
 
 function parsePayload(value: string) {

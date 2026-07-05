@@ -166,6 +166,14 @@ export function canReviewProposal(proposal: Pick<StrategyProposal, "status"> | n
   return Boolean(isAdmin && proposal?.status === "submitted");
 }
 
+export function canDeleteProposalAs(
+  proposal: Pick<StrategyProposal, "createdBy"> | null,
+  openId: string,
+  isAdmin: boolean,
+) {
+  return Boolean(proposal && (isAdmin || proposal.createdBy === openId));
+}
+
 export function canRestoreApprovedSnapshot(
   proposal: Pick<StrategyProposal, "createdBy" | "status" | "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload"> | null,
   openId: string,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canDeleteProposalAs,
   canEditProposal,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
@@ -83,6 +84,9 @@ describe("strategy proposal helpers", () => {
     expect(canReviewProposal(proposal("submitted"), true)).toBe(true);
     expect(canReviewProposal(proposal("draft"), true)).toBe(false);
     expect(canReviewProposal(proposal("submitted"), false)).toBe(false);
+    expect(canDeleteProposalAs(proposal("submitted"), "u1", false)).toBe(true);
+    expect(canDeleteProposalAs(proposal("submitted"), "u2", false)).toBe(false);
+    expect(canDeleteProposalAs(proposal("submitted"), "u2", true)).toBe(true);
   });
 
   it("allows restoring a changed proposal to the last approved snapshot", () => {

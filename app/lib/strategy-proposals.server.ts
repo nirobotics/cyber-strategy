@@ -1,6 +1,7 @@
 import { appendAudit } from "./audit.server";
 import { getClient } from "./supabase.server";
 import {
+  canDeleteProposalAs,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
@@ -200,6 +201,26 @@ export async function restoreApprovedStrategyProposal(opts: {
     changedFields: ["match_key", "match_label", "own_team", "proposal_type", "status", "title", "payload"],
   });
   return rowToProposal(data as StrategyProposalRow);
+}
+
+export async function deleteStrategyProposal(opts: {
+  id: string;
+  actorOpenId: string;
+  isAdmin: boolean;
+}): Promise<void> {
+  const proposal = await getStrategyProposal(opts.id);
+  if (!proposal) throw new Response("Proposal 不存在", { status: 404 });
+  if (!canDeleteProposalAs(proposal, opts.actorOpenId, opts.isAdmin)) throw new Response("无删除权限", { status: 403 });
+  const sb = getClient();
+  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+
+  const { error } = await sb.from("strategy_proposals").delete().eq("id", proposal.id);
+  if (error) throw new Response("删除 Strategy Proposal 失败", { status: 500 });
+
+  await appendAudit("strategy_proposal.delete", {
+    actorOpenId: opts.actorOpenId,
+    changedFields: ["id", "status"],
+  });
 }
 
 async function getStrategyProposal(id: string): Promise<StrategyProposal | null> {
