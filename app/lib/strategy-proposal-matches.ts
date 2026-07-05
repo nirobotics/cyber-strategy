@@ -26,6 +26,12 @@ export function proposalMatchIncludesTeam(match: ProposalMatch, team: string) {
   return match.redTeams.includes(team) || match.blueTeams.includes(team);
 }
 
+export function proposalMatchMatchesTeamQuery(match: ProposalMatch, query: string) {
+  const teamQuery = query.replace(/\D/g, "");
+  if (!teamQuery) return true;
+  return [...match.redTeams, ...match.blueTeams].some((team) => team.includes(teamQuery));
+}
+
 function matchHasOwnTeam(match: ProposalMatch) {
   return ownStrategyTeams.some((team) => proposalMatchIncludesTeam(match, team));
 }

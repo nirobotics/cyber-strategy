@@ -15,7 +15,13 @@ import { StrategyNavigation } from "./strategy-navigation";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
 import { type ScoutingDataset, type ScoutingEventOption } from "../lib/scouting";
-import { firstProposalMatchForTeam, proposalMatchIncludesTeam, proposalMatchesForTeam, type ProposalMatch } from "../lib/strategy-proposal-matches";
+import {
+  firstProposalMatchForTeam,
+  proposalMatchIncludesTeam,
+  proposalMatchesForTeam,
+  proposalMatchMatchesTeamQuery,
+  type ProposalMatch,
+} from "../lib/strategy-proposal-matches";
 import {
   autoWinners,
   canDeleteProposalAs,
@@ -79,6 +85,7 @@ export function StrategyProposalPanel({
   const [typeFilter, setTypeFilter] = useState<StrategyProposalType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
   const [matchFilter, setMatchFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("");
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
@@ -94,6 +101,9 @@ export function StrategyProposalPanel({
   const reviewer = canReviewProposal(selected, data.isAdmin);
   const restorable = canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && data.isAdmin);
+  const matchByKey = new Map(data.matches.map((match) => [match.key, match]));
+  const teamFilterDigits = teamFilter.replace(/\D/g, "");
+  const matchFilterOptions = data.matches.filter((match) => proposalMatchMatchesTeamQuery(match, teamFilter));
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
     ...selected,
     matchKey: editor.matchKey,
@@ -105,7 +115,8 @@ export function StrategyProposalPanel({
   const filteredProposals = data.proposals.filter((proposal) =>
     (typeFilter === "all" || proposal.proposalType === typeFilter) &&
     (statusFilter === "all" || proposal.status === statusFilter) &&
-    (matchFilter === "all" || proposal.matchKey === matchFilter)
+    (matchFilter === "all" || proposal.matchKey === matchFilter) &&
+    (!teamFilterDigits || proposal.ownTeam.includes(teamFilterDigits) || proposalMatchMatchesTeamQuery(matchByKey.get(proposal.matchKey) ?? emptyProposalMatch(proposal), teamFilter))
   );
   const teamDetail = detailTeam ? data.dataset.teamData[detailTeam] : null;
 
@@ -192,6 +203,12 @@ export function StrategyProposalPanel({
     }));
   }
 
+  function updateTeamFilter(value: string) {
+    setTeamFilter(value);
+    const selectedMatchFilter = data.matches.find((match) => match.key === matchFilter) ?? null;
+    if (selectedMatchFilter && !proposalMatchMatchesTeamQuery(selectedMatchFilter, value)) setMatchFilter("all");
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-3">
       {!embedded ? <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
@@ -246,9 +263,17 @@ export function StrategyProposalPanel({
               <option value="all">所有状态</option>
               {proposalStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
             </select>
+            <input
+              value={teamFilter}
+              onChange={(event) => updateTeamFilter(event.target.value)}
+              inputMode="numeric"
+              className="input h-9 font-sans"
+              placeholder="按队号查找"
+              aria-label="按队号查找 proposal"
+            />
             <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value)} className="input h-9 font-sans">
               <option value="all">所有己方比赛</option>
-              {data.matches.map((match) => (
+              {matchFilterOptions.map((match) => (
                 <option key={match.key} value={match.key}>{match.label} · R {match.redTeams.join("/")} · B {match.blueTeams.join("/")}</option>
               ))}
             </select>
@@ -520,6 +545,10 @@ function PayloadEditor({
       onChange={onChange}
     />
   );
+}
+
+function emptyProposalMatch(proposal: StrategyProposal): ProposalMatch {
+  return { key: proposal.matchKey, label: proposal.matchLabel, redTeams: [proposal.ownTeam], blueTeams: [] };
 }
 
 function AutoProposalEditor({

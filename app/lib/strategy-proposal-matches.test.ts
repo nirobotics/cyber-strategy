@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { firstProposalMatchForTeam, proposalMatchIncludesTeam, proposalMatchesForTeam, type ProposalMatch } from "./strategy-proposal-matches";
+import {
+  firstProposalMatchForTeam,
+  proposalMatchIncludesTeam,
+  proposalMatchesForTeam,
+  proposalMatchMatchesTeamQuery,
+  type ProposalMatch,
+} from "./strategy-proposal-matches";
 
 const matches: ProposalMatch[] = [
   { key: "qm1", label: "Q1", redTeams: ["8214", "111", "222"], blueTeams: ["333", "444", "555"] },
@@ -13,5 +19,11 @@ describe("strategy proposal matches", () => {
     expect(proposalMatchesForTeam(matches, "9635").map((match) => match.key)).toEqual(["qm2", "qm3"]);
     expect(firstProposalMatchForTeam(matches, "9635")?.key).toBe("qm2");
     expect(proposalMatchIncludesTeam(matches[0], "9635")).toBe(false);
+  });
+
+  it("matches proposal matches by partial team number query", () => {
+    expect(proposalMatchMatchesTeamQuery(matches[0], "82")).toBe(true);
+    expect(proposalMatchMatchesTeamQuery(matches[0], "Team 333")).toBe(true);
+    expect(proposalMatchMatchesTeamQuery(matches[0], "9635")).toBe(false);
   });
 });
