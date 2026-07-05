@@ -581,6 +581,13 @@ function AutoProposalEditor({
         onOpenTeam={onOpenTeam}
         onRoutesChange={(transitionRoutes) => onChange({ ...payload, transitionRoutes })}
       />
+      <TeamNoteRows
+        title="队伍备注"
+        teams={teams}
+        notes={payload.teamNotes}
+        disabled={disabled}
+        onChange={(teamNotes) => onChange({ ...payload, teamNotes })}
+      />
       <NoteBox value={payload.note} disabled={disabled} onChange={(note) => onChange({ ...payload, note })} />
     </div>
   );
@@ -662,8 +669,50 @@ function PartnerStrategyEditor({
         onOpenTeam={onOpenTeam}
         onRoutesChange={(routes) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, routes } } })}
       />
+      <TeamNoteRows
+        title="队友备注"
+        teams={partners}
+        notes={payload.partnerNotes}
+        disabled={disabled}
+        onChange={(partnerNotes) => onChange({ ...payload, partners, partnerNotes })}
+      />
       <NoteBox value={current.note} disabled={disabled} onChange={(note) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, note } } })} />
     </ShiftSection>
+  );
+}
+
+function TeamNoteRows({
+  title,
+  teams,
+  notes,
+  disabled,
+  onChange,
+}: {
+  title: string;
+  teams: string[];
+  notes: Record<string, string>;
+  disabled: boolean;
+  onChange: (notes: Record<string, string>) => void;
+}) {
+  if (!teams.length) return null;
+  return (
+    <div className="grid gap-2 rounded-md border border-line bg-surface-2 p-3">
+      <p className="section-label">{title}</p>
+      <div className="grid gap-2 md:grid-cols-2">
+        {teams.map((team) => (
+          <label key={team} className="grid gap-1">
+            <span className="text-sm font-medium text-ink-dim">Team {team}</span>
+            <input
+              value={notes[team] ?? ""}
+              disabled={disabled}
+              onChange={(event) => onChange({ ...notes, [team]: event.target.value })}
+              className="input h-10 font-sans"
+              placeholder="备注"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -924,6 +973,7 @@ function ensureAutoPayload(payload: AutoProposalPayload, teams: string[]): AutoP
     ...payload,
     autoRoutes: keepRouteTeams(payload.autoRoutes, teams),
     transitionRoutes: keepRouteTeams(payload.transitionRoutes, teams),
+    teamNotes: keepNotesForTeams(payload.teamNotes, teams),
   };
 }
 
@@ -931,6 +981,7 @@ function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[
   return {
     ...payload,
     partners,
+    partnerNotes: keepNotesForTeams(payload.partnerNotes, partners),
     shifts: Object.fromEntries(strategyShifts.map((shift) => [
       shift,
       {
@@ -944,6 +995,12 @@ function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[
 function keepRouteTeams(routes: RouteMap, teams: string[]) {
   const next: RouteMap = {};
   for (const team of teams) next[team] = routes[team] ?? [];
+  return next;
+}
+
+function keepNotesForTeams(notes: Record<string, string>, teams: string[]) {
+  const next: Record<string, string> = {};
+  for (const team of teams) next[team] = notes[team] ?? "";
   return next;
 }
 

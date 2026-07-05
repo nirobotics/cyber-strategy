@@ -24,12 +24,14 @@ describe("strategy proposal helpers", () => {
       autoWinner: "red",
       autoRoutes: { frc8214: [{ x: 10.04, y: 99.96 }, { x: -1, y: 2 }] },
       transitionRoutes: { 9635: [{ x: 50, y: 40 }] },
+      teamNotes: { frc8214: "  start left  " },
       note: "  hold center  ",
     })).toEqual({
       kind: "auto",
       autoWinner: "red",
       autoRoutes: { "8214": [{ x: 10, y: 100 }] },
       transitionRoutes: { "9635": [{ x: 50, y: 40 }] },
+      teamNotes: { "8214": "start left" },
       note: "hold center",
     });
   });
@@ -55,6 +57,7 @@ describe("strategy proposal helpers", () => {
   it("keeps partner strategy as one shared route map per shift", () => {
     const payload = normalizeProposalPayload("partner_strategy", {
       partners: ["frc1", "2"],
+      partnerNotes: { frc1: "  feed from left  " },
       shifts: {
         active: {
           routes: {
@@ -69,6 +72,7 @@ describe("strategy proposal helpers", () => {
     expect(payload).toMatchObject({
       kind: "partner_strategy",
       partners: ["1", "2"],
+      partnerNotes: { "1": "feed from left" },
       shifts: {
         active: {
           routes: {

@@ -18,6 +18,7 @@ export type AutoProposalPayload = {
   autoWinner: AutoWinner;
   autoRoutes: RouteMap;
   transitionRoutes: RouteMap;
+  teamNotes: Record<string, string>;
   note: string;
 };
 
@@ -29,6 +30,7 @@ export type SelfStrategyPayload = {
 export type PartnerStrategyPayload = {
   kind: "partner_strategy";
   partners: string[];
+  partnerNotes: Record<string, string>;
   shifts: Record<StrategyShift, { routes: RouteMap; note: string }>;
 };
 
@@ -103,6 +105,7 @@ export function normalizeProposalPayload(type: StrategyProposalType, value: unkn
     return {
       kind: "partner_strategy",
       partners: stringArray(record.partners),
+      partnerNotes: normalizeNoteMap(record.partnerNotes),
       shifts: Object.fromEntries(
         strategyShifts.map((shift) => {
           const source = objectValue(record.shifts)[shift];
@@ -118,6 +121,7 @@ export function normalizeProposalPayload(type: StrategyProposalType, value: unkn
     autoWinner: autoWinners.includes(record.autoWinner as AutoWinner) ? (record.autoWinner as AutoWinner) : "unknown",
     autoRoutes: normalizeRouteMap(record.autoRoutes),
     transitionRoutes: normalizeRouteMap(record.transitionRoutes),
+    teamNotes: normalizeNoteMap(record.teamNotes),
     note: stringValue(record.note),
   };
 }
@@ -147,6 +151,17 @@ export function normalizeRouteMap(value: unknown): RouteMap {
     routes[normalizedTeam] = normalizePoints(points);
   }
   return routes;
+}
+
+function normalizeNoteMap(value: unknown) {
+  const record = objectValue(value);
+  const notes: Record<string, string> = {};
+  for (const [team, note] of Object.entries(record)) {
+    const normalizedTeam = teamNumber(team);
+    if (!normalizedTeam) continue;
+    notes[normalizedTeam] = stringValue(note);
+  }
+  return notes;
 }
 
 export function canEditProposal(proposal: Pick<StrategyProposal, "createdBy" | "status"> | null, openId: string) {
