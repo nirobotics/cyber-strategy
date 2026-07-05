@@ -9,15 +9,16 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Form, Link, redirect, useActionData, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.strategy-proposal";
+import { PhotoLightbox, TeamDetailModal } from "../components/analytics-dashboard";
 import { Badge, Button, Card, Input, cn } from "../components/ui";
 import { requireUser } from "../lib/auth.server";
 import { getStrategyDatasetForRequest } from "../lib/cyber-scout.server";
 import { matchIdentity, matchLabel, matchTeams, sortedMatches, type CombinedMatch } from "../lib/match-analysis";
 import { isAdmin } from "../lib/profiles.server";
-import { reliability, type ScoutingDataset, type TeamSummary } from "../lib/scouting";
+import { type ScoutingDataset } from "../lib/scouting";
 import {
   listStrategyProposals,
   reviewStrategyProposal,
@@ -164,6 +165,7 @@ function StrategyProposalPage({
   const [typeFilter, setTypeFilter] = useState<StrategyProposalType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [editor, setEditor] = useState(() => initialEditorState(selected, loaderData.matches, loaderData.dataset));
   const busy = navigation.state !== "idle";
   const selectedMatch = loaderData.matches.find((match) => match.key === editor.matchKey) ?? loaderData.matches[0] ?? null;
@@ -238,7 +240,6 @@ function StrategyProposalPage({
       <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="section-label">Strategy Proposal</p>
-          <h1 className="text-2xl font-semibold text-ink">提交与审核策略 proposal</h1>
           <p className="mt-1 text-sm text-ink-dim">
             {loaderData.selectedEventKey} · {loaderData.proposals.length} 个 proposal · {loaderData.matches.length} 场比赛
           </p>
@@ -459,7 +460,23 @@ function StrategyProposalPage({
         </Card>
       </div>
 
-      {teamDetail ? <TeamDetailModal team={teamDetail} onClose={() => setDetailTeam(null)} /> : null}
+      {teamDetail ? (
+        <TeamDetailModal
+          team={teamDetail}
+          photos={loaderData.dataset.teamPhotos[teamDetail.team] ?? []}
+          pitInfo={loaderData.dataset.teamPitData?.[teamDetail.team]}
+          onOpenPhoto={(index) => setLightbox({ team: teamDetail.team, index })}
+          onClose={() => setDetailTeam(null)}
+        />
+      ) : null}
+      {lightbox ? (
+        <PhotoLightbox
+          photos={loaderData.dataset.teamPhotos[lightbox.team] ?? []}
+          index={lightbox.index}
+          onChange={(index) => setLightbox({ ...lightbox, index })}
+          onClose={() => setLightbox(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -829,73 +846,6 @@ function NoteBox({ value, disabled, onChange }: { value: string; disabled: boole
       <span className="text-sm font-medium text-ink-dim">备注</span>
       <textarea value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="input min-h-24 font-sans" />
     </label>
-  );
-}
-
-function TeamDetailModal({ team, onClose }: { team: TeamSummary; onClose: () => void }) {
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 p-3 md:p-6" role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <Card className="mx-auto max-h-[90dvh] w-full max-w-3xl overflow-hidden p-0 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between gap-2 border-b border-line p-3">
-          <div>
-            <p className="section-label">队伍详情</p>
-            <h2 className="text-lg font-semibold text-ink">Team {team.team}</h2>
-          </div>
-          <Button type="button" onClick={onClose} className="h-9 px-2">
-            <X className="size-4" />
-          </Button>
-        </div>
-        <div className="grid gap-3 overflow-y-auto p-3">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <MiniStat label="综合分" value={team.avgTotal} />
-            <MiniStat label="Auto" value={team.avgAuto} />
-            <MiniStat label="Tele" value={team.avgTele} />
-            <MiniStat label="可靠性" value={`${reliability(team)}%`} />
-          </div>
-          <div className="overflow-x-auto rounded-md border border-line">
-            <table className="w-full min-w-[540px] text-left text-sm">
-              <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
-                <tr>
-                  <th className="px-3 py-2">场次</th>
-                  <th className="px-3 py-2">综合分</th>
-                  <th className="px-3 py-2">Auto</th>
-                  <th className="px-3 py-2">Tele</th>
-                  <th className="px-3 py-2">备注</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {team.matches.map((match) => (
-                  <tr key={match.match}>
-                    <td className="px-3 py-2 font-semibold">M{match.match}</td>
-                    <td className="px-3 py-2">{match.totalPts}</td>
-                    <td className="px-3 py-2">{match.autoPts}</td>
-                    <td className="px-3 py-2">{match.telePts}</td>
-                    <td className="px-3 py-2 text-ink-dim">{match.comment || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-md border border-line bg-surface-2 p-3">
-      <p className="section-label">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
-    </div>
   );
 }
 

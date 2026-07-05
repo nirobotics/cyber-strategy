@@ -764,7 +764,7 @@ function PicklistBoard({
   );
 }
 
-function TeamDetailModal({
+export function TeamDetailModal({
   team,
   tier,
   photos,
@@ -882,7 +882,7 @@ function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number
   );
 }
 
-function PhotoLightbox({
+export function PhotoLightbox({
   photos,
   index,
   onChange,
@@ -1163,7 +1163,7 @@ function compareLineConfig(teams: TeamSummary[], palette: ChartPaletteLike): Cha
     data: {
       datasets: teams.map((team, index) => ({
         label: `Team ${team.team}`,
-        data: team.matches.map((match) => ({ x: match.match, y: match.totalPts })),
+        data: team.matches.map((match, matchIndex) => ({ x: matchIndex + 1, y: match.totalPts })),
         borderColor: palette.colors[index],
         backgroundColor: `${palette.colors[index]}18`,
         pointBackgroundColor: palette.colors[index],
@@ -1178,7 +1178,12 @@ function compareLineConfig(teams: TeamSummary[], palette: ChartPaletteLike): Cha
       interaction: { mode: "index", intersect: false },
       plugins: { legend: { labels: { color: palette.muted, boxWidth: 10 } }, tooltip: tooltipOptions(palette) },
       scales: {
-        x: { type: "linear", title: { display: true, text: "场次", color: palette.muted }, ticks: { color: palette.muted }, grid: { color: palette.grid } },
+        x: {
+          type: "linear",
+          title: { display: true, text: "队伍第 n 场", color: palette.muted },
+          ticks: { color: palette.muted, precision: 0, callback: (value) => `M${value}` },
+          grid: { color: palette.grid },
+        },
         y: { title: { display: true, text: "综合分", color: palette.muted }, ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
       },
     },
