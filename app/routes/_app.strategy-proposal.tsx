@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   CheckCircle2,
   Eye,
   Plus,
@@ -10,9 +9,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { Link, useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.strategy-proposal";
 import { PhotoLightbox, TeamDetailModal } from "../components/analytics-dashboard";
+import { StrategyNavigation } from "../components/strategy-navigation";
 import { Badge, Button, Card, Input, cn } from "../components/ui";
 import { requireUser } from "../lib/auth.server";
 import { getStrategyDatasetForRequest } from "../lib/cyber-scout.server";
@@ -273,11 +273,10 @@ function StrategyProposalPage({
               </option>
             ))}
           </select>
-          <Link to={`/?event=${encodeURIComponent(loaderData.selectedEventKey)}`} className="btn">
-            <ArrowLeft className="size-4" />
-            返回
-          </Link>
         </div>
+      </div>
+      <div className="rounded-card border border-line bg-surface p-2">
+        <StrategyNavigation active="proposal" eventKey={loaderData.selectedEventKey} isAdmin={loaderData.isAdmin} />
       </div>
 
       {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}

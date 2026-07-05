@@ -21,7 +21,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router";
+import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import { MatchAnalysis } from "./match-analysis";
@@ -67,10 +67,11 @@ export function AnalyticsDashboard({
   tierPercentages: TierPercentages;
 }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const teams = useMemo(() => sortedTeams(dataset.teamData), [dataset.teamData]);
   const tierByTeam = useMemo(() => buildTierAssignments(teams, tierPercentages), [teams, tierPercentages]);
   const rankByTeam = useMemo(() => new Map(teams.map((team, index) => [team.team, index + 1])), [teams]);
-  const [tab, setTab] = useState<Tab>("browser");
+  const [tab, setTab] = useState<Tab>(() => readDashboardTab(searchParams.get("tab")));
   const [selectedTeam, setSelectedTeam] = useState(() => teams[0]?.team ?? "");
   const [search, setSearch] = useState("");
   const [hiddenTeams, setHiddenTeams] = useStoredList(`cyber-strategy:hidden:${dataset.id}`);
@@ -114,6 +115,15 @@ export function AnalyticsDashboard({
     }
     const search = params.toString();
     navigate(search ? `/?${search}` : "/");
+  }
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    const params = new URLSearchParams(window.location.search);
+    if (next === "browser") params.delete("tab");
+    else params.set("tab", next);
+    const search = params.toString();
+    window.history.replaceState(null, "", search ? `/?${search}` : "/");
   }
 
   function toggleHidden(team: string) {
@@ -162,16 +172,16 @@ export function AnalyticsDashboard({
               ))}
             </select>
           </label>
-          <SegmentedTab active={tab} value="browser" onClick={setTab} icon={<Bot className="size-4" />}>
+          <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
             队伍浏览
           </SegmentedTab>
-          <SegmentedTab active={tab} value="compare" onClick={setTab} icon={<BarChart3 className="size-4" />}>
+          <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-4" />}>
             队伍对比
           </SegmentedTab>
-          <SegmentedTab active={tab} value="match" onClick={setTab} icon={<Table2 className="size-4" />}>
+          <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-4" />}>
             赛程分析
           </SegmentedTab>
-          <SegmentedTab active={tab} value="picklist" onClick={setTab} icon={<ListChecks className="size-4" />}>
+          <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
             Picklist
           </SegmentedTab>
           <NavLink
@@ -307,6 +317,10 @@ export function AnalyticsDashboard({
       ) : null}
     </div>
   );
+}
+
+function readDashboardTab(value: string | null): Tab {
+  return value === "compare" || value === "match" || value === "picklist" ? value : "browser";
 }
 
 function TeamDetail({

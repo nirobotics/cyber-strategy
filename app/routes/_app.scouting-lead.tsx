@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
@@ -14,8 +13,9 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.scouting-lead";
+import { StrategyNavigation } from "../components/strategy-navigation";
 import { Badge, Button, Card, Input, cn } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
 import {
@@ -136,11 +136,10 @@ export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) 
               </option>
             ))}
           </select>
-          <Link to={selectedEventKey ? `/?event=${encodeURIComponent(selectedEventKey)}` : "/"} className="btn">
-            <ArrowLeft className="size-4" />
-            返回
-          </Link>
         </div>
+      </div>
+      <div className="rounded-card border border-line bg-surface p-2">
+        <StrategyNavigation active="lead" eventKey={selectedEventKey} isAdmin />
       </div>
 
       <div className="flex flex-wrap gap-2 rounded-card border border-line bg-surface p-2">
