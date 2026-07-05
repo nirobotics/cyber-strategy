@@ -25,6 +25,9 @@ import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import { MatchAnalysis } from "./match-analysis";
+import { ScoutingLeadPanel, type ScoutingLeadPanelData } from "./scouting-lead-panel";
+import { StrategyProposalPanel, type StrategyProposalPanelData } from "./strategy-proposal-panel";
+import type { SessionUser } from "../lib/auth-types";
 import {
   reliability,
   sortedTeams,
@@ -45,7 +48,7 @@ import {
 } from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 
-type Tab = "browser" | "compare" | "match" | "picklist";
+type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead";
 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
 const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
@@ -58,6 +61,9 @@ export function AnalyticsDashboard({
   sourceStatus,
   isAdmin,
   tierPercentages,
+  user,
+  strategyProposal,
+  scoutingLead,
 }: {
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
@@ -65,6 +71,9 @@ export function AnalyticsDashboard({
   sourceStatus: DatasetSourceStatus;
   isAdmin: boolean;
   tierPercentages: TierPercentages;
+  user: SessionUser;
+  strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches">;
+  scoutingLead: ScoutingLeadPanelData | null;
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -83,6 +92,8 @@ export function AnalyticsDashboard({
   const selected = dataset.teamData[selectedTeam] ?? teams[0];
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
   const detail = detailTeam ? dataset.teamData[detailTeam] : null;
+  const activeTab = tab === "lead" && !isAdmin ? "browser" : tab;
+  const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -122,6 +133,8 @@ export function AnalyticsDashboard({
     const params = new URLSearchParams(window.location.search);
     if (next === "browser") params.delete("tab");
     else params.set("tab", next);
+    if (next !== "proposal") params.delete("proposal");
+    if (next !== "lead") params.delete("view");
     const search = params.toString();
     window.history.replaceState(null, "", search ? `/?${search}` : "/");
   }
@@ -184,22 +197,14 @@ export function AnalyticsDashboard({
           <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
             Picklist
           </SegmentedTab>
-          <NavLink
-            to={`/strategy-proposal?event=${encodeURIComponent(selectedEventKey ?? dataset.eventKey)}`}
-            className="btn"
-          >
-            <FileText className="size-4" />
+          <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
             Strategy Proposal
-          </NavLink>
+          </SegmentedTab>
           {isAdmin ? (
             <>
-              <NavLink
-                to={`/scouting-lead?event=${encodeURIComponent(selectedEventKey ?? dataset.eventKey)}`}
-                className="btn"
-              >
-                <ShieldCheck className="size-4" />
+              <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
                 Scouting Lead
-              </NavLink>
+              </SegmentedTab>
               <NavLink to="/admin" className="btn">
                 <Settings className="size-4" />
                 管理
@@ -215,7 +220,7 @@ export function AnalyticsDashboard({
         </Card>
       ) : null}
 
-      {teams.length && tab === "browser" && selected ? (
+      {teams.length && activeTab === "browser" && selected ? (
         <div className="grid min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
           <Card className="overflow-hidden p-0 lg:sticky lg:top-3 lg:max-h-[calc(100dvh-13rem)]">
             <div className="flex items-center gap-2 border-b border-line p-3">
@@ -284,9 +289,9 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
 
-      {teams.length && tab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {tab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
-      {teams.length && tab === "picklist" ? (
+      {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
+      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
+      {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}
           teams={teams}
@@ -295,6 +300,21 @@ export function AnalyticsDashboard({
           onOpenTeam={setDetailTeam}
         />
       ) : null}
+      {activeTab === "proposal" ? (
+        <StrategyProposalPanel
+          data={{
+            dataset,
+            events,
+            selectedEventKey: resolvedEventKey,
+            isAdmin,
+            user,
+            ...strategyProposal,
+          }}
+          initialSelectedId={searchParams.get("proposal")}
+          embedded
+        />
+      ) : null}
+      {activeTab === "lead" && scoutingLead ? <ScoutingLeadPanel data={scoutingLead} embedded /> : null}
 
       {detail ? (
         <TeamDetailModal
@@ -320,7 +340,7 @@ export function AnalyticsDashboard({
 }
 
 function readDashboardTab(value: string | null): Tab {
-  return value === "compare" || value === "match" || value === "picklist" ? value : "browser";
+  return value === "compare" || value === "match" || value === "picklist" || value === "proposal" || value === "lead" ? value : "browser";
 }
 
 function TeamDetail({

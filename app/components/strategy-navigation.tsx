@@ -19,8 +19,8 @@ export function StrategyNavigation({
     { id: "compare", label: "队伍对比", icon: <BarChart3 className="size-4" />, to: dashboardPath(eventKey, "compare") },
     { id: "match", label: "赛程分析", icon: <Table2 className="size-4" />, to: dashboardPath(eventKey, "match") },
     { id: "picklist", label: "Picklist", icon: <ListChecks className="size-4" />, to: dashboardPath(eventKey, "picklist") },
-    { id: "proposal", label: "Strategy Proposal", icon: <FileText className="size-4" />, to: pagePath("/strategy-proposal", eventKey) },
-    { id: "lead", label: "Scouting Lead", icon: <ShieldCheck className="size-4" />, to: pagePath("/scouting-lead", eventKey), adminOnly: true },
+    { id: "proposal", label: "Strategy Proposal", icon: <FileText className="size-4" />, to: dashboardPath(eventKey, "proposal") },
+    { id: "lead", label: "Scouting Lead", icon: <ShieldCheck className="size-4" />, to: dashboardPath(eventKey, "lead"), adminOnly: true },
     { id: "admin", label: "管理", icon: <Settings className="size-4" />, to: "/admin", adminOnly: true },
   ];
 
@@ -46,9 +46,4 @@ function dashboardPath(eventKey: string | null, tab: StrategyNavItem) {
   if (tab !== "browser") params.set("tab", tab);
   const search = params.toString();
   return search ? `/?${search}` : "/";
-}
-
-function pagePath(path: string, eventKey: string | null) {
-  if (!eventKey) return path;
-  return `${path}?event=${encodeURIComponent(eventKey)}`;
 }
