@@ -1,5 +1,4 @@
 import {
-  MATCH_TOTAL_DURATION_MS,
   summarizeTeamMatches,
   type ScoutingDataset,
   type ScoutingMatch,
@@ -67,6 +66,8 @@ type PitRecord = {
   autoRoutes: Array<{ id: string; points: Array<{ x: number; y: number }> }>;
   sourceAt: number;
 };
+
+const incapPenaltyDurationMs = 135_000;
 
 export function buildCyberScoutDataset({
   event,
@@ -250,7 +251,7 @@ function scoreScoutMatch({
   const accuracy = (clamp(superRecord?.accuracy ?? 0, 0, 100) / 100) * 20;
   const drive = (clamp(superRecord?.drive ?? 0, 0, 5) / 5) * 10;
   const defense = (clamp(superRecord?.defense ?? 0, 0, 5) / 5) * 10;
-  const incapPenalty = Math.min(20, (Math.max(0, incapMs) / MATCH_TOTAL_DURATION_MS) * 20);
+  const incapPenalty = Math.min(20, (Math.max(0, incapMs) / incapPenaltyDurationMs) * 20);
   return round1(Math.max(0, auto + bps + accuracy + drive + defense + climbPts - incapPenalty));
 }
 

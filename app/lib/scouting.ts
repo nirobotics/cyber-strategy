@@ -90,7 +90,7 @@ export type DatasetSourceStatus = {
 
 type CsvRow = Record<string, unknown>;
 
-export const MATCH_TOTAL_DURATION_MS = 135_000;
+export const MATCH_TOTAL_DURATION_MS = 150_000;
 
 export function parseScoutingCsv(text: string): ScoutingDatasetPayload["teamData"] {
   const parsed = Papa.parse<CsvRow>(text, {

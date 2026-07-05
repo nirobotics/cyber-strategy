@@ -6,8 +6,8 @@ describe("scouting data processing", () => {
   it("computes Advantalytics team summaries from CSV rows", () => {
     const result = processCsvRows([
       row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2),
-      row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3, 67_500),
-      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4, 135_000),
+      row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3, 75_000),
+      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4, 150_000),
     ]);
 
     expect(result["8214"]).toMatchObject({

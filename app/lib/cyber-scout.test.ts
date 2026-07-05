@@ -93,7 +93,7 @@ describe("cyber-scout dataset conversion", () => {
       event,
       records: [
         normal(6328, 2, { noShow: true, incapPeriods: [{ startMs: 0, endMs: 200_000 }] }),
-        normal(157, 2, { climbPosition: "A", climbFailed: true, incapPeriods: [{ startMs: 0, endMs: 135_000 }] }),
+        normal(157, 2, { climbPosition: "A", climbFailed: true, incapPeriods: [{ startMs: 0, endMs: 150_000 }] }),
         superRecord(2, {
           teams: [6328, 157, 8214],
           auto: [100, 100, 0],
@@ -117,7 +117,7 @@ describe("cyber-scout dataset conversion", () => {
       climbPts: 0,
       botState: 3,
       disabled: false,
-      downtimeMs: 135_000,
+      downtimeMs: 150_000,
     });
     expect(reliability(dataset.teamData["157"])).toBe(100);
   });
