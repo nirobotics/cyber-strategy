@@ -279,6 +279,14 @@ export function StrategyProposalPanel({
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
           </div>
 
+          {selected?.status === "rejected" ? (
+            <div className="flex flex-wrap gap-x-2 gap-y-1 border-b border-danger/30 bg-danger/10 px-3 py-2 text-sm md:px-4">
+              <span className="font-semibold text-danger">退回反馈</span>
+              <span className="text-ink">{selected.reviewNote || "管理员未填写反馈。"}</span>
+              {selected.reviewedAt ? <span className="text-ink-dim">{new Date(selected.reviewedAt).toLocaleString()}</span> : null}
+            </div>
+          ) : null}
+
           <proposalFetcher.Form method="post" action="/strategy-proposal" className="grid gap-4 p-3 md:p-4">
             <input type="hidden" name="id" value={editor.id ?? ""} />
             <input type="hidden" name="eventKey" value={data.selectedEventKey} />
