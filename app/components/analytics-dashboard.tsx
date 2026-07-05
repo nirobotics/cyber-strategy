@@ -665,7 +665,7 @@ function PicklistBoard({
                   type="button"
                   onClick={() => onOpenTeam(team.team)}
                   className={cn(
-                    "w-fit shrink-0 rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+                    "w-fit shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
                     crossed && "line-through",
                   )}
                 >
@@ -767,7 +767,7 @@ function PicklistBoard({
                 <button
                   type="button"
                   onClick={() => onOpenTeam(team.team)}
-                  className="w-fit flex-1 rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                  className="w-fit min-w-max flex-1 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
                 >
                   Team {team.team}
                 </button>
