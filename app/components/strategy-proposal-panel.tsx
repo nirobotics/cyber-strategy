@@ -22,6 +22,7 @@ import {
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
+  proposalMatchesSnapshot,
   normalizeProposalPayload,
   ownStrategyTeams,
   proposalStatuses,
@@ -91,8 +92,15 @@ export function StrategyProposalPanel({
   const deletable = canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
   const reviewer = canReviewProposal(selected, data.isAdmin);
   const restorable = canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
-  const creatorEditingApproved = Boolean(selected?.status === "approved" && selected.createdBy === data.user.feishuOpenId && !data.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && data.isAdmin);
+  const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
+    ...selected,
+    matchKey: editor.matchKey,
+    matchLabel: matchLabelValue,
+    ownTeam: editor.ownTeam,
+    proposalType: editor.proposalType,
+    payload: editor.payload,
+  }));
   const filteredProposals = data.proposals.filter((proposal) =>
     (typeFilter === "all" || proposal.proposalType === typeFilter) &&
     (statusFilter === "all" || proposal.status === statusFilter) &&
@@ -360,23 +368,30 @@ export function StrategyProposalPanel({
                 </Button>
               ) : null}
               {editable ? (
-                creatorEditingApproved ? (
-                  <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
-                    <Send className="size-4" />
-                    修改并提交审核
-                  </Button>
+                selected?.status === "approved" ? (
+                  approvedEditorChanged ? (
+                    <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
+                      <Send className="size-4" />
+                      需要重新审核
+                    </Button>
+                  ) : adminEditingApproved ? (
+                    <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
+                      <Save className="size-4" />
+                      保存并保持通过
+                    </Button>
+                  ) : (
+                    <span className="text-sm text-ink-dim">已通过版本未修改。</span>
+                  )
                 ) : (
                   <>
                     <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
                       <Save className="size-4" />
-                      {adminEditingApproved ? "保存并保持通过" : "保存草稿"}
+                      保存草稿
                     </Button>
-                    {!adminEditingApproved ? (
-                      <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
-                        <Send className="size-4" />
-                        提交审核
-                      </Button>
-                    ) : null}
+                    <Button type="submit" name="intent" value="submit" variant="primary" disabled={busy || !selectedMatch}>
+                      <Send className="size-4" />
+                      提交审核
+                    </Button>
                   </>
                 )
               ) : (

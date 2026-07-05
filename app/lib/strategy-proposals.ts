@@ -180,7 +180,7 @@ export function canDeleteProposalAs(
 }
 
 export function canRestoreApprovedSnapshot(
-  proposal: Pick<StrategyProposal, "createdBy" | "status" | "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload"> | null,
+  proposal: Pick<StrategyProposal, "createdBy" | "status" | "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "payload"> | null,
   openId: string,
   isAdmin: boolean,
 ) {
@@ -188,7 +188,7 @@ export function canRestoreApprovedSnapshot(
 }
 
 export function proposalMatchesSnapshot(
-  proposal: Pick<StrategyProposal, "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "title" | "payload">,
+  proposal: Pick<StrategyProposal, "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "payload">,
 ) {
   const snapshot = proposal.lastApprovedSnapshot;
   if (!snapshot) return false;
@@ -197,14 +197,12 @@ export function proposalMatchesSnapshot(
     matchLabel: proposal.matchLabel,
     ownTeam: proposal.ownTeam,
     proposalType: proposal.proposalType,
-    title: proposal.title,
     payload: proposal.payload,
   }) === JSON.stringify({
     matchKey: snapshot.matchKey,
     matchLabel: snapshot.matchLabel,
     ownTeam: snapshot.ownTeam,
     proposalType: snapshot.proposalType,
-    title: snapshot.title,
     payload: snapshot.payload,
   });
 }

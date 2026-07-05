@@ -7,6 +7,7 @@ import {
   canReviewProposal,
   normalizeOwnTeam,
   normalizeProposalPayload,
+  proposalMatchesSnapshot,
   strategyProposalTitle,
   type StrategyProposal,
 } from "./strategy-proposals";
@@ -123,6 +124,29 @@ describe("strategy proposal helpers", () => {
     expect(canRestoreApprovedSnapshot(changed, "u2", false)).toBe(false);
     expect(canRestoreApprovedSnapshot(changed, "u2", true)).toBe(true);
     expect(canRestoreApprovedSnapshot(unchanged, "u1", false)).toBe(false);
+  });
+
+  it("does not treat generated title differences as proposal changes", () => {
+    const payload = normalizeProposalPayload("auto", { note: "same" });
+    expect(proposalMatchesSnapshot({
+      ...proposal("approved"),
+      matchKey: "qm1",
+      matchLabel: "Q1",
+      ownTeam: "8214",
+      proposalType: "auto",
+      payload,
+      lastApprovedSnapshot: {
+        matchKey: "qm1",
+        matchLabel: "Q1",
+        ownTeam: "8214",
+        proposalType: "auto",
+        title: "Old generated title",
+        payload,
+        reviewedBy: "admin",
+        reviewNote: null,
+        reviewedAt: "2026-07-05T00:00:00.000Z",
+      },
+    })).toBe(true);
   });
 });
 

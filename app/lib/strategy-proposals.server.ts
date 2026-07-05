@@ -10,6 +10,7 @@ import {
   normalizeOwnTeam,
   normalizeProposalPayload,
   normalizeProposalSnapshot,
+  proposalMatchesSnapshot,
   strategyProposalTitle,
   type StrategyProposal,
   type StrategyProposalSnapshot,
@@ -73,14 +74,6 @@ export async function saveStrategyProposal(opts: {
   if (!canEditProposalAs(existing, opts.actorOpenId, opts.isAdmin)) throw new Response("当前状态不允许编辑或提交", { status: 403 });
 
   const now = new Date().toISOString();
-  const editingApprovedAsCreator = Boolean(existing?.status === "approved" && existing.createdBy === opts.actorOpenId && !opts.isAdmin);
-  const nextStatus: StrategyProposalStatus = editingApprovedAsCreator
-    ? "submitted"
-    : opts.submit
-      ? "submitted"
-      : existing?.status === "rejected"
-        ? "draft"
-        : existing?.status ?? "draft";
   const normalizedType = opts.proposalType;
   const normalizedValues = {
     matchKey: cleanText(opts.matchKey),
@@ -90,6 +83,15 @@ export async function saveStrategyProposal(opts: {
     title: strategyProposalTitle(normalizedType, cleanText(opts.matchLabel) || cleanText(opts.matchKey)),
     payload: normalizeProposalPayload(normalizedType, opts.payload),
   };
+  const approvedValuesChanged = Boolean(existing?.status === "approved" && !proposalMatchesSnapshot({ ...existing, ...normalizedValues }));
+  const editingApprovedAsCreator = Boolean(existing?.status === "approved" && existing.createdBy === opts.actorOpenId && !opts.isAdmin);
+  const nextStatus: StrategyProposalStatus = editingApprovedAsCreator && approvedValuesChanged
+    ? "submitted"
+    : opts.submit
+      ? "submitted"
+      : existing?.status === "rejected"
+        ? "draft"
+        : existing?.status ?? "draft";
   const nextReviewedBy = nextStatus === "approved" ? opts.actorOpenId : nextStatus === "submitted" ? null : existing?.reviewedBy ?? null;
   const nextReviewNote = nextStatus === "submitted" ? null : existing?.reviewNote ?? null;
   const nextReviewedAt = nextStatus === "approved" ? now : nextStatus === "submitted" ? null : existing?.reviewedAt ?? null;
