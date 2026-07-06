@@ -42,6 +42,7 @@ type NormalRecord = {
   climbFailed: boolean;
   incapMs: number;
   shootingMs: number;
+  transferShootingMs: number;
   sourceAt: number;
 };
 
@@ -150,6 +151,7 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
   const team = positiveId(row.team_number) ?? positiveId(payload.teamNumber);
   const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
   if (!team || !match) return;
+  const shotTimes = manualShotTimes(payload);
 
   const record: NormalRecord = {
     team,
@@ -160,7 +162,8 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
     climbPosition: stringValue(payload.climbPosition),
     climbFailed: booleanValue(payload.climbFailed),
     incapMs: timedPeriodsMs(payload.incapPeriods ?? payload.ip),
-    shootingMs: timedPeriodsMs(payload.manualShotWhileIntaking ?? payload.wi) + timedPeriodsMs(payload.manualShotDirect ?? payload.sd),
+    shootingMs: shotTimes.scoringMs,
+    transferShootingMs: shotTimes.transferMs,
     sourceAt: rowTimestamp(row),
   };
   upsertLatest(map, teamMatchKey(team, match), record);
@@ -231,6 +234,7 @@ function toScoutingMatch({
   const climbPts = normal?.climbPosition && !normal.climbFailed ? 5 : 0;
   const autoScore = noShow ? 0 : round1(tbaScore.autoPts);
   const teleScore = noShow ? 0 : round1(tbaScore.teleGamePiecePts + climbPts);
+  const transferPieces = noShow ? 0 : predictedTransferPieces(normal, superRecord);
   const totalScore = noShow ? 0 : round1(autoScore + teleScore);
   const safeAuto = Math.min(autoScore, totalScore);
   const accuracy = noShow ? null : normalizeAccuracy(superRecord?.accuracy);
@@ -242,6 +246,7 @@ function toScoutingMatch({
     totalPts: totalScore,
     autoPts: round1(safeAuto),
     telePts: round1(Math.max(0, totalScore - safeAuto)),
+    transferPieces,
     bps: clamp(superRecord?.bps ?? 0, 0, 35),
     hubSuccess: accuracy ?? 0,
     hubFail: accuracy == null ? 0 : round1(100 - accuracy),
@@ -311,8 +316,63 @@ function predictedGamePieces(normal?: NormalRecord, superRecord?: SuperRecord) {
   return clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds * accuracy;
 }
 
+function predictedTransferPieces(normal?: NormalRecord, superRecord?: SuperRecord) {
+  const shootingSeconds = Math.max(0, normal?.transferShootingMs ?? 0) / 1000;
+  const accuracy = clamp(superRecord?.accuracy ?? 0, 0, 100) / 100;
+  return round1(clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds * accuracy);
+}
+
+function manualShotTimes(payload: Record<string, unknown>) {
+  const shots = [...timedPeriods(payload.manualShotWhileIntaking ?? payload.wi), ...timedPeriods(payload.manualShotDirect ?? payload.sd)];
+  const zones = manualZoneIntervals(payload);
+  let scoringMs = 0;
+  let transferMs = 0;
+
+  for (const shot of shots) {
+    for (const zone of zones) {
+      const overlap = Math.max(0, Math.min(shot.endMs, zone.endMs) - Math.max(shot.startMs, zone.startMs));
+      if (!overlap) continue;
+      if (zone.kind === "alliance") scoringMs += overlap;
+      if (zone.kind === "transfer") transferMs += overlap;
+    }
+  }
+
+  return { scoringMs, transferMs };
+}
+
+function manualZoneIntervals(payload: Record<string, unknown>) {
+  const events = arrayValue(payload.manualZoneEvents ?? payload.me)
+    .map((event) => {
+      const item = objectPayload(event);
+      const atMs = numberValue(item.atMs ?? item.a, Number.NaN);
+      const kind = zoneKind(item.zone);
+      return Number.isFinite(atMs) && kind ? { atMs, kind } : null;
+    })
+    .filter((event): event is { atMs: number; kind: "alliance" | "transfer" } => Boolean(event))
+    .sort((a, b) => a.atMs - b.atMs);
+
+  if (!events.length) {
+    const kind = zoneKind(payload.manualZone ?? payload.mz ?? payload.finalZone ?? payload.fz);
+    return kind ? [{ startMs: 0, endMs: Number.POSITIVE_INFINITY, kind }] : [];
+  }
+
+  return events.map((event, index) => ({
+    startMs: event.atMs,
+    endMs: events[index + 1]?.atMs ?? Number.POSITIVE_INFINITY,
+    kind: event.kind,
+  }));
+}
+
+function zoneKind(value: unknown): "alliance" | "transfer" | null {
+  const zone = stringValue(value).toLowerCase();
+  if (zone === "联盟" || zone === "alliance" || zone === "a") return "alliance";
+  if (zone === "中立" || zone === "对方" || zone === "neutral" || zone === "opponent" || zone === "n" || zone === "o") return "transfer";
+  return null;
+}
+
 function allocateByWeight(total: number | null, weights: number[]) {
   if (total == null) return weights.map(() => null);
+  if (total === 0) return weights.map(() => 0);
   const sum = weights.reduce((value, weight) => value + Math.max(0, weight), 0);
   if (sum <= 0) return weights.map(() => null);
   return weights.map((weight) => round1((total * Math.max(0, weight)) / sum));
@@ -475,12 +535,16 @@ function stringAt(value: unknown, index: number): string {
 }
 
 function timedPeriodsMs(value: unknown): number {
-  return arrayValue(value).reduce<number>((sum, period) => {
+  return timedPeriods(value).reduce<number>((sum, period) => sum + Math.max(0, period.endMs - period.startMs), 0);
+}
+
+function timedPeriods(value: unknown): Array<{ startMs: number; endMs: number }> {
+  return arrayValue(value).map((period) => {
     const item = objectPayload(period);
     const start = numberValue(item.startMs ?? item.s);
     const end = numberValue(item.endMs ?? item.e);
-    return sum + Math.max(0, end - start);
-  }, 0);
+    return { startMs: start, endMs: end };
+  });
 }
 
 function autoRouteArray(value: unknown): Array<{ id: string; points: Array<{ x: number; y: number }> }> {

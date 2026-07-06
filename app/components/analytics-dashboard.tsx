@@ -389,6 +389,7 @@ function TeamDetail({
         <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
         <Stat label="自动贡献" value={team.avgAuto} sub="分" />
         <Stat label="手动贡献" value={team.avgTele} sub="分" />
+        <Stat label="Transfer 球量" value={(team.avgTransferPieces ?? 0) > 0 ? team.avgTransferPieces : "-"} sub="平均" />
         <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} sub="Scout" />
         <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} sub="Scout" />
         <Stat label="可靠性" value={`${reliability(team)}%`} sub="平均宕机占比" />
@@ -449,13 +450,14 @@ function TeamDetail({
           <h3 className="section-label">逐场数据</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
+          <table className="w-full min-w-[800px] border-collapse text-sm">
             <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
               <tr>
                 <th className="px-3 py-2 text-left">场次</th>
                 <th className="px-3 py-2 text-left">综合分</th>
                 <th className="px-3 py-2 text-left">自动贡献</th>
                 <th className="px-3 py-2 text-left">手动贡献</th>
+                <th className="px-3 py-2 text-left">Transfer</th>
                 <th className="px-3 py-2 text-left">命中率</th>
                 <th className="px-3 py-2 text-left">状态</th>
                 <th className="px-3 py-2 text-left">备注</th>
@@ -470,6 +472,7 @@ function TeamDetail({
                   </td>
                   <td className="px-3 py-2">{match.autoPts}</td>
                   <td className="px-3 py-2">{match.telePts}</td>
+                  <td className="px-3 py-2">{(match.transferPieces ?? 0) > 0 ? match.transferPieces : "-"}</td>
                   <td className="px-3 py-2">{match.accuracy == null ? "-" : `${match.accuracy}%`}</td>
                   <td className="px-3 py-2">
                     <StatePill match={match} />

@@ -40,6 +40,7 @@ describe("cyber-scout dataset conversion", () => {
           climbFailed: false,
           startPosition: "hub-front",
           manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
         }),
         superRecord(1, {
           teams: [8214, 6328, 157],
@@ -144,12 +145,15 @@ describe("cyber-scout dataset conversion", () => {
         normal(8214, 3, {
           climbPosition: "A",
           manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
         }),
         normal(6328, 3, {
           manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
         }),
         normal(157, 3, {
           manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
         }),
         superRecord(3, {
           teams: [8214, 6328, 157],
@@ -181,6 +185,59 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("scores only alliance-zone shooting and reports neutral or opponent shooting as transfer", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 4,
+        alliances: {
+          red: { team_keys: ["frc8214", "frc6328", "frc157"] },
+        },
+        score_breakdown: {
+          red: {
+            autoPoints: 10,
+            teleopGamePiecePoints: 40,
+          },
+        },
+      }],
+      records: [
+        normal(8214, 4, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }, { zone: "中立", atMs: 5_000 }],
+        }),
+        normal(6328, 4, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "对方", atMs: 0 }],
+        }),
+        superRecord(4, {
+          teams: [8214, 6328, 157],
+          auto: [100, 0, 0],
+          drive: [0, 0, 0],
+          defense: [0, 0, 0],
+          bps: [2, 2, 0],
+          accuracy: [50, 50, 0],
+          comments: ["", "", ""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({
+      autoPts: 10,
+      telePts: 40,
+      transferPieces: 5,
+      totalPts: 50,
+    });
+    expect(dataset.teamData["6328"].matches[0]).toMatchObject({
+      autoPts: 0,
+      telePts: 0,
+      transferPieces: 10,
+      totalPts: 0,
+    });
+    expect(dataset.teamData["8214"].avgTransferPieces).toBe(5);
+    expect(dataset.teamData["6328"].avgTransferPieces).toBe(10);
+  });
+
   it("applies no-show, incap, and climb failure rules", () => {
     const dataset = buildCyberScoutDataset({
       event,
@@ -199,7 +256,13 @@ describe("cyber-scout dataset conversion", () => {
       }],
       records: [
         normal(6328, 2, { noShow: true, incapPeriods: [{ startMs: 0, endMs: 200_000 }] }),
-        normal(157, 2, { climbPosition: "A", climbFailed: true, incapPeriods: [{ startMs: 0, endMs: 150_000 }], manualShotDirect: [{ startMs: 0, endMs: 10_000 }] }),
+        normal(157, 2, {
+          climbPosition: "A",
+          climbFailed: true,
+          incapPeriods: [{ startMs: 0, endMs: 150_000 }],
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
         superRecord(2, {
           teams: [6328, 157, 8214],
           auto: [100, 100, 0],

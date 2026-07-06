@@ -5,6 +5,7 @@ export type ScoutingMatch = {
   totalPts: number;
   autoPts: number;
   telePts: number;
+  transferPieces?: number;
   bps?: number;
   hubSuccess: number;
   hubFail: number;
@@ -27,6 +28,7 @@ export type TeamSummary = {
   avgTotal: number;
   avgAuto: number;
   avgTele: number;
+  avgTransferPieces?: number;
   avgAccuracy: number;
   avgDriver: number;
   avgDefense?: number;
@@ -140,6 +142,7 @@ export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): Te
     avgTotal,
     avgAuto: avg(matchList.map((match) => match.autoPts)),
     avgTele: avg(matchList.map((match) => match.telePts)),
+    avgTransferPieces: avg(matchList.map((match) => match.transferPieces ?? 0).filter((value) => value > 0)),
     avgAccuracy: avg(matchList.map((match) => match.accuracy).filter((value) => value !== null)),
     avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
     avgDefense: avg(matchList.map((match) => match.defenseRating).filter((value) => value > 0)),
@@ -189,6 +192,7 @@ function toMatch(row: CsvRow): ScoutingMatch {
     totalPts: number(row.TotalPoints),
     autoPts: number(row.AutoPoints),
     telePts: number(row.TelePoints),
+    transferPieces: number(row.TransferPieces),
     bps: number(row.BPS),
     hubSuccess,
     hubFail,
