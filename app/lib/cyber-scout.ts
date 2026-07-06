@@ -70,11 +70,13 @@ type PitRecord = {
 };
 
 type TbaTeamScore = {
-  autoPts?: number;
-  teleGamePiecePts?: number;
+  autoPts: number;
+  teleGamePiecePts: number;
 };
 
-const incapPenaltyDurationMs = 135_000;
+type ScoredDataset = ScoutingDataset & {
+  scoringIgnoredMatches: number;
+};
 
 export function buildCyberScoutDataset({
   event,
@@ -84,7 +86,7 @@ export function buildCyberScoutDataset({
   event: CyberScoutEventRow;
   records: CyberScoutRecordRow[];
   tbaMatches?: TbaMatch[];
-}): ScoutingDataset {
+}): ScoredDataset {
   const normalByTeamMatch = new Map<string, NormalRecord>();
   const superByTeamMatch = new Map<string, SuperRecord>();
   const pitByTeam = new Map<string, PitRecord>();
@@ -96,6 +98,7 @@ export function buildCyberScoutDataset({
   }
 
   const tbaScores = buildTbaTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch });
+  let scoringIgnoredMatches = 0;
   const matchesByTeam = new Map<string, ScoutingMatch[]>();
   const keys = new Set([...normalByTeamMatch.keys(), ...superByTeamMatch.keys()]);
   for (const key of keys) {
@@ -104,8 +107,13 @@ export function buildCyberScoutDataset({
     const team = normal?.team ?? superRecord?.team;
     const match = normal?.match ?? superRecord?.match;
     if (!team || !match) continue;
+    const tbaScore = tbaScores.get(key);
+    if (!tbaScore) {
+      scoringIgnoredMatches += 1;
+      continue;
+    }
 
-    const scoutingMatch = toScoutingMatch({ normal, superRecord, match, tbaScore: tbaScores.get(key) });
+    const scoutingMatch = toScoutingMatch({ normal, superRecord, match, tbaScore });
     matchesByTeam.set(team, [...(matchesByTeam.get(team) ?? []), scoutingMatch]);
   }
 
@@ -126,6 +134,7 @@ export function buildCyberScoutDataset({
     isActive: event.is_active,
     createdAt: null,
     updatedAt: latestTimestamp(records) ?? event.updated_at,
+    scoringIgnoredMatches,
   };
 }
 
@@ -216,16 +225,12 @@ function toScoutingMatch({
   normal?: NormalRecord;
   superRecord?: SuperRecord;
   match: number;
-  tbaScore?: TbaTeamScore;
+  tbaScore: TbaTeamScore;
 }): ScoutingMatch {
   const noShow = normal?.noShow ?? false;
   const climbPts = normal?.climbPosition && !normal.climbFailed ? 5 : 0;
-  const fallbackAutoScore = round1((clamp(superRecord?.auto ?? 0, 0, 100) / 100) * 20);
-  const fallbackTotalScore = scoreScoutMatch({ superRecord, climbPts, incapMs: normal?.incapMs ?? 0 });
-  const autoScore = noShow ? 0 : round1(tbaScore?.autoPts ?? fallbackAutoScore);
-  const teleScore = noShow
-    ? 0
-    : round1(tbaScore?.teleGamePiecePts == null ? Math.max(0, fallbackTotalScore - fallbackAutoScore) : tbaScore.teleGamePiecePts + climbPts);
+  const autoScore = noShow ? 0 : round1(tbaScore.autoPts);
+  const teleScore = noShow ? 0 : round1(tbaScore.teleGamePiecePts + climbPts);
   const totalScore = noShow ? 0 : round1(autoScore + teleScore);
   const safeAuto = Math.min(autoScore, totalScore);
   const accuracy = noShow ? null : normalizeAccuracy(superRecord?.accuracy);
@@ -291,10 +296,9 @@ function buildTbaTeamScores({
       const teleAllocations = allocateByWeight(teleGamePieceTotal, rows.map((row) => row.teleWeight));
 
       rows.forEach((row, index) => {
-        const score: TbaTeamScore = {};
-        if (autoAllocations[index] != null) score.autoPts = autoAllocations[index] ?? undefined;
-        if (teleAllocations[index] != null) score.teleGamePiecePts = teleAllocations[index] ?? undefined;
-        if (score.autoPts != null || score.teleGamePiecePts != null) scores.set(row.key, score);
+        const autoPts = autoAllocations[index];
+        const teleGamePiecePts = teleAllocations[index];
+        if (autoPts != null && teleGamePiecePts != null) scores.set(row.key, { autoPts, teleGamePiecePts });
       });
     }
   }
@@ -396,24 +400,6 @@ function finiteOrNull(value: unknown) {
 
 function teamNumbers(values: Array<string | number> | undefined) {
   return (values ?? []).map((team) => String(team).replace(/^frc/, ""));
-}
-
-function scoreScoutMatch({
-  superRecord,
-  climbPts,
-  incapMs,
-}: {
-  superRecord?: SuperRecord;
-  climbPts: number;
-  incapMs: number;
-}) {
-  const auto = (clamp(superRecord?.auto ?? 0, 0, 100) / 100) * 20;
-  const bps = clamp(superRecord?.bps ?? 0, 0, 35);
-  const accuracy = (clamp(superRecord?.accuracy ?? 0, 0, 100) / 100) * 20;
-  const drive = (clamp(superRecord?.drive ?? 0, 0, 5) / 5) * 10;
-  const defense = (clamp(superRecord?.defense ?? 0, 0, 5) / 5) * 10;
-  const incapPenalty = Math.min(20, (Math.max(0, incapMs) / incapPenaltyDurationMs) * 20);
-  return round1(Math.max(0, auto + bps + accuracy + drive + defense + climbPts - incapPenalty));
 }
 
 function buildComment(normal?: NormalRecord, superRecord?: SuperRecord) {

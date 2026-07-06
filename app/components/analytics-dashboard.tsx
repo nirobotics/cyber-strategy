@@ -163,7 +163,7 @@ export function AnalyticsDashboard({
               {sourceStatus.updatedAt ? new Date(sourceStatus.updatedAt).toLocaleString() : sourceStatus.message}
             </span>
           </div>
-          {sourceStatus.error ? <p className="mt-1 truncate text-xs text-danger">{sourceStatus.error}</p> : null}
+          {sourceStatus.error ? <p className="mt-1 text-xs text-danger">{sourceStatus.error}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="grid min-w-[170px] gap-1 text-sm">

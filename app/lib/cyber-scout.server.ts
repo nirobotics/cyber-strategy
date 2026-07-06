@@ -194,6 +194,11 @@ export async function loadCyberScoutDataset(eventKey: string | null): Promise<Cy
       tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
     }
     const dataset = buildCyberScoutDataset({ event, records, tbaMatches });
+    const scoringError = tbaError
+      ? `${tbaError}；已忽略需要 TBA 分项的比赛记录。`
+      : dataset.scoringIgnoredMatches > 0
+        ? `已忽略 ${dataset.scoringIgnoredMatches} 条缺少 TBA 分项或无法按比例分配的比赛记录。`
+        : undefined;
     return {
       dataset,
       events,
@@ -201,9 +206,9 @@ export async function loadCyberScoutDataset(eventKey: string | null): Promise<Cy
       status: {
         source: "cyber-scout",
         label: "Scout 实时数据",
-        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录${tbaError ? " · TBA 暂不可用" : ""}`,
+        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录${scoringError ? " · 部分比赛已忽略" : ""}`,
         updatedAt: dataset.updatedAt,
-        error: tbaError ?? undefined,
+        error: scoringError,
       },
     };
   } catch (error) {

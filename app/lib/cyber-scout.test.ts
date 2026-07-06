@@ -21,11 +21,25 @@ describe("cyber-scout dataset conversion", () => {
   it("converts raw scout records into Strategy team summaries", () => {
     const dataset = buildCyberScoutDataset({
       event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 1,
+        alliances: {
+          red: { team_keys: ["frc8214", "frc6328", "frc157"] },
+        },
+        score_breakdown: {
+          red: {
+            autoPoints: 20,
+            teleopGamePiecePoints: 69,
+          },
+        },
+      }],
       records: [
         normal(8214, 1, {
           climbPosition: "A",
           climbFailed: false,
           startPosition: "hub-front",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
         }),
         superRecord(1, {
           teams: [8214, 6328, 157],
@@ -86,6 +100,27 @@ describe("cyber-scout dataset conversion", () => {
       comment: "clean",
       startPos: "hub-front",
     });
+  });
+
+  it("ignores scout matches that cannot be scored from TBA", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      records: [
+        normal(8214, 1, { manualShotDirect: [{ startMs: 0, endMs: 10_000 }] }),
+        superRecord(1, {
+          teams: [8214],
+          auto: [100],
+          drive: [5],
+          defense: [5],
+          bps: [35],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"]).toBeUndefined();
+    expect(dataset.scoringIgnoredMatches).toBe(1);
   });
 
   it("uses TBA auto and tele game-piece totals with scout contribution ratios", () => {
@@ -149,9 +184,22 @@ describe("cyber-scout dataset conversion", () => {
   it("applies no-show, incap, and climb failure rules", () => {
     const dataset = buildCyberScoutDataset({
       event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 2,
+        alliances: {
+          red: { team_keys: ["frc6328", "frc157", "frc8214"] },
+        },
+        score_breakdown: {
+          red: {
+            autoPoints: 60,
+            teleopGamePiecePoints: 20,
+          },
+        },
+      }],
       records: [
         normal(6328, 2, { noShow: true, incapPeriods: [{ startMs: 0, endMs: 200_000 }] }),
-        normal(157, 2, { climbPosition: "A", climbFailed: true, incapPeriods: [{ startMs: 0, endMs: 150_000 }] }),
+        normal(157, 2, { climbPosition: "A", climbFailed: true, incapPeriods: [{ startMs: 0, endMs: 150_000 }], manualShotDirect: [{ startMs: 0, endMs: 10_000 }] }),
         superRecord(2, {
           teams: [6328, 157, 8214],
           auto: [100, 100, 0],
@@ -171,7 +219,7 @@ describe("cyber-scout dataset conversion", () => {
     });
     expect(reliability(dataset.teamData["6328"])).toBe(100);
     expect(dataset.teamData["157"].matches[0]).toMatchObject({
-      totalPts: 75,
+      totalPts: 80,
       climbPts: 0,
       botState: 3,
       disabled: false,
