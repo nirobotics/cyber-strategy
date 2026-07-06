@@ -88,6 +88,64 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("uses TBA auto and tele game-piece totals with scout contribution ratios", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 3,
+        alliances: {
+          red: { team_keys: ["frc8214", "frc6328", "frc157"] },
+          blue: { team_keys: ["frc1", "frc2", "frc3"] },
+        },
+        score_breakdown: {
+          red: {
+            autoPoints: 30,
+            teleopGamePiecePoints: 80,
+          },
+        },
+      }],
+      records: [
+        normal(8214, 3, {
+          climbPosition: "A",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+        }),
+        normal(6328, 3, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+        }),
+        normal(157, 3, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+        }),
+        superRecord(3, {
+          teams: [8214, 6328, 157],
+          auto: [50, 30, 20],
+          drive: [0, 0, 0],
+          defense: [0, 0, 0],
+          bps: [2, 1, 4],
+          accuracy: [50, 100, 0],
+          comments: ["", "", ""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({
+      autoPts: 15,
+      telePts: 45,
+      totalPts: 60,
+      climbPts: 5,
+    });
+    expect(dataset.teamData["6328"].matches[0]).toMatchObject({
+      autoPts: 9,
+      telePts: 40,
+      totalPts: 49,
+    });
+    expect(dataset.teamData["157"].matches[0]).toMatchObject({
+      autoPts: 6,
+      telePts: 0,
+      totalPts: 6,
+    });
+  });
+
   it("applies no-show, incap, and climb failure rules", () => {
     const dataset = buildCyberScoutDataset({
       event,

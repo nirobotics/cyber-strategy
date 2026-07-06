@@ -186,7 +186,14 @@ export async function loadCyberScoutDataset(eventKey: string | null): Promise<Cy
     }
 
     const records = await fetchRecords(db, event.id);
-    const dataset = buildCyberScoutDataset({ event, records });
+    let tbaMatches: TbaMatch[] = [];
+    let tbaError: string | null = null;
+    try {
+      tbaMatches = await fetchTbaMatches(event.tba_event_key);
+    } catch (error) {
+      tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
+    }
+    const dataset = buildCyberScoutDataset({ event, records, tbaMatches });
     return {
       dataset,
       events,
@@ -194,8 +201,9 @@ export async function loadCyberScoutDataset(eventKey: string | null): Promise<Cy
       status: {
         source: "cyber-scout",
         label: "Scout 实时数据",
-        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录`,
+        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录${tbaError ? " · TBA 暂不可用" : ""}`,
         updatedAt: dataset.updatedAt,
+        error: tbaError ?? undefined,
       },
     };
   } catch (error) {

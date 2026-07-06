@@ -8,6 +8,10 @@ export type TbaMatch = {
     red?: { team_keys?: string[]; score?: number };
     blue?: { team_keys?: string[]; score?: number };
   };
+  score_breakdown?: {
+    red?: Record<string, unknown>;
+    blue?: Record<string, unknown>;
+  };
 };
 
 export async function fetchTbaMatches(eventKey: string): Promise<TbaMatch[]> {

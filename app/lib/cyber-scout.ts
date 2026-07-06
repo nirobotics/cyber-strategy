@@ -6,6 +6,7 @@ import {
   type TeamData,
   type TeamPhotos,
 } from "./scouting";
+import type { TbaMatch } from "./tba.server";
 
 export type CyberScoutEventRow = {
   id: string;
@@ -40,6 +41,7 @@ type NormalRecord = {
   climbPosition: string;
   climbFailed: boolean;
   incapMs: number;
+  shootingMs: number;
   sourceAt: number;
 };
 
@@ -67,14 +69,21 @@ type PitRecord = {
   sourceAt: number;
 };
 
+type TbaTeamScore = {
+  autoPts?: number;
+  teleGamePiecePts?: number;
+};
+
 const incapPenaltyDurationMs = 135_000;
 
 export function buildCyberScoutDataset({
   event,
   records,
+  tbaMatches = [],
 }: {
   event: CyberScoutEventRow;
   records: CyberScoutRecordRow[];
+  tbaMatches?: TbaMatch[];
 }): ScoutingDataset {
   const normalByTeamMatch = new Map<string, NormalRecord>();
   const superByTeamMatch = new Map<string, SuperRecord>();
@@ -86,6 +95,7 @@ export function buildCyberScoutDataset({
     if (row.record_type === "pit") addPitRecord(pitByTeam, row);
   }
 
+  const tbaScores = buildTbaTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch });
   const matchesByTeam = new Map<string, ScoutingMatch[]>();
   const keys = new Set([...normalByTeamMatch.keys(), ...superByTeamMatch.keys()]);
   for (const key of keys) {
@@ -95,7 +105,7 @@ export function buildCyberScoutDataset({
     const match = normal?.match ?? superRecord?.match;
     if (!team || !match) continue;
 
-    const scoutingMatch = toScoutingMatch({ normal, superRecord, match });
+    const scoutingMatch = toScoutingMatch({ normal, superRecord, match, tbaScore: tbaScores.get(key) });
     matchesByTeam.set(team, [...(matchesByTeam.get(team) ?? []), scoutingMatch]);
   }
 
@@ -140,7 +150,8 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
     noShow: booleanValue(payload.noShow),
     climbPosition: stringValue(payload.climbPosition),
     climbFailed: booleanValue(payload.climbFailed),
-    incapMs: timedPeriodsMs(payload.incapPeriods),
+    incapMs: timedPeriodsMs(payload.incapPeriods ?? payload.ip),
+    shootingMs: timedPeriodsMs(payload.manualShotWhileIntaking ?? payload.wi) + timedPeriodsMs(payload.manualShotDirect ?? payload.sd),
     sourceAt: rowTimestamp(row),
   };
   upsertLatest(map, teamMatchKey(team, match), record);
@@ -200,15 +211,22 @@ function toScoutingMatch({
   normal,
   superRecord,
   match,
+  tbaScore,
 }: {
   normal?: NormalRecord;
   superRecord?: SuperRecord;
   match: number;
+  tbaScore?: TbaTeamScore;
 }): ScoutingMatch {
   const noShow = normal?.noShow ?? false;
   const climbPts = normal?.climbPosition && !normal.climbFailed ? 5 : 0;
-  const autoScore = noShow ? 0 : round1((clamp(superRecord?.auto ?? 0, 0, 100) / 100) * 20);
-  const totalScore = noShow ? 0 : scoreScoutMatch({ superRecord, climbPts, incapMs: normal?.incapMs ?? 0 });
+  const fallbackAutoScore = round1((clamp(superRecord?.auto ?? 0, 0, 100) / 100) * 20);
+  const fallbackTotalScore = scoreScoutMatch({ superRecord, climbPts, incapMs: normal?.incapMs ?? 0 });
+  const autoScore = noShow ? 0 : round1(tbaScore?.autoPts ?? fallbackAutoScore);
+  const teleScore = noShow
+    ? 0
+    : round1(tbaScore?.teleGamePiecePts == null ? Math.max(0, fallbackTotalScore - fallbackAutoScore) : tbaScore.teleGamePiecePts + climbPts);
+  const totalScore = noShow ? 0 : round1(autoScore + teleScore);
   const safeAuto = Math.min(autoScore, totalScore);
   const accuracy = noShow ? null : normalizeAccuracy(superRecord?.accuracy);
   const disabled = noShow;
@@ -235,6 +253,149 @@ function toScoutingMatch({
     startPos: normal?.startPos ?? "",
     scoutName: superRecord?.scoutName || normal?.scoutName || "",
   };
+}
+
+function buildTbaTeamScores({
+  tbaMatches,
+  normalByTeamMatch,
+  superByTeamMatch,
+}: {
+  tbaMatches: TbaMatch[];
+  normalByTeamMatch: Map<string, NormalRecord>;
+  superByTeamMatch: Map<string, SuperRecord>;
+}): Map<string, TbaTeamScore> {
+  const scores = new Map<string, TbaTeamScore>();
+  for (const match of tbaMatches) {
+    const matchNumber = positiveNumber(match.match_number);
+    if (!matchNumber) continue;
+
+    for (const alliance of ["red", "blue"] as const) {
+      const teams = teamNumbers(match.alliances?.[alliance]?.team_keys);
+      const breakdown = objectPayload(match.score_breakdown?.[alliance]);
+      const autoTotal = tbaAutoPoints(breakdown);
+      const teleGamePieceTotal = tbaTeleGamePiecePoints(breakdown);
+      if (!teams.length || (autoTotal == null && teleGamePieceTotal == null)) continue;
+
+      const rows = teams.map((team) => {
+        const key = teamMatchKey(team, matchNumber);
+        const normal = normalByTeamMatch.get(key);
+        const superRecord = superByTeamMatch.get(key);
+        const noShow = normal?.noShow ?? false;
+        return {
+          key,
+          autoWeight: noShow ? 0 : clamp(superRecord?.auto ?? 0, 0, 100),
+          teleWeight: noShow ? 0 : predictedGamePieces(normal, superRecord),
+        };
+      });
+      const autoAllocations = allocateByWeight(autoTotal, rows.map((row) => row.autoWeight));
+      const teleAllocations = allocateByWeight(teleGamePieceTotal, rows.map((row) => row.teleWeight));
+
+      rows.forEach((row, index) => {
+        const score: TbaTeamScore = {};
+        if (autoAllocations[index] != null) score.autoPts = autoAllocations[index] ?? undefined;
+        if (teleAllocations[index] != null) score.teleGamePiecePts = teleAllocations[index] ?? undefined;
+        if (score.autoPts != null || score.teleGamePiecePts != null) scores.set(row.key, score);
+      });
+    }
+  }
+  return scores;
+}
+
+function predictedGamePieces(normal?: NormalRecord, superRecord?: SuperRecord) {
+  const shootingSeconds = Math.max(0, normal?.shootingMs ?? 0) / 1000;
+  const accuracy = clamp(superRecord?.accuracy ?? 0, 0, 100) / 100;
+  return clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds * accuracy;
+}
+
+function allocateByWeight(total: number | null, weights: number[]) {
+  if (total == null) return weights.map(() => null);
+  const sum = weights.reduce((value, weight) => value + Math.max(0, weight), 0);
+  if (sum <= 0) return weights.map(() => null);
+  return weights.map((weight) => round1((total * Math.max(0, weight)) / sum));
+}
+
+function tbaAutoPoints(breakdown: Record<string, unknown>) {
+  return firstFinite(
+    breakdown.autoPoints,
+    breakdown.autoTotalPoints,
+    breakdown.autoGamePiecePoints,
+    breakdown.autoCellPoints,
+    breakdown.autoNotePoints,
+    breakdown.autoCoralPoints,
+    breakdown.autoAlgaePoints,
+    breakdown.autoCargoPoints,
+  );
+}
+
+function tbaTeleGamePiecePoints(breakdown: Record<string, unknown>) {
+  const explicit = sumKnownFields(breakdown, [
+    "teleopGamePiecePoints",
+    "teleGamePiecePoints",
+    "teleopPiecePoints",
+    "teleopCellPoints",
+    "teleopNotePoints",
+    "teleopCoralPoints",
+    "teleopAlgaePoints",
+    "teleopCargoPoints",
+    "teleopSpeakerNotePoints",
+    "teleopAmpNotePoints",
+    "endgameGamePiecePoints",
+    "endGameGamePiecePoints",
+  ]);
+  if (explicit !== null) return explicit;
+
+  const cellPoints = weightedSum(breakdown, [
+    ["teleopCellsBottom", 1],
+    ["teleopCellsOuter", 2],
+    ["teleopCellsInner", 3],
+  ]);
+  if (cellPoints !== null) return cellPoints;
+
+  const teleopPoints = finiteOrNull(breakdown.teleopPoints);
+  const endgamePoints = finiteOrNull(breakdown.endgamePoints);
+  if (teleopPoints !== null) return round1(Math.max(0, teleopPoints - (endgamePoints ?? 0)));
+  return null;
+}
+
+function sumKnownFields(values: Record<string, unknown>, keys: string[]) {
+  let total = 0;
+  let found = false;
+  for (const key of keys) {
+    const value = finiteOrNull(values[key]);
+    if (value === null) continue;
+    total += value;
+    found = true;
+  }
+  return found ? round1(total) : null;
+}
+
+function weightedSum(values: Record<string, unknown>, entries: Array<[string, number]>) {
+  let total = 0;
+  let found = false;
+  for (const [key, weight] of entries) {
+    const value = finiteOrNull(values[key]);
+    if (value === null) continue;
+    total += value * weight;
+    found = true;
+  }
+  return found ? round1(total) : null;
+}
+
+function firstFinite(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = finiteOrNull(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function finiteOrNull(value: unknown) {
+  const parsed = numberValue(value, Number.NaN);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function teamNumbers(values: Array<string | number> | undefined) {
+  return (values ?? []).map((team) => String(team).replace(/^frc/, ""));
 }
 
 function scoreScoutMatch({
@@ -330,8 +491,8 @@ function stringAt(value: unknown, index: number): string {
 function timedPeriodsMs(value: unknown): number {
   return arrayValue(value).reduce<number>((sum, period) => {
     const item = objectPayload(period);
-    const start = numberValue(item.startMs);
-    const end = numberValue(item.endMs);
+    const start = numberValue(item.startMs ?? item.s);
+    const end = numberValue(item.endMs ?? item.e);
     return sum + Math.max(0, end - start);
   }, 0);
 }
