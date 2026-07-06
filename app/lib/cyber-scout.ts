@@ -318,8 +318,7 @@ function predictedGamePieces(normal?: NormalRecord, superRecord?: SuperRecord) {
 
 function predictedTransferPieces(normal?: NormalRecord, superRecord?: SuperRecord) {
   const shootingSeconds = Math.max(0, normal?.transferShootingMs ?? 0) / 1000;
-  const accuracy = clamp(superRecord?.accuracy ?? 0, 0, 100) / 100;
-  return round1(clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds * accuracy);
+  return round1(clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds);
 }
 
 function manualShotTimes(payload: Record<string, unknown>) {

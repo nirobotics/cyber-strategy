@@ -225,17 +225,17 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.teamData["8214"].matches[0]).toMatchObject({
       autoPts: 10,
       telePts: 40,
-      transferPieces: 5,
+      transferPieces: 10,
       totalPts: 50,
     });
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({
       autoPts: 0,
       telePts: 0,
-      transferPieces: 10,
+      transferPieces: 20,
       totalPts: 0,
     });
-    expect(dataset.teamData["8214"].avgTransferPieces).toBe(5);
-    expect(dataset.teamData["6328"].avgTransferPieces).toBe(10);
+    expect(dataset.teamData["8214"].avgTransferPieces).toBe(10);
+    expect(dataset.teamData["6328"].avgTransferPieces).toBe(20);
   });
 
   it("applies no-show, incap, and climb failure rules", () => {
