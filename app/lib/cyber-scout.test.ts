@@ -29,8 +29,10 @@ describe("cyber-scout dataset conversion", () => {
         },
         score_breakdown: {
           red: {
-            autoPoints: 20,
-            teleopGamePiecePoints: 69,
+            hubScore: {
+              autoPoints: 20,
+              teleopPoints: 69,
+            },
           },
         },
       }],
@@ -124,7 +126,44 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.scoringIgnoredMatches).toBe(1);
   });
 
-  it("uses TBA auto and tele game-piece totals with scout contribution ratios", () => {
+  it("does not score TBA matches from legacy top-level breakdown fields", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 1,
+        alliances: {
+          red: { team_keys: ["frc8214"] },
+        },
+        score_breakdown: {
+          red: {
+            autoPoints: 20,
+            teleopGamePiecePoints: 69,
+          },
+        },
+      }],
+      records: [
+        normal(8214, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214],
+          auto: [100],
+          drive: [5],
+          defense: [5],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"]).toBeUndefined();
+    expect(dataset.scoringIgnoredMatches).toBe(1);
+  });
+
+  it("uses TBA hubScore auto and teleop totals with scout contribution ratios", () => {
     const dataset = buildCyberScoutDataset({
       event,
       tbaMatches: [{
@@ -136,8 +175,10 @@ describe("cyber-scout dataset conversion", () => {
         },
         score_breakdown: {
           red: {
-            autoPoints: 30,
-            teleopGamePiecePoints: 80,
+            hubScore: {
+              autoPoints: 30,
+              teleopPoints: 80,
+            },
           },
         },
       }],
@@ -196,8 +237,10 @@ describe("cyber-scout dataset conversion", () => {
         },
         score_breakdown: {
           red: {
-            autoPoints: 10,
-            teleopGamePiecePoints: 40,
+            hubScore: {
+              autoPoints: 10,
+              teleopPoints: 40,
+            },
           },
         },
       }],
@@ -249,8 +292,10 @@ describe("cyber-scout dataset conversion", () => {
         },
         score_breakdown: {
           red: {
-            autoPoints: 60,
-            teleopGamePiecePoints: 20,
+            hubScore: {
+              autoPoints: 60,
+              teleopPoints: 20,
+            },
           },
         },
       }],

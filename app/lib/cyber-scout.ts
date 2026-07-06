@@ -378,78 +378,11 @@ function allocateByWeight(total: number | null, weights: number[]) {
 }
 
 function tbaAutoPoints(breakdown: Record<string, unknown>) {
-  return firstFinite(
-    breakdown.autoPoints,
-    breakdown.autoTotalPoints,
-    breakdown.autoGamePiecePoints,
-    breakdown.autoCellPoints,
-    breakdown.autoNotePoints,
-    breakdown.autoCoralPoints,
-    breakdown.autoAlgaePoints,
-    breakdown.autoCargoPoints,
-  );
+  return finiteOrNull(objectPayload(breakdown.hubScore).autoPoints);
 }
 
 function tbaTeleGamePiecePoints(breakdown: Record<string, unknown>) {
-  const explicit = sumKnownFields(breakdown, [
-    "teleopGamePiecePoints",
-    "teleGamePiecePoints",
-    "teleopPiecePoints",
-    "teleopCellPoints",
-    "teleopNotePoints",
-    "teleopCoralPoints",
-    "teleopAlgaePoints",
-    "teleopCargoPoints",
-    "teleopSpeakerNotePoints",
-    "teleopAmpNotePoints",
-    "endgameGamePiecePoints",
-    "endGameGamePiecePoints",
-  ]);
-  if (explicit !== null) return explicit;
-
-  const cellPoints = weightedSum(breakdown, [
-    ["teleopCellsBottom", 1],
-    ["teleopCellsOuter", 2],
-    ["teleopCellsInner", 3],
-  ]);
-  if (cellPoints !== null) return cellPoints;
-
-  const teleopPoints = finiteOrNull(breakdown.teleopPoints);
-  const endgamePoints = finiteOrNull(breakdown.endgamePoints);
-  if (teleopPoints !== null) return round1(Math.max(0, teleopPoints - (endgamePoints ?? 0)));
-  return null;
-}
-
-function sumKnownFields(values: Record<string, unknown>, keys: string[]) {
-  let total = 0;
-  let found = false;
-  for (const key of keys) {
-    const value = finiteOrNull(values[key]);
-    if (value === null) continue;
-    total += value;
-    found = true;
-  }
-  return found ? round1(total) : null;
-}
-
-function weightedSum(values: Record<string, unknown>, entries: Array<[string, number]>) {
-  let total = 0;
-  let found = false;
-  for (const [key, weight] of entries) {
-    const value = finiteOrNull(values[key]);
-    if (value === null) continue;
-    total += value * weight;
-    found = true;
-  }
-  return found ? round1(total) : null;
-}
-
-function firstFinite(...values: unknown[]) {
-  for (const value of values) {
-    const parsed = finiteOrNull(value);
-    if (parsed !== null) return parsed;
-  }
-  return null;
+  return finiteOrNull(objectPayload(breakdown.hubScore).teleopPoints);
 }
 
 function finiteOrNull(value: unknown) {
