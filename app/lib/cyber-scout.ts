@@ -6,6 +6,7 @@ import {
   type TeamData,
   type TeamPhotos,
 } from "./scouting";
+import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
 import type { TbaMatch } from "./tba.server";
 
 export type CyberScoutEventRow = {
@@ -35,6 +36,8 @@ export type CyberScoutRecordRow = {
 type NormalRecord = {
   team: string;
   match: number;
+  matchType: DataRange;
+  tbaMatchKey: string | null;
   scoutName: string;
   startPos: string;
   noShow: boolean;
@@ -49,6 +52,8 @@ type NormalRecord = {
 type SuperRecord = {
   team: string;
   match: number;
+  matchType: DataRange;
+  tbaMatchKey: string | null;
   scoutName: string;
   auto: number;
   drive: number;
@@ -83,22 +88,25 @@ export function buildCyberScoutDataset({
   event,
   records,
   tbaMatches = [],
+  includedMatchTypes = DEFAULT_DATA_RANGE,
 }: {
   event: CyberScoutEventRow;
   records: CyberScoutRecordRow[];
   tbaMatches?: TbaMatch[];
+  includedMatchTypes?: DataRange[];
 }): ScoredDataset {
   const normalByTeamMatch = new Map<string, NormalRecord>();
   const superByTeamMatch = new Map<string, SuperRecord>();
   const pitByTeam = new Map<string, PitRecord>();
+  const includedTypes = new Set(includedMatchTypes);
 
   for (const row of records) {
-    if (row.record_type === "normal_match") addNormalRecord(normalByTeamMatch, row);
-    if (row.record_type === "super_match") addSuperRecord(superByTeamMatch, row);
+    if (row.record_type === "normal_match") addNormalRecord(normalByTeamMatch, row, includedTypes);
+    if (row.record_type === "super_match") addSuperRecord(superByTeamMatch, row, includedTypes);
     if (row.record_type === "pit") addPitRecord(pitByTeam, row);
   }
 
-  const tbaScores = buildTbaTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch });
+  const tbaScores = buildTbaTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch, includedMatchTypes: includedTypes });
   let scoringIgnoredMatches = 0;
   const matchesByTeam = new Map<string, ScoutingMatch[]>();
   const keys = new Set([...normalByTeamMatch.keys(), ...superByTeamMatch.keys()]);
@@ -146,16 +154,21 @@ export function isSafeCyberScoutPhotoPath(path: string): boolean {
   return /\.(?:jpe?g|png|webp)$/i.test(path);
 }
 
-function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRow) {
+function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
   const payload = objectPayload(row.payload);
   const team = positiveId(row.team_number) ?? positiveId(payload.teamNumber);
   const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
   if (!team || !match) return;
+  const matchType = recordMatchType(row, payload);
+  if (!includedMatchTypes.has(matchType)) return;
   const shotTimes = manualShotTimes(payload);
+  const tbaMatchKey = recordTbaMatchKey(payload);
 
   const record: NormalRecord = {
     team,
     match,
+    matchType,
+    tbaMatchKey,
     scoutName: stringValue(payload.scout),
     startPos: stringValue(payload.startPosition),
     noShow: booleanValue(payload.noShow),
@@ -166,14 +179,17 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
     transferShootingMs: shotTimes.transferMs,
     sourceAt: rowTimestamp(row),
   };
-  upsertLatest(map, teamMatchKey(team, match), record);
+  upsertLatest(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
 }
 
-function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow) {
+function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
   const payload = objectPayload(row.payload);
   const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
   const teams = arrayValue(payload.teams);
   if (!match || !teams.length) return;
+  const matchType = recordMatchType(row, payload);
+  if (!includedMatchTypes.has(matchType)) return;
+  const tbaMatchKey = recordTbaMatchKey(payload);
 
   teams.forEach((teamValue, index) => {
     const team = positiveId(teamValue);
@@ -181,6 +197,8 @@ function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow)
     const record: SuperRecord = {
       team,
       match,
+      matchType,
+      tbaMatchKey,
       scoutName: stringValue(payload.scout),
       auto: numberAt(payload.auto, index),
       drive: numberAt(payload.drive, index),
@@ -190,7 +208,7 @@ function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow)
       comment: stringAt(payload.comments, index),
       sourceAt: rowTimestamp(row),
     };
-    upsertLatest(map, teamMatchKey(team, match), record);
+    upsertLatest(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
   });
 }
 
@@ -269,16 +287,21 @@ function buildTbaTeamScores({
   tbaMatches,
   normalByTeamMatch,
   superByTeamMatch,
+  includedMatchTypes,
 }: {
   tbaMatches: TbaMatch[];
   normalByTeamMatch: Map<string, NormalRecord>;
   superByTeamMatch: Map<string, SuperRecord>;
+  includedMatchTypes: Set<DataRange>;
 }): Map<string, TbaTeamScore> {
   const scores = new Map<string, TbaTeamScore>();
   for (const match of tbaMatches) {
-    if (match.comp_level && match.comp_level !== "qm") continue;
+    const matchType = matchTypeFromTbaCompLevel(match.comp_level);
+    if (!matchType || !includedMatchTypes.has(matchType)) continue;
     const matchNumber = positiveNumber(match.match_number);
     if (!matchNumber) continue;
+    const tbaKey = stringValue(match.key);
+    if (matchType === "playoff" && !tbaKey) continue;
 
     for (const alliance of ["red", "blue"] as const) {
       const teams = teamNumbers(match.alliances?.[alliance]?.team_keys);
@@ -288,7 +311,7 @@ function buildTbaTeamScores({
       if (!teams.length || (autoTotal == null && teleGamePieceTotal == null)) continue;
 
       const rows = teams.map((team) => {
-        const key = teamMatchKey(team, matchNumber);
+        const key = teamMatchKey(team, matchType, matchNumber, matchType === "playoff" ? tbaKey : null);
         const normal = normalByTeamMatch.get(key);
         const superRecord = superByTeamMatch.get(key);
         const noShow = normal?.noShow ?? false;
@@ -440,8 +463,16 @@ function upsertLatest<T extends { sourceAt: number }>(map: Map<string, T>, key: 
   if (!current || record.sourceAt >= current.sourceAt) map.set(key, record);
 }
 
-function teamMatchKey(team: string, match: number) {
-  return `${team}:${match}`;
+function teamMatchKey(team: string, matchType: DataRange, match: number, tbaMatchKey: string | null) {
+  return `${team}:${matchType}:${tbaMatchKey || match}`;
+}
+
+function recordMatchType(row: CyberScoutRecordRow, payload: Record<string, unknown>): DataRange {
+  return matchTypeFromValue(row.match_type ?? payload.matchType ?? payload.mt ?? payload.compLevel ?? payload.comp_level);
+}
+
+function recordTbaMatchKey(payload: Record<string, unknown>): string | null {
+  return stringValue(payload.tbaMatchKey ?? payload.tba_match_key ?? payload.matchKey ?? payload.key) || null;
 }
 
 function objectPayload(value: unknown): Record<string, unknown> {

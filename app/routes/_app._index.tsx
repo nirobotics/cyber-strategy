@@ -4,18 +4,19 @@ import { requireUser } from "../lib/auth.server";
 import { getStrategyDatasetForRequest, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import type { CombinedMatch } from "../lib/match-analysis";
 import { isAdmin } from "../lib/profiles.server";
-import { getTierPercentages } from "../lib/settings.server";
+import { getDataRange, getTierPercentages } from "../lib/settings.server";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import { listStrategyProposals } from "../lib/strategy-proposals.server";
 import { fetchTbaMatches } from "../lib/tba.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = requireUser(request, { redirectToLogin: true });
-  const [data, admin, tierPercentages] = await Promise.all([
-    getStrategyDatasetForRequest(request),
+  const [admin, tierPercentages, dataRange] = await Promise.all([
     isAdmin(user.feishuOpenId),
     getTierPercentages(),
+    getDataRange(),
   ]);
+  const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   let proposalError: string | null = null;
   const [proposals, tbaMatches, scoutingLead] = await Promise.all([

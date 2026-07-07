@@ -6,6 +6,7 @@ import {
   type CyberScoutEventRow,
   type CyberScoutRecordRow,
 } from "./cyber-scout";
+import { DEFAULT_DATA_RANGE, type DataRange } from "./data-range";
 import { getActiveDataset } from "./datasets.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
@@ -132,10 +133,13 @@ export function getCyberScoutClient(): SupabaseClient | null {
   return cachedScoutClient;
 }
 
-export async function getStrategyDatasetForRequest(request: Request): Promise<StrategyDatasetResult> {
+export async function getStrategyDatasetForRequest(
+  request: Request,
+  opts: { includedMatchTypes?: DataRange[] } = {},
+): Promise<StrategyDatasetResult> {
   const url = new URL(request.url);
   const requestedEventKey = cleanEventKey(url.searchParams.get("event"));
-  const scout = await loadCyberScoutDataset(requestedEventKey);
+  const scout = await loadCyberScoutDataset(requestedEventKey, opts.includedMatchTypes);
   if (scout.dataset) {
     return {
       dataset: scout.dataset,
@@ -160,7 +164,10 @@ export async function getStrategyDatasetForRequest(request: Request): Promise<St
   };
 }
 
-export async function loadCyberScoutDataset(eventKey: string | null): Promise<CyberScoutLoadResult> {
+export async function loadCyberScoutDataset(
+  eventKey: string | null,
+  includedMatchTypes: DataRange[] = DEFAULT_DATA_RANGE,
+): Promise<CyberScoutLoadResult> {
   const db = getCyberScoutClient();
   if (!db) {
     return unavailable(eventKey, "未配置 cyber-scout 数据源。");
@@ -193,7 +200,7 @@ export async function loadCyberScoutDataset(eventKey: string | null): Promise<Cy
     } catch (error) {
       tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
     }
-    const dataset = buildCyberScoutDataset({ event, records, tbaMatches });
+    const dataset = buildCyberScoutDataset({ event, records, tbaMatches, includedMatchTypes });
     const scoringError = tbaError
       ? `${tbaError}；已忽略需要 TBA 分项的比赛记录。`
       : dataset.scoringIgnoredMatches > 0

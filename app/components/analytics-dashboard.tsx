@@ -734,11 +734,11 @@ function PicklistBoard({
           </div>
         </div>
         <div
-          className={cn(
-            "min-h-80 max-h-[68dvh] overflow-y-auto p-2 transition-colors",
-            dropTarget === "end" && "bg-brand/10",
-          )}
-          onDragOver={(event) => event.preventDefault()}
+          className="min-h-80 max-h-[68dvh] overflow-y-auto p-2"
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDropTarget("end");
+          }}
           onDragEnter={() => setDropTarget("end")}
           onDragLeave={() => setDropTarget(null)}
           onDrop={(event) => dropTeam(event)}
@@ -752,51 +752,65 @@ function PicklistBoard({
             const team = teams.find((item) => item.team === teamNumber);
             if (!team) return null;
             return (
-              <div
-                key={team.team}
-                draggable
-                onDragStart={(event) => startDrag(event, team.team, "pick")}
-                onDragOver={(event) => event.preventDefault()}
-                onDragEnter={() => setDropTarget(team.team)}
-                onDragLeave={() => setDropTarget(null)}
-                onDrop={(event) => dropTeam(event, team.team)}
-                className={cn(
-                  "mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50",
-                  dropTarget === team.team && "border-brand bg-brand/10",
-                )}
-              >
-                <GripVertical className="size-4 text-ink-faint" />
-                <span className="w-8 text-right text-xs font-semibold tabular-nums text-ink-faint">{index + 1}</span>
-                <button
-                  type="button"
-                  onClick={() => onOpenTeam(team.team)}
-                  className="w-fit min-w-max shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+              <div key={team.team}>
+                <DropLine active={dropTarget === team.team} />
+                <div
+                  draggable
+                  onDragStart={(event) => startDrag(event, team.team, "pick")}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setDropTarget(team.team);
+                  }}
+                  onDragEnter={(event) => {
+                    event.stopPropagation();
+                    setDropTarget(team.team);
+                  }}
+                  onDrop={(event) => dropTeam(event, team.team)}
+                  className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50"
                 >
-                  Team {team.team}
-                </button>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  {team.avgTotal} 综合均分
-                </span>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  Drive score {team.avgDriver.toFixed(1)}
-                </span>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  Defence score {defenceScore(team).toFixed(1)}
-                </span>
-                <Button
-                  type="button"
-                  title="移出当前列表"
-                  aria-label="移出当前列表"
-                  className="h-8 px-2"
-                  onClick={() => updateCurrentPick((current) => removePickListTeam(current, team.team))}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                  <GripVertical className="size-4 text-ink-faint" />
+                  <span className="w-8 text-right text-xs font-semibold tabular-nums text-ink-faint">{index + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => onOpenTeam(team.team)}
+                    className="w-fit min-w-max shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+                  >
+                    Team {team.team}
+                  </button>
+                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                    {team.avgTotal} 综合均分
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                    Drive score {team.avgDriver.toFixed(1)}
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                    Defence score {defenceScore(team).toFixed(1)}
+                  </span>
+                  <Button
+                    type="button"
+                    title="移出当前列表"
+                    aria-label="移出当前列表"
+                    className="h-8 px-2"
+                    onClick={() => updateCurrentPick((current) => removePickListTeam(current, team.team))}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
             );
           })}
+          {pickTeams.length ? <DropLine active={dropTarget === "end"} /> : null}
         </div>
       </Card>
+    </div>
+  );
+}
+
+function DropLine({ active }: { active: boolean }) {
+  return (
+    <div className="h-2">
+      {active ? <div className="mx-2 h-0.5 rounded-full bg-brand shadow-[0_0_0_1px_var(--accent)]" /> : null}
     </div>
   );
 }

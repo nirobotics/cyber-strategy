@@ -293,6 +293,130 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("filters scout records by the selected data range", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      includedMatchTypes: ["qualification"],
+      tbaMatches: [
+        {
+          comp_level: "qm",
+          match_number: 1,
+          alliances: {
+            red: { team_keys: ["frc8214"] },
+          },
+          score_breakdown: {
+            red: {
+              hubScore: {
+                autoPoints: 10,
+                teleopPoints: 20,
+              },
+            },
+          },
+        },
+        {
+          comp_level: "qm",
+          match_number: 2,
+          alliances: {
+            red: { team_keys: ["frc8214"] },
+          },
+          score_breakdown: {
+            red: {
+              hubScore: {
+                autoPoints: 100,
+                teleopPoints: 200,
+              },
+            },
+          },
+        },
+      ],
+      records: [
+        normal(8214, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214],
+          auto: [100],
+          drive: [1],
+          defense: [1],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+        normal(8214, 2, {
+          matchType: "P",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(2, {
+          matchType: "P",
+          teams: [8214],
+          auto: [100],
+          drive: [5],
+          defense: [5],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matchCount).toBe(1);
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({
+      match: 1,
+      totalPts: 30,
+    });
+    expect(dataset.scoringIgnoredMatches).toBe(0);
+  });
+
+  it("scores playoff records only when they carry an exact TBA match key and playoffs are selected", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      includedMatchTypes: ["playoff"],
+      tbaMatches: [{
+        key: "2026test_sf7m1",
+        comp_level: "sf",
+        match_number: 1,
+        alliances: {
+          red: { team_keys: ["frc6941"] },
+        },
+        score_breakdown: {
+          red: {
+            hubScore: {
+              autoPoints: 80,
+              teleopPoints: 282,
+            },
+          },
+        },
+      }],
+      records: [
+        normal(6941, 1, {
+          matchType: "playoff",
+          tbaMatchKey: "2026test_sf7m1",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          matchType: "playoff",
+          tbaMatchKey: "2026test_sf7m1",
+          teams: [6941],
+          auto: [100],
+          drive: [3],
+          defense: [4],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["6941"].matches[0]).toMatchObject({
+      autoPts: 80,
+      telePts: 282,
+      totalPts: 362,
+    });
+  });
+
   it("scores only alliance-zone shooting and reports neutral or opponent shooting as transfer", () => {
     const dataset = buildCyberScoutDataset({
       event,

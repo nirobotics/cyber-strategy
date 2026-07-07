@@ -2,9 +2,10 @@ import { Form, Link, redirect, useActionData, useNavigation } from "react-router
 import type { Route } from "./+types/_app.admin";
 import { Badge, Button, Card, Input } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
+import { DATA_RANGE_OPTIONS, DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
 import { activateDataset, createDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
 import { parseScoutingCsv } from "../lib/scouting";
-import { getTierPercentages, saveTierPercentages } from "../lib/settings.server";
+import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
   RANKED_TIER_ORDER,
@@ -17,8 +18,8 @@ type ActionData = { error?: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const [datasets, tierPercentages] = await Promise.all([listDatasets(), getTierPercentages()]);
-  return { datasets, tierPercentages };
+  const [datasets, tierPercentages, dataRange] = await Promise.all([listDatasets(), getTierPercentages(), getDataRange()]);
+  return { datasets, tierPercentages, dataRange };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
@@ -66,6 +67,19 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
 
     if (intent === "reset-tier-percentages") {
       await saveTierPercentages(DEFAULT_TIER_PERCENTAGES, user.feishuOpenId);
+      throw redirect("/admin");
+    }
+
+    if (intent === "save-data-range") {
+      const range = parseDataRange(formData.getAll("dataRange"));
+      const validationError = validateDataRange(range);
+      if (validationError) return { error: validationError };
+      await saveDataRange(range, user.feishuOpenId);
+      throw redirect("/admin");
+    }
+
+    if (intent === "reset-data-range") {
+      await saveDataRange(DEFAULT_DATA_RANGE, user.feishuOpenId);
       throw redirect("/admin");
     }
   } catch (error) {
@@ -169,6 +183,49 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
         </Form>
         <Form method="post" className="mt-2">
           <input type="hidden" name="intent" value="reset-tier-percentages" />
+          <Button type="submit" disabled={busy}>
+            恢复默认
+          </Button>
+        </Form>
+      </Card>
+
+      <Card className="p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="section-label">数据范围</p>
+            <h2 className="text-lg font-semibold">参与计算的比赛类型</h2>
+          </div>
+          <Badge className="border-line bg-surface-2 text-ink-dim">
+            {loaderData.dataRange.length} / {DATA_RANGE_OPTIONS.length}
+          </Badge>
+        </div>
+        <Form method="post" className="grid gap-3">
+          <input type="hidden" name="intent" value="save-data-range" />
+          <div className="grid gap-2 sm:grid-cols-3">
+            {DATA_RANGE_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className="flex items-center gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm font-medium text-ink-dim"
+              >
+                <input
+                  name="dataRange"
+                  type="checkbox"
+                  value={option.value}
+                  defaultChecked={loaderData.dataRange.includes(option.value)}
+                  className="size-4 accent-[var(--accent)]"
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" disabled={busy}>
+              保存范围
+            </Button>
+          </div>
+        </Form>
+        <Form method="post" className="mt-2">
+          <input type="hidden" name="intent" value="reset-data-range" />
           <Button type="submit" disabled={busy}>
             恢复默认
           </Button>

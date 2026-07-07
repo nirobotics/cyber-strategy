@@ -5,6 +5,7 @@ import { requireUser } from "../lib/auth.server";
 import { getStrategyDatasetForRequest } from "../lib/cyber-scout.server";
 import type { CombinedMatch } from "../lib/match-analysis";
 import { isAdmin } from "../lib/profiles.server";
+import { getDataRange } from "../lib/settings.server";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import {
   deleteStrategyProposal,
@@ -17,7 +18,8 @@ import { fetchTbaMatches } from "../lib/tba.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = requireUser(request, { redirectToLogin: true });
-  const data = await getStrategyDatasetForRequest(request);
+  const dataRange = await getDataRange();
+  const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   let proposalError: string | null = null;
   const [admin, proposals, tbaMatches] = await Promise.all([
