@@ -1056,13 +1056,16 @@ function PointsBar({ value, max }: { value: number; max: number }) {
   );
 }
 
+const INCAP_DISPLAY_THRESHOLD_MS = 20_000;
+
 function StatePill({ match }: { match: ScoutingMatch }) {
+  const displayBotState = displayedBotState(match);
   const className =
-    match.botState === 2
+    displayBotState === 2
       ? "border-warn/40 bg-warn/10 text-warn"
-      : match.botState === 3
+      : displayBotState === 3
         ? "border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-300"
-        : match.botState === 4
+        : displayBotState === 4
           ? "border-danger/40 bg-danger/10 text-danger"
           : "border-ok/40 bg-ok/10 text-ok";
   return (
@@ -1073,7 +1076,12 @@ function StatePill({ match }: { match: ScoutingMatch }) {
   );
 }
 
+function displayedBotState(match: ScoutingMatch) {
+  return isShortIncap(match) ? 1 : match.botState;
+}
+
 function botStateLabel(match: ScoutingMatch) {
+  if (isShortIncap(match)) return "正常";
   const normalized = match.botStateText.trim().toLowerCase();
   const byText: Record<string, string> = {
     "no issue": "正常",
@@ -1085,7 +1093,11 @@ function botStateLabel(match: ScoutingMatch) {
     unknown: "未知",
   };
   if (byText[normalized]) return byText[normalized];
-  return { 1: "正常", 2: "通信问题", 3: "轻微故障", 4: "严重故障" }[match.botState] ?? match.botStateText;
+  return { 1: "正常", 2: "通信问题", 3: "轻微故障", 4: "严重故障" }[displayedBotState(match)] ?? match.botStateText;
+}
+
+function isShortIncap(match: ScoutingMatch) {
+  return match.botStateText.trim().toLowerCase() === "incap" && (match.downtimeMs ?? 0) <= INCAP_DISPLAY_THRESHOLD_MS;
 }
 
 function trendLabel(trend: TeamSummary["trend"]) {
