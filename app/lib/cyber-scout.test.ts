@@ -226,6 +226,73 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("does not let playoff matches with the same match number override qualification scout records", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      tbaMatches: [
+        {
+          comp_level: "qm",
+          match_number: 1,
+          alliances: {
+            red: { team_keys: ["frc6941", "frc11485", "frc6986"] },
+          },
+          score_breakdown: {
+            red: {
+              hubScore: {
+                autoPoints: 57,
+                teleopPoints: 142,
+              },
+            },
+          },
+        },
+        {
+          comp_level: "sf",
+          match_number: 1,
+          alliances: {
+            red: { team_keys: ["frc10526", "frc6941", "frc8214"] },
+          },
+          score_breakdown: {
+            red: {
+              hubScore: {
+                autoPoints: 80,
+                teleopPoints: 282,
+              },
+            },
+          },
+        },
+      ],
+      records: [
+        normal(6941, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(11485, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 2_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(6986, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 7_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [6941, 11485, 6986],
+          auto: [50, 0, 50],
+          drive: [3, 0, 0],
+          defense: [4, 0, 0],
+          bps: [10, 5, 20],
+          accuracy: [60, 70, 70],
+          comments: ["", "", ""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["6941"].matches[0]).toMatchObject({
+      autoPts: 28.5,
+      telePts: 51.6,
+      totalPts: 80.1,
+    });
+  });
+
   it("scores only alliance-zone shooting and reports neutral or opponent shooting as transfer", () => {
     const dataset = buildCyberScoutDataset({
       event,

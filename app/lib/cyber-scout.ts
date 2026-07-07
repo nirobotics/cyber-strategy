@@ -276,6 +276,7 @@ function buildTbaTeamScores({
 }): Map<string, TbaTeamScore> {
   const scores = new Map<string, TbaTeamScore>();
   for (const match of tbaMatches) {
+    if (match.comp_level && match.comp_level !== "qm") continue;
     const matchNumber = positiveNumber(match.match_number);
     if (!matchNumber) continue;
 
