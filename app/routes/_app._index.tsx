@@ -25,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       return [];
     }),
     fetchTbaMatches(selectedEventKey).catch(() => []),
-    admin ? loadScoutConfidenceReport(selectedEventKey).catch(() => null) : Promise.resolve(null),
+    admin ? loadScoutConfidenceReport(selectedEventKey, { includedMatchTypes: dataRange }).catch(() => null) : Promise.resolve(null),
   ]);
 
   return {

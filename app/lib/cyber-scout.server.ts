@@ -6,10 +6,11 @@ import {
   type CyberScoutEventRow,
   type CyberScoutRecordRow,
 } from "./cyber-scout";
-import { DEFAULT_DATA_RANGE, type DataRange } from "./data-range";
+import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
 import { getActiveDataset } from "./datasets.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
+import { getDataRange } from "./settings.server";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
 type CyberScoutLoadResult = {
@@ -236,10 +237,14 @@ export async function loadCyberScoutDataset(
 
 export async function loadScoutConfidenceForRequest(request: Request): Promise<ScoutConfidenceResult> {
   const url = new URL(request.url);
-  return loadScoutConfidenceReport(cleanEventKey(url.searchParams.get("event")));
+  const dataRange = await getDataRange();
+  return loadScoutConfidenceReport(cleanEventKey(url.searchParams.get("event")), { includedMatchTypes: dataRange });
 }
 
-export async function loadScoutConfidenceReport(eventKey: string | null): Promise<ScoutConfidenceResult> {
+export async function loadScoutConfidenceReport(
+  eventKey: string | null,
+  opts: { includedMatchTypes?: DataRange[] } = {},
+): Promise<ScoutConfidenceResult> {
   const db = getCyberScoutClient();
   if (!db) {
     return emptyConfidenceResult(eventKey, {
@@ -283,16 +288,22 @@ export async function loadScoutConfidenceReport(eventKey: string | null): Promis
     } catch (error) {
       tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
     }
+    const includedTypes = new Set(opts.includedMatchTypes ?? DEFAULT_DATA_RANGE);
+    const confidenceRecords = records.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
+    const confidenceTbaMatches = tbaMatches.filter((match) => {
+      const type = matchTypeFromTbaCompLevel(match.comp_level);
+      return type ? includedTypes.has(type) : false;
+    });
 
     return {
-      report: buildScoutConfidenceReport({ records, tbaMatches }),
+      report: buildScoutConfidenceReport({ records: confidenceRecords, tbaMatches: confidenceTbaMatches }),
       events,
       selectedEventKey: event.tba_event_key,
       sourceStatus: {
         source: "cyber-scout",
         label: "Scout 信心分",
-        message: `${event.name || event.tba_event_key} · ${records.length} 条普通侦察记录${tbaError ? " · TBA 暂不可用" : ""}`,
-        updatedAt: latestRowTimestamp(records) ?? event.updated_at,
+        message: `${event.name || event.tba_event_key} · ${confidenceRecords.length} 条参与信心分${tbaError ? " · TBA 暂不可用" : ""}`,
+        updatedAt: latestRowTimestamp(confidenceRecords) ?? event.updated_at,
         error: tbaError ?? undefined,
       },
       leadData: {
@@ -430,7 +441,7 @@ async function fetchEvents(db: SupabaseClient): Promise<CyberScoutEventRow[]> {
 async function fetchRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
   const { data, error } = await db
     .from("scouting_records")
-    .select("id,record_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
+    .select("id,record_type,match_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
     .in("record_type", ["normal_match", "super_match", "pit"])
     .order("uploaded_at", { ascending: false });
@@ -441,7 +452,7 @@ async function fetchRecords(db: SupabaseClient, eventId: string): Promise<CyberS
 async function fetchNormalRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
   const { data, error } = await db
     .from("scouting_records")
-    .select("id,record_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
+    .select("id,record_type,match_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
     .eq("record_type", "normal_match")
     .order("uploaded_at", { ascending: false });
@@ -747,6 +758,11 @@ function positiveInteger(value: unknown): number | null {
 
 function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function confidenceRecordMatchType(row: CyberScoutRecordRow): DataRange {
+  const payload = objectValue(row.payload);
+  return matchTypeFromValue(row.match_type ?? payload.matchType ?? payload.mt ?? payload.compLevel ?? payload.comp_level);
 }
 
 function stringValue(value: unknown) {
