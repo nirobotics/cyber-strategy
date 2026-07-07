@@ -417,6 +417,54 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("treats final scout records as playoff records", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      includedMatchTypes: ["playoff"],
+      tbaMatches: [{
+        key: "2026test_f1m1",
+        comp_level: "f",
+        match_number: 1,
+        alliances: {
+          blue: { team_keys: ["frc9635"] },
+        },
+        score_breakdown: {
+          blue: {
+            hubScore: {
+              autoPoints: 40,
+              teleopPoints: 120,
+            },
+          },
+        },
+      }],
+      records: [
+        normal(9635, 1, {
+          matchType: "final",
+          tbaMatchKey: "2026test_f1m1",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          matchType: "final",
+          tbaMatchKey: "2026test_f1m1",
+          teams: [9635],
+          auto: [100],
+          drive: [5],
+          defense: [5],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["9635"].matches[0]).toMatchObject({
+      autoPts: 40,
+      telePts: 120,
+      totalPts: 160,
+    });
+  });
+
   it("scores only alliance-zone shooting and reports neutral or opponent shooting as transfer", () => {
     const dataset = buildCyberScoutDataset({
       event,

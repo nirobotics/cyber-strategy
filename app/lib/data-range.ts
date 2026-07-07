@@ -27,7 +27,13 @@ export function validateDataRange(range: DataRange[]): string | null {
 export function matchTypeFromValue(value: unknown): DataRange {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (["p", "pr", "practice", "practice_match", "练习赛"].includes(normalized)) return "practice";
-  if (["e", "elims", "elim", "elimination", "playoff", "playoffs", "ef", "qf", "sf", "f", "淘汰赛"].includes(normalized)) return "playoff";
+  if (
+    ["e", "elims", "elim", "elimination", "playoff", "playoffs", "ef", "qf", "sf", "f", "final", "finals", "决赛", "淘汰赛"].includes(
+      normalized,
+    )
+  ) {
+    return "playoff";
+  }
   return "qualification";
 }
 

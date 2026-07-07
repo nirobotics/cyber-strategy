@@ -256,7 +256,6 @@ function buildCalibration(predictions: ScoutConfidencePrediction[]): ScoutConfid
 function buildActualWinnerMap(matches: ConfidenceTbaMatch[]): Map<number, ActualWinner> {
   const values = new Map<number, ActualWinner>();
   for (const match of matches) {
-    if (match.comp_level && match.comp_level !== "qm") continue;
     if (!match.match_number) continue;
     const winner = actualWinner(match);
     if (winner) values.set(match.match_number, winner);

@@ -60,6 +60,23 @@ describe("scout confidence scoring", () => {
     });
   });
 
+  it("scores final matches when they are passed into the report", () => {
+    const report = buildScoutConfidenceReport({
+      records: [
+        normal("final", "Ada", 1, 9635, "blue", 5),
+      ],
+      tbaMatches: [
+        tba(1, "blue", "f"),
+      ],
+    });
+
+    expect(report.people[0]).toMatchObject({
+      scoutName: "Ada",
+      netScore: 5,
+      scoredCount: 1,
+    });
+  });
+
   it("sorts people by net confidence, scored count, then accuracy", () => {
     const report = buildScoutConfidenceReport({
       records: [
@@ -107,9 +124,9 @@ function normal(
   };
 }
 
-function tba(match: number, winner: "red" | "blue") {
+function tba(match: number, winner: "red" | "blue", compLevel = "qm") {
   return {
-    comp_level: "qm",
+    comp_level: compLevel,
     match_number: match,
     winning_alliance: winner,
     alliances: {
