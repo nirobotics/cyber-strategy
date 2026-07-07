@@ -170,7 +170,7 @@ export function reliability(team: TeamSummary): number {
   if (!team.matchCount) return 0;
   return avg(team.matches.map((match) => {
     const downtimeMs = Math.min(Math.max(0, match.downtimeMs ?? 0), MATCH_TOTAL_DURATION_MS);
-    return (downtimeMs / MATCH_TOTAL_DURATION_MS) * 100;
+    return (1 - downtimeMs / MATCH_TOTAL_DURATION_MS) * 100;
   }));
 }
 

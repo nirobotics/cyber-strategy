@@ -392,7 +392,7 @@ describe("cyber-scout dataset conversion", () => {
       botState: 4,
       disabled: true,
     });
-    expect(reliability(dataset.teamData["6328"])).toBe(100);
+    expect(reliability(dataset.teamData["6328"])).toBe(0);
     expect(dataset.teamData["157"].matches[0]).toMatchObject({
       totalPts: 80,
       climbPts: 0,
@@ -400,7 +400,7 @@ describe("cyber-scout dataset conversion", () => {
       disabled: false,
       downtimeMs: 150_000,
     });
-    expect(reliability(dataset.teamData["157"])).toBe(100);
+    expect(reliability(dataset.teamData["157"])).toBe(0);
   });
 
   it("rejects unsafe cyber-scout photo paths", () => {
