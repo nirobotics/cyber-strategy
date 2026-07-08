@@ -588,13 +588,18 @@ function TeamDetail({
 }
 
 function CompareTeams({ teams }: { teams: TeamSummary[] }) {
-  const defaults = [teams[0]?.team, teams[1]?.team, teams[2]?.team].filter(Boolean) as string[];
+  const defaults = [teams[0]?.team ?? "", teams[1]?.team ?? "", teams[2]?.team ?? ""];
   const [selected, setSelected] = useState<string[]>(defaults);
-  const selectedTeams = selected.length ? selected : defaults;
+  const teamSet = useMemo(() => new Set(teams.map((team) => team.team)), [teams]);
+  const selectedTeams = [0, 1, 2].map((index) => {
+    const team = selected[index];
+    if (team === "") return "";
+    return team && teamSet.has(team) ? team : defaults[index] ?? "";
+  });
   const compared = selectedTeams.map((team) => teams.find((item) => item.team === team)).filter(Boolean) as TeamSummary[];
 
   function setTeam(index: number, team: string) {
-    setSelected((current) => current.map((value, currentIndex) => (currentIndex === index ? team : value)));
+    setSelected((current) => [0, 1, 2].map((slot) => (slot === index ? team : current[slot] ?? defaults[slot] ?? "")));
   }
 
   return (
@@ -605,10 +610,11 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
             <label key={index} className="grid gap-1 text-sm">
               <span className="font-medium text-ink-dim">Team {index + 1}</span>
               <select
-              value={selectedTeams[index] ?? ""}
+                value={selectedTeams[index] ?? ""}
                 onChange={(event) => setTeam(index, event.target.value)}
                 className="input h-10 font-sans"
               >
+                <option value="">无</option>
                 {teams.map((team) => (
                   <option key={team.team} value={team.team}>
                     Team {team.team}（{team.avgTotal} 综合均分）

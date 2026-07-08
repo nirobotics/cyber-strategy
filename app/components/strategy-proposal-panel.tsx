@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  Download,
   Eye,
   Plus,
   Save,
@@ -25,6 +26,7 @@ import {
 } from "../lib/strategy-proposal-matches";
 import {
   autoWinners,
+  buildStrategyProposalExport,
   canDeleteProposalAs,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
@@ -36,6 +38,7 @@ import {
   proposalStatuses,
   proposalTypes,
   strategyShifts,
+  strategyProposalExportFilename,
   type AutoProposalPayload,
   type AutoWinner,
   type OwnStrategyTeam,
@@ -211,6 +214,19 @@ export function StrategyProposalPanel({
     if (selectedMatchFilter && !proposalMatchMatchesTeamQuery(selectedMatchFilter, value)) setMatchFilter("all");
   }
 
+  function exportProposals() {
+    const payload = buildStrategyProposalExport(data.selectedEventKey, filteredProposals);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = strategyProposalExportFilename(data.selectedEventKey);
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-3">
       {!embedded ? <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
@@ -251,10 +267,18 @@ export function StrategyProposalPanel({
               <p className="section-label">Proposal</p>
               <h2 className="text-lg font-semibold text-ink">列表</h2>
             </div>
-            <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
-              <Plus className="size-4" />
-              新建
-            </Button>
+            <div className="flex gap-2">
+              {data.isAdmin ? (
+                <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表">
+                  <Download className="size-4" />
+                  导出
+                </Button>
+              ) : null}
+              <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
+                <Plus className="size-4" />
+                新建
+              </Button>
+            </div>
           </div>
           <div className="grid gap-2 border-b border-line p-3">
             <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as StrategyProposalType | "all")} className="input h-9 font-sans">

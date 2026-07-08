@@ -69,6 +69,20 @@ export type StrategyProposal = {
   updatedAt: string;
 };
 
+export function buildStrategyProposalExport(eventKey: string, proposals: StrategyProposal[], exportedAt = new Date().toISOString()) {
+  return {
+    eventKey,
+    exportedAt,
+    count: proposals.length,
+    proposals,
+  };
+}
+
+export function strategyProposalExportFilename(eventKey: string, date = new Date()) {
+  const safeEventKey = eventKey.replace(/[^a-zA-Z0-9_-]+/g, "-") || "event";
+  return `strategy-proposals-${safeEventKey}-${date.toISOString().slice(0, 10)}.json`;
+}
+
 export function normalizeOwnTeam(value: unknown): OwnStrategyTeam {
   return value === "9635" ? "9635" : "8214";
 }
