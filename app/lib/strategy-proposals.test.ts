@@ -42,7 +42,7 @@ describe("strategy proposal helpers", () => {
   it("keeps self strategy as one map per shift", () => {
     const payload = normalizeProposalPayload("self_strategy", {
       shifts: {
-        active: { points: [{ x: 1, y: 2 }], note: "cycle" },
+        active: { points: [{ x: 1, y: 2 }], opponentRoutes: { frc3: [{ x: 5, y: 6 }] }, note: "cycle" },
         inactive: { points: [{ x: 3, y: 4 }], note: "feed" },
       },
     });
@@ -50,9 +50,9 @@ describe("strategy proposal helpers", () => {
     expect(payload).toMatchObject({
       kind: "self_strategy",
       shifts: {
-        active: { points: [{ x: 1, y: 2 }], note: "cycle" },
-        inactive: { points: [{ x: 3, y: 4 }], note: "feed" },
-        endgame: { points: [], note: "" },
+        active: { points: [{ x: 1, y: 2 }], opponentRoutes: { "3": [{ x: 5, y: 6 }] }, note: "cycle" },
+        inactive: { points: [{ x: 3, y: 4 }], opponentRoutes: {}, note: "feed" },
+        endgame: { points: [], opponentRoutes: {}, note: "" },
       },
     });
   });

@@ -24,7 +24,7 @@ export type AutoProposalPayload = {
 
 export type SelfStrategyPayload = {
   kind: "self_strategy";
-  shifts: Record<StrategyShift, { points: RoutePoint[]; note: string }>;
+  shifts: Record<StrategyShift, { points: RoutePoint[]; opponentRoutes: RouteMap; note: string }>;
 };
 
 export type PartnerStrategyPayload = {
@@ -114,7 +114,11 @@ export function normalizeProposalPayload(type: StrategyProposalType, value: unkn
         strategyShifts.map((shift) => {
           const source = objectValue(record.shifts)[shift];
           const shiftRecord = objectValue(source);
-          return [shift, { points: normalizePoints(shiftRecord.points), note: stringValue(shiftRecord.note) }];
+          return [shift, {
+            points: normalizePoints(shiftRecord.points),
+            opponentRoutes: normalizeRouteMap(shiftRecord.opponentRoutes),
+            note: stringValue(shiftRecord.note),
+          }];
         }),
       ) as SelfStrategyPayload["shifts"],
     };

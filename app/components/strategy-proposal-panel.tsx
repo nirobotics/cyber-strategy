@@ -187,10 +187,12 @@ export function StrategyProposalPanel({
         ownTeam,
         matchKey: nextMatch?.key ?? "",
         payload: current.payload.kind === "partner_strategy"
-          ? ensurePartnerPayload(current.payload, partnerTeams(nextMatch, ownTeam))
+          ? ensurePartnerPayload(current.payload, partnerTeams(nextMatch, ownTeam), opponentTeams(nextMatch, ownTeam))
           : current.payload.kind === "auto"
             ? ensureAutoPayload(current.payload, teams)
-            : current.payload,
+            : current.payload.kind === "self_strategy"
+              ? ensureSelfPayload(current.payload, opponentTeams(nextMatch, ownTeam))
+              : current.payload,
       };
     });
   }
@@ -202,10 +204,12 @@ export function StrategyProposalPanel({
       ...current,
       matchKey,
       payload: current.payload.kind === "partner_strategy"
-        ? ensurePartnerPayload(current.payload, partnerTeams(match, current.ownTeam))
+        ? ensurePartnerPayload(current.payload, partnerTeams(match, current.ownTeam), opponentTeams(match, current.ownTeam))
         : current.payload.kind === "auto"
           ? ensureAutoPayload(current.payload, teams)
-          : current.payload,
+          : current.payload.kind === "self_strategy"
+            ? ensureSelfPayload(current.payload, opponentTeams(match, current.ownTeam))
+            : current.payload,
     }));
   }
 
@@ -533,10 +537,12 @@ function PayloadEditor({
 }) {
   const matchTeamList = match ? [...match.redTeams, ...match.blueTeams] : [];
   if (proposalType === "self_strategy") {
+    const opponents = opponentTeams(match, ownTeam);
     return (
       <SelfStrategyEditor
-        payload={payload.kind === "self_strategy" ? payload : emptySelfPayload()}
+        payload={payload.kind === "self_strategy" ? ensureSelfPayload(payload, opponents) : emptySelfPayload()}
         ownTeam={ownTeam}
+        match={match}
         disabled={disabled}
         onOpenTeam={onOpenTeam}
         onChange={onChange}
@@ -546,10 +552,13 @@ function PayloadEditor({
 
   if (proposalType === "partner_strategy") {
     const partners = partnerTeams(match, ownTeam);
+    const opponents = opponentTeams(match, ownTeam);
     return (
       <PartnerStrategyEditor
-        payload={payload.kind === "partner_strategy" ? ensurePartnerPayload(payload, partners) : emptyPartnerPayload(partners)}
+        payload={payload.kind === "partner_strategy" ? ensurePartnerPayload(payload, partners, opponents) : emptyPartnerPayload(partners, opponents)}
         partners={partners}
+        opponents={opponents}
+        opponentTone={opponentTone(match, ownTeam)}
         disabled={disabled}
         onOpenTeam={onOpenTeam}
         onChange={onChange}
@@ -638,31 +647,49 @@ function AutoProposalEditor({
 function SelfStrategyEditor({
   payload,
   ownTeam,
+  match,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: SelfStrategyPayload;
   ownTeam: string;
+  match: ProposalMatch | null;
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: SelfStrategyPayload) => void;
 }) {
   const [shift, setShift] = useState<StrategyShift>("active");
+  const [activeTeam, setActiveTeam] = useState(ownTeam);
   const current = payload.shifts[shift];
+  const opponents = opponentTeams(match, ownTeam);
+  const teams = [ownTeam, ...opponents];
+  const resolvedActiveTeam = teams.includes(activeTeam) ? activeTeam : ownTeam;
+  const routes = { ...current.opponentRoutes, [ownTeam]: current.points };
   return (
     <ShiftSection activeShift={shift} onShift={setShift}>
       <RoutePlanner
         title={`${shiftLabel(shift)} 路线`}
-        teams={[ownTeam]}
-        activeTeam={ownTeam}
-        routes={{ [ownTeam]: current.points }}
+        teams={teams}
+        teamGroups={[
+          { label: "己方", tone: "neutral", teams: [ownTeam] },
+          { label: "对方", tone: opponentTone(match, ownTeam), teams: opponents },
+        ]}
+        activeTeam={resolvedActiveTeam}
+        routes={routes}
         disabled={disabled}
-        onActiveTeam={() => undefined}
+        onActiveTeam={setActiveTeam}
         onOpenTeam={onOpenTeam}
         onRoutesChange={(routes) => onChange({
           ...payload,
-          shifts: { ...payload.shifts, [shift]: { ...current, points: routes[ownTeam] ?? [] } },
+          shifts: {
+            ...payload.shifts,
+            [shift]: {
+              ...current,
+              points: routes[ownTeam] ?? [],
+              opponentRoutes: keepRouteTeams(routes, opponents),
+            },
+          },
         })}
       />
       <NoteBox value={current.note} disabled={disabled} onChange={(note) => onChange({ ...payload, shifts: { ...payload.shifts, [shift]: { ...current, note } } })} />
@@ -673,12 +700,16 @@ function SelfStrategyEditor({
 function PartnerStrategyEditor({
   payload,
   partners,
+  opponents,
+  opponentTone,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: PartnerStrategyPayload;
   partners: string[];
+  opponents: string[];
+  opponentTone: TeamGroup["tone"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: PartnerStrategyPayload) => void;
@@ -686,7 +717,8 @@ function PartnerStrategyEditor({
   const [shift, setShift] = useState<StrategyShift>("active");
   const [activeTeam, setActiveTeam] = useState(partners[0] ?? "");
   const current = payload.shifts[shift];
-  const resolvedActiveTeam = partners.includes(activeTeam) ? activeTeam : partners[0] ?? "";
+  const teams = [...partners, ...opponents];
+  const resolvedActiveTeam = teams.includes(activeTeam) ? activeTeam : partners[0] ?? opponents[0] ?? "";
 
   return (
     <ShiftSection activeShift={shift} onShift={setShift}>
@@ -697,13 +729,17 @@ function PartnerStrategyEditor({
       ) : null}
       <RoutePlanner
         title={`${shiftLabel(shift)} 队友共享地图`}
-        teams={partners}
+        teams={teams}
+        teamGroups={[
+          { label: "队友", tone: "neutral", teams: partners },
+          { label: "对方", tone: opponentTone, teams: opponents },
+        ]}
         activeTeam={resolvedActiveTeam}
         routes={current.routes}
         disabled={disabled}
         onActiveTeam={setActiveTeam}
         onOpenTeam={onOpenTeam}
-        onRoutesChange={(routes) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, routes } } })}
+        onRoutesChange={(routes) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, routes: keepRouteTeams(routes, teams) } } })}
       />
       <TeamNoteRows
         title="队友备注"
@@ -788,7 +824,7 @@ function RoutePlanner({
   onOpenTeam: (team: string) => void;
   onRoutesChange: (routes: RouteMap) => void;
 }) {
-  const displayGroups = teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }];
+  const displayGroups = (teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }]).filter((group) => group.teams.length);
   const orderedTeams = displayGroups.flatMap((group) => group.teams);
   const activePoints = useMemo(() => routes[activeTeam] ?? [], [activeTeam, routes]);
   const drawingRef = useRef(false);
@@ -1044,7 +1080,7 @@ function emptyPayload(type: StrategyProposalType, ownTeam: string, teams: string
     return emptySelfPayload();
   }
   if (type === "partner_strategy") {
-    return emptyPartnerPayload(partners);
+    return emptyPartnerPayload(partners, teams.filter((team) => team !== ownTeam && !partners.includes(team)));
   }
   return emptyAutoPayload(teams.includes(ownTeam) ? teams : teams);
 }
@@ -1055,12 +1091,12 @@ function emptyAutoPayload(teams: string[]): AutoProposalPayload {
 
 function emptySelfPayload(): SelfStrategyPayload {
   return normalizeProposalPayload("self_strategy", {
-    shifts: Object.fromEntries(strategyShifts.map((shift) => [shift, { points: [], note: "" }])),
+    shifts: Object.fromEntries(strategyShifts.map((shift) => [shift, { points: [], opponentRoutes: {}, note: "" }])),
   }) as SelfStrategyPayload;
 }
 
-function emptyPartnerPayload(partners: string[]): PartnerStrategyPayload {
-  return ensurePartnerPayload(normalizeProposalPayload("partner_strategy", { partners }) as PartnerStrategyPayload, partners);
+function emptyPartnerPayload(partners: string[], opponents: string[]): PartnerStrategyPayload {
+  return ensurePartnerPayload(normalizeProposalPayload("partner_strategy", { partners }) as PartnerStrategyPayload, partners, opponents);
 }
 
 function ensureAutoPayload(payload: AutoProposalPayload, teams: string[]): AutoProposalPayload {
@@ -1072,7 +1108,22 @@ function ensureAutoPayload(payload: AutoProposalPayload, teams: string[]): AutoP
   };
 }
 
-function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[]): PartnerStrategyPayload {
+function ensureSelfPayload(payload: SelfStrategyPayload, opponents: string[]): SelfStrategyPayload {
+  return {
+    ...payload,
+    shifts: Object.fromEntries(strategyShifts.map((shift) => [
+      shift,
+      {
+        note: payload.shifts[shift]?.note ?? "",
+        points: payload.shifts[shift]?.points ?? [],
+        opponentRoutes: keepRouteTeams(payload.shifts[shift]?.opponentRoutes ?? {}, opponents),
+      },
+    ])) as SelfStrategyPayload["shifts"],
+  };
+}
+
+function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[], opponents: string[]): PartnerStrategyPayload {
+  const routeTeams = [...partners, ...opponents];
   return {
     ...payload,
     partners,
@@ -1081,7 +1132,7 @@ function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[
       shift,
       {
         note: payload.shifts[shift]?.note ?? "",
-        routes: keepRouteTeams(payload.shifts[shift]?.routes ?? {}, partners),
+        routes: keepRouteTeams(payload.shifts[shift]?.routes ?? {}, routeTeams),
       },
     ])) as PartnerStrategyPayload["shifts"],
   };
@@ -1104,6 +1155,20 @@ function partnerTeams(match: ProposalMatch | null, ownTeam: string) {
   if (match.redTeams.includes(ownTeam)) return match.redTeams.filter((team) => team !== ownTeam);
   if (match.blueTeams.includes(ownTeam)) return match.blueTeams.filter((team) => team !== ownTeam);
   return [];
+}
+
+function opponentTeams(match: ProposalMatch | null, ownTeam: string) {
+  if (!match) return [];
+  if (match.redTeams.includes(ownTeam)) return match.blueTeams;
+  if (match.blueTeams.includes(ownTeam)) return match.redTeams;
+  return [];
+}
+
+function opponentTone(match: ProposalMatch | null, ownTeam: string): TeamGroup["tone"] {
+  if (!match) return "neutral";
+  if (match.redTeams.includes(ownTeam)) return "blue";
+  if (match.blueTeams.includes(ownTeam)) return "red";
+  return "neutral";
 }
 
 function allianceGroups(match: ProposalMatch): TeamGroup[] {
