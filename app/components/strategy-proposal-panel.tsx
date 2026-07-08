@@ -400,7 +400,7 @@ export function StrategyProposalPanel({
                 当前赛事没有 Team {editor.ownTeam} 的 TBA 赛程，暂不能创建 proposal。
               </div>
             ) : (
-              <MatchTeamsBar match={selectedMatch} activeTeam={editor.ownTeam} onOpenTeam={setDetailTeam} dataset={data.dataset} />
+              <MatchTeamsBar match={selectedMatch} activeTeam={editor.ownTeam} onOpenTeam={setDetailTeam} />
             )}
 
             <PayloadEditor
@@ -408,7 +408,6 @@ export function StrategyProposalPanel({
               ownTeam={editor.ownTeam}
               match={selectedMatch}
               payload={editor.payload}
-              teamData={data.dataset.teamData}
               disabled={!editable}
               onOpenTeam={setDetailTeam}
               onChange={(payload) => setEditor((current) => ({ ...current, payload }))}
@@ -493,7 +492,7 @@ export function StrategyProposalPanel({
         </Card>
       </div>
 
-      {teamDetail ? (
+      {detailTeam && teamDetail ? (
         <TeamDetailModal
           team={teamDetail}
           photos={data.dataset.teamPhotos[teamDetail.team] ?? []}
@@ -502,6 +501,7 @@ export function StrategyProposalPanel({
           onClose={() => setDetailTeam(null)}
         />
       ) : null}
+      {detailTeam && !teamDetail ? <MissingTeamDetailModal team={detailTeam} onClose={() => setDetailTeam(null)} /> : null}
       {lightbox ? (
         <PhotoLightbox
           photos={data.dataset.teamPhotos[lightbox.team] ?? []}
@@ -519,7 +519,6 @@ function PayloadEditor({
   ownTeam,
   match,
   payload,
-  teamData,
   disabled,
   onOpenTeam,
   onChange,
@@ -528,7 +527,6 @@ function PayloadEditor({
   ownTeam: OwnStrategyTeam;
   match: ProposalMatch | null;
   payload: StrategyProposalPayload;
-  teamData: ScoutingDataset["teamData"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: StrategyProposalPayload) => void;
@@ -539,7 +537,6 @@ function PayloadEditor({
       <SelfStrategyEditor
         payload={payload.kind === "self_strategy" ? payload : emptySelfPayload()}
         ownTeam={ownTeam}
-        teamData={teamData}
         disabled={disabled}
         onOpenTeam={onOpenTeam}
         onChange={onChange}
@@ -553,7 +550,6 @@ function PayloadEditor({
       <PartnerStrategyEditor
         payload={payload.kind === "partner_strategy" ? ensurePartnerPayload(payload, partners) : emptyPartnerPayload(partners)}
         partners={partners}
-        teamData={teamData}
         disabled={disabled}
         onOpenTeam={onOpenTeam}
         onChange={onChange}
@@ -565,7 +561,6 @@ function PayloadEditor({
     <AutoProposalEditor
       payload={payload.kind === "auto" ? ensureAutoPayload(payload, matchTeamList) : emptyAutoPayload(matchTeamList)}
       match={match}
-      teamData={teamData}
       disabled={disabled}
       onOpenTeam={onOpenTeam}
       onChange={onChange}
@@ -576,14 +571,12 @@ function PayloadEditor({
 function AutoProposalEditor({
   payload,
   match,
-  teamData,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: AutoProposalPayload;
   match: ProposalMatch | null;
-  teamData: ScoutingDataset["teamData"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: AutoProposalPayload) => void;
@@ -615,7 +608,6 @@ function AutoProposalEditor({
         activeTeam={resolvedAutoTeam}
         routes={payload.autoRoutes}
         disabled={disabled}
-        teamData={teamData}
         onActiveTeam={setActiveAutoTeam}
         onOpenTeam={onOpenTeam}
         onRoutesChange={(autoRoutes) => onChange({ ...payload, autoRoutes })}
@@ -627,7 +619,6 @@ function AutoProposalEditor({
         activeTeam={resolvedTransitionTeam}
         routes={payload.transitionRoutes}
         disabled={disabled}
-        teamData={teamData}
         onActiveTeam={setActiveTransitionTeam}
         onOpenTeam={onOpenTeam}
         onRoutesChange={(transitionRoutes) => onChange({ ...payload, transitionRoutes })}
@@ -647,14 +638,12 @@ function AutoProposalEditor({
 function SelfStrategyEditor({
   payload,
   ownTeam,
-  teamData,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: SelfStrategyPayload;
   ownTeam: string;
-  teamData: ScoutingDataset["teamData"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: SelfStrategyPayload) => void;
@@ -669,7 +658,6 @@ function SelfStrategyEditor({
         activeTeam={ownTeam}
         routes={{ [ownTeam]: current.points }}
         disabled={disabled}
-        teamData={teamData}
         onActiveTeam={() => undefined}
         onOpenTeam={onOpenTeam}
         onRoutesChange={(routes) => onChange({
@@ -685,14 +673,12 @@ function SelfStrategyEditor({
 function PartnerStrategyEditor({
   payload,
   partners,
-  teamData,
   disabled,
   onOpenTeam,
   onChange,
 }: {
   payload: PartnerStrategyPayload;
   partners: string[];
-  teamData: ScoutingDataset["teamData"];
   disabled: boolean;
   onOpenTeam: (team: string) => void;
   onChange: (payload: PartnerStrategyPayload) => void;
@@ -715,7 +701,6 @@ function PartnerStrategyEditor({
         activeTeam={resolvedActiveTeam}
         routes={current.routes}
         disabled={disabled}
-        teamData={teamData}
         onActiveTeam={setActiveTeam}
         onOpenTeam={onOpenTeam}
         onRoutesChange={(routes) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, routes } } })}
@@ -789,7 +774,6 @@ function RoutePlanner({
   activeTeam,
   routes,
   disabled,
-  teamData,
   onActiveTeam,
   onOpenTeam,
   onRoutesChange,
@@ -800,7 +784,6 @@ function RoutePlanner({
   activeTeam: string;
   routes: RouteMap;
   disabled: boolean;
-  teamData: ScoutingDataset["teamData"];
   onActiveTeam: (team: string) => void;
   onOpenTeam: (team: string) => void;
   onRoutesChange: (routes: RouteMap) => void;
@@ -925,7 +908,7 @@ function RoutePlanner({
                       <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(index) }} />
                       Team {team}
                     </button>
-                    <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)} disabled={!teamData[team]}>
+                    <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)}>
                       <Eye className="size-4" />
                     </button>
                   </div>
@@ -970,32 +953,50 @@ function RoutePlanner({
   );
 }
 
-function MatchTeamsBar({ match, activeTeam, onOpenTeam, dataset }: { match: ProposalMatch; activeTeam: string; onOpenTeam: (team: string) => void; dataset: ScoutingDataset }) {
+function MatchTeamsBar({ match, activeTeam, onOpenTeam }: { match: ProposalMatch; activeTeam: string; onOpenTeam: (team: string) => void }) {
   return (
     <div className="grid gap-2 rounded-md border border-line bg-surface-2 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="border-danger/40 bg-danger/10 text-danger">Red</Badge>
-        {match.redTeams.map((team) => <TeamChip key={team} team={team} active={team === activeTeam} onOpenTeam={onOpenTeam} disabled={!dataset.teamData[team]} />)}
+        {match.redTeams.map((team) => <TeamChip key={team} team={team} active={team === activeTeam} onOpenTeam={onOpenTeam} />)}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="border-info/40 bg-info/10 text-info">Blue</Badge>
-        {match.blueTeams.map((team) => <TeamChip key={team} team={team} active={team === activeTeam} onOpenTeam={onOpenTeam} disabled={!dataset.teamData[team]} />)}
+        {match.blueTeams.map((team) => <TeamChip key={team} team={team} active={team === activeTeam} onOpenTeam={onOpenTeam} />)}
       </div>
     </div>
   );
 }
 
-function TeamChip({ team, active, onOpenTeam, disabled }: { team: string; active: boolean; onOpenTeam: (team: string) => void; disabled: boolean }) {
+function TeamChip({ team, active, onOpenTeam }: { team: string; active: boolean; onOpenTeam: (team: string) => void }) {
   return (
     <button
       type="button"
       onClick={() => onOpenTeam(team)}
-      disabled={disabled}
-      className={cn("rounded-md border px-2 py-1 text-sm font-semibold", active ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-ink-dim", disabled && "opacity-50")}
-      title={disabled ? "暂无队伍详情" : "查看队伍详情"}
+      className={cn("rounded-md border px-2 py-1 text-sm font-semibold", active ? "border-brand bg-brand/10 text-brand" : "border-line bg-surface text-ink-dim")}
+      title="查看队伍详情"
     >
       Team {team}
     </button>
+  );
+}
+
+function MissingTeamDetailModal({ team, onClose }: { team: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-3" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <Card className="w-full max-w-md p-4" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="section-label">队伍详情</p>
+            <h2 className="text-xl font-semibold text-ink">Team {team}</h2>
+          </div>
+          <button type="button" className="grid size-9 place-items-center rounded-md border border-line text-ink-dim hover:text-ink" onClick={onClose} aria-label="关闭">
+            <X className="size-4" />
+          </button>
+        </div>
+        <p className="mt-3 text-sm text-ink-dim">当前数据集里没有这支队伍的详细数据。</p>
+      </Card>
+    </div>
   );
 }
 
