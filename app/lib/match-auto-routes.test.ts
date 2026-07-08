@@ -10,19 +10,37 @@ describe("match auto routes", () => {
   });
 
   it("builds a signature from node order only", () => {
-    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }]))).toBe(
+    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }], { autoStartPosition: "hub-front" }))).toBe(
       "tower>alliance-center",
     );
-    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 900 }, { node: "alliance-center", atMs: 1800 }]))).toBe(
+    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 900 }, { node: "alliance-center", atMs: 1800 }], { autoStartPosition: "hub-front" }))).toBe(
       "tower>alliance-center",
     );
   });
 
+  it("starts routes from the selected start-position button", () => {
+    const routes = buildMatchAutoRoutes(team([
+      match(1, [{ node: "alliance-center", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
+    ]));
+
+    expect(routes[0].nodes).toEqual(["tower", "alliance-center"]);
+    expect(routes[0].points).toEqual([{ x: 6, y: 50 }, { x: 17.5, y: 50 }]);
+  });
+
+  it("keeps different start positions as different routes", () => {
+    const routes = buildMatchAutoRoutes(team([
+      match(1, [{ node: "alliance-center", atMs: 1200 }], { autoStartPosition: "hub-front" }),
+      match(2, [{ node: "alliance-center", atMs: 1300 }], { autoStartPosition: "right-in" }),
+    ]));
+
+    expect(routes.map((route) => route.signature)).toEqual(["tower>alliance-center", "right-trench>alliance-center"]);
+  });
+
   it("merges identical node sequences and keeps different sequences separate", () => {
     const routes = buildMatchAutoRoutes(team([
-      match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }], { autoAlliance: "red" }),
-      match(2, [{ node: "tower", atMs: 300 }, { node: "alliance-center", atMs: 1500 }], { autoAlliance: "blue" }),
-      match(3, [{ node: "tower", atMs: 0 }, { node: "alliance-left", atMs: 1200 }], { autoAlliance: "red" }),
+      match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
+      match(2, [{ node: "tower", atMs: 300 }, { node: "alliance-center", atMs: 1500 }], { autoAlliance: "blue", autoStartPosition: "hub-front" }),
+      match(3, [{ node: "tower", atMs: 0 }, { node: "alliance-left", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
     ]));
 
     expect(routes).toHaveLength(2);
@@ -32,7 +50,10 @@ describe("match auto routes", () => {
   });
 
   it("ignores empty or unknown auto paths", () => {
-    expect(buildMatchAutoRoutes(team([match(1, []), match(2, [{ node: "unknown", atMs: 0 }])]))).toEqual([]);
+    expect(buildMatchAutoRoutes(team([
+      match(1, [], { autoStartPosition: "hub-front" }),
+      match(2, [{ node: "unknown", atMs: 0 }], { autoStartPosition: "hub-front" }),
+    ]))).toEqual([]);
   });
 });
 

@@ -66,6 +66,16 @@ const AUTO_NODE_CENTERS: Record<AllianceSide, Record<string, AutoRoutePoint>> = 
   },
 };
 
+const START_TO_AUTO_NODE: Record<string, string> = {
+  "right-out": "right-trench",
+  "left-out": "left-trench",
+  "right-in": "right-trench",
+  "right-bump": "right-bump",
+  "hub-front": "tower",
+  "left-bump": "left-bump",
+  "left-in": "left-trench",
+};
+
 export function buildMatchAutoRoutes(team: TeamSummary): MatchAutoRoute[] {
   const bySignature = new Map<string, MatchAutoRoute>();
 
@@ -106,9 +116,13 @@ export function buildMatchAutoRoutes(team: TeamSummary): MatchAutoRoute[] {
 }
 
 export function matchAutoNodes(match: ScoutingMatch): string[] {
-  return (match.autoPath ?? [])
+  const nodes = (match.autoPath ?? [])
     .map((point) => point.node)
     .filter((node) => Boolean(AUTO_NODE_CENTERS.red[node]));
+  if (!nodes.length) return [];
+  const startNode = START_TO_AUTO_NODE[match.autoStartPosition ?? ""];
+  if (!startNode) return nodes;
+  return nodes[0] === startNode ? nodes : [startNode, ...nodes];
 }
 
 export function autoPathSignature(match: ScoutingMatch): string {
