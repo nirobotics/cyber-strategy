@@ -9,7 +9,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { PhotoLightbox, TeamDetailModal } from "./analytics-dashboard";
 import { StrategyNavigation } from "./strategy-navigation";
@@ -43,6 +43,7 @@ import {
   type AutoWinner,
   type OwnStrategyTeam,
   type PartnerStrategyPayload,
+  type RoutePoint,
   type RouteMap,
   type SelfStrategyPayload,
   type StrategyProposal,
@@ -806,9 +807,17 @@ function RoutePlanner({
 }) {
   const displayGroups = teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }];
   const orderedTeams = displayGroups.flatMap((group) => group.teams);
-  const activePoints = routes[activeTeam] ?? [];
+  const activePoints = useMemo(() => routes[activeTeam] ?? [], [activeTeam, routes]);
+  const drawingRef = useRef(false);
+  const draftPointsRef = useRef<RoutePoint[]>(activePoints);
+  const routesRef = useRef(routes);
 
-  function addPoint(event: ReactMouseEvent<HTMLButtonElement>) {
+  useEffect(() => {
+    routesRef.current = routes;
+    if (!drawingRef.current) draftPointsRef.current = activePoints;
+  }, [activePoints, routes]);
+
+  function pointFromPointer(event: ReactPointerEvent<HTMLButtonElement>) {
     if (disabled || !activeTeam) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const point = {
@@ -816,11 +825,50 @@ function RoutePlanner({
       y: Math.round(((event.clientY - rect.top) / rect.height) * 1000) / 10,
     };
     if (point.x < 0 || point.x > 100 || point.y < 0 || point.y > 100) return;
-    onRoutesChange({ ...routes, [activeTeam]: [...activePoints, point] });
+    return point;
+  }
+
+  function setActiveRoute(points: RoutePoint[]) {
+    const nextRoutes = { ...routesRef.current, [activeTeam]: points };
+    routesRef.current = nextRoutes;
+    draftPointsRef.current = points;
+    onRoutesChange(nextRoutes);
+  }
+
+  function startStroke(event: ReactPointerEvent<HTMLButtonElement>) {
+    const point = pointFromPointer(event);
+    if (!point) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    drawingRef.current = true;
+    setActiveRoute([...activePoints, { ...point, start: true }]);
+  }
+
+  function drawStroke(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!drawingRef.current) return;
+    const point = pointFromPointer(event);
+    if (!point) return;
+    event.preventDefault();
+    const previous = draftPointsRef.current.at(-1);
+    if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.7) return;
+    setActiveRoute([...draftPointsRef.current, point]);
+  }
+
+  function stopStroke(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
   function undo() {
-    onRoutesChange({ ...routes, [activeTeam]: activePoints.slice(0, -1) });
+    let lastStrokeStart = -1;
+    for (let index = activePoints.length - 1; index >= 0; index -= 1) {
+      if (activePoints[index].start) {
+        lastStrokeStart = index;
+        break;
+      }
+    }
+    onRoutesChange({ ...routes, [activeTeam]: activePoints.slice(0, Math.max(0, lastStrokeStart)) });
   }
 
   function clear() {
@@ -888,8 +936,12 @@ function RoutePlanner({
         </div>
         <button
           type="button"
-          className={cn("relative aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2", !disabled && activeTeam && "cursor-crosshair")}
-          onClick={addPoint}
+          className={cn("relative aspect-[2/1] touch-none overflow-hidden rounded-md border border-line bg-surface-2", !disabled && activeTeam && "cursor-crosshair")}
+          onPointerDown={startStroke}
+          onPointerMove={drawStroke}
+          onPointerUp={stopStroke}
+          onPointerCancel={stopStroke}
+          onPointerLeave={stopStroke}
           disabled={disabled || !activeTeam}
           aria-label={title}
         >
@@ -898,10 +950,10 @@ function RoutePlanner({
             {orderedTeams.map((team, index) => {
               const points = routes[team] ?? [];
               if (points.length < 2) return null;
-              return (
+              return routeSegments(points).map((segment, segmentIndex) => (
                 <polyline
-                  key={team}
-                  points={points.map((point) => `${point.x},${point.y}`).join(" ")}
+                  key={`${team}-${segmentIndex}`}
+                  points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
                   fill="none"
                   stroke={routeColor(index)}
                   strokeWidth="3"
@@ -909,18 +961,9 @@ function RoutePlanner({
                   strokeLinejoin="round"
                   vectorEffect="non-scaling-stroke"
                 />
-              );
+              ));
             })}
           </svg>
-          {orderedTeams.flatMap((team, teamIndex) => (routes[team] ?? []).map((point, pointIndex) => (
-            <span
-              key={`${team}-${point.x}-${point.y}-${pointIndex}`}
-              className="absolute grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-white text-[10px] font-bold text-white shadow-sm"
-              style={{ left: `${point.x}%`, top: `${point.y}%`, backgroundColor: routeColor(teamIndex) }}
-            >
-              {pointIndex + 1}
-            </span>
-          )))}
         </button>
       </div>
     </Card>
@@ -1103,6 +1146,15 @@ function autoWinnerLabel(value: AutoWinner) {
   if (value === "blue") return "蓝方";
   if (value === "tie") return "平局";
   return "未知";
+}
+
+function routeSegments(points: RoutePoint[]) {
+  const segments: RoutePoint[][] = [];
+  for (const point of points) {
+    if (point.start || !segments.length) segments.push([point]);
+    else segments[segments.length - 1].push(point);
+  }
+  return segments.filter((segment) => segment.length > 1);
 }
 
 function routeColor(index: number) {

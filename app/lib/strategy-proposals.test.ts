@@ -25,14 +25,14 @@ describe("strategy proposal helpers", () => {
   it("normalizes auto proposal payload and manual winner", () => {
     expect(normalizeProposalPayload("auto", {
       autoWinner: "red",
-      autoRoutes: { frc8214: [{ x: 10.04, y: 99.96 }, { x: -1, y: 2 }] },
+      autoRoutes: { frc8214: [{ x: 10.04, y: 99.96, start: true }, { x: 20, y: 80, s: true }, { x: -1, y: 2 }] },
       transitionRoutes: { 9635: [{ x: 50, y: 40 }] },
       teamNotes: { frc8214: "  start left  " },
       note: "  hold center  ",
     })).toEqual({
       kind: "auto",
       autoWinner: "red",
-      autoRoutes: { "8214": [{ x: 10, y: 100 }] },
+      autoRoutes: { "8214": [{ x: 10, y: 100, start: true }, { x: 20, y: 80, start: true }] },
       transitionRoutes: { "9635": [{ x: 50, y: 40 }] },
       teamNotes: { "8214": "start left" },
       note: "hold center",

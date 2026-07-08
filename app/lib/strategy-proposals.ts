@@ -10,7 +10,7 @@ export type StrategyProposalStatus = (typeof proposalStatuses)[number];
 export type StrategyShift = (typeof strategyShifts)[number];
 export type AutoWinner = (typeof autoWinners)[number];
 
-export type RoutePoint = { x: number; y: number };
+export type RoutePoint = { x: number; y: number; start?: boolean };
 export type RouteMap = Record<string, RoutePoint[]>;
 
 export type AutoProposalPayload = {
@@ -248,7 +248,8 @@ function normalizePoints(value: unknown): RoutePoint[] {
       const record = objectValue(point);
       const x = boundedPercent(record.x);
       const y = boundedPercent(record.y);
-      return x == null || y == null ? null : { x, y };
+      if (x == null || y == null) return null;
+      return record.start === true || record.s === true ? { x, y, start: true } : { x, y };
     })
     .filter((point): point is RoutePoint => Boolean(point));
 }
