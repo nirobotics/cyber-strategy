@@ -29,6 +29,8 @@ import { ScoutingLeadPanel, type ScoutingLeadPanelData } from "./scouting-lead-p
 import { StrategyProposalPanel, type StrategyProposalPanelData } from "./strategy-proposal-panel";
 import type { SessionUser } from "../lib/auth-types";
 import {
+  applyIgnoredMatchesToTeamData,
+  matchIgnoreKey,
   reliability,
   sortedTeams,
   type DatasetSourceStatus,
@@ -78,21 +80,27 @@ export function AnalyticsDashboard({
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const teams = useMemo(() => sortedTeams(dataset.teamData), [dataset.teamData]);
-  const tierByTeam = useMemo(() => buildTierAssignments(teams, tierPercentages), [teams, tierPercentages]);
-  const rankByTeam = useMemo(() => new Map(teams.map((team, index) => [team.team, index + 1])), [teams]);
   const [tab, setTab] = useState<Tab>(() => readDashboardTab(searchParams.get("tab")));
-  const [selectedTeam, setSelectedTeam] = useState(() => teams[0]?.team ?? "");
+  const [selectedTeam, setSelectedTeam] = useState("");
   const [search, setSearch] = useState("");
   const [hiddenTeams, setHiddenTeams] = useStoredList(`cyber-strategy:hidden:${dataset.id}`);
+  const [ignoredMatches, setIgnoredMatches] = useStoredList(`cyber-strategy:ignored-matches:${dataset.id}`);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
 
+  const analysisTeamData = useMemo(() => applyIgnoredMatchesToTeamData(dataset.teamData, ignoredMatches), [dataset.teamData, ignoredMatches]);
+  const analysisDataset = useMemo(() => ({ ...dataset, teamData: analysisTeamData }), [dataset, analysisTeamData]);
+  const teams = useMemo(() => sortedTeams(analysisTeamData), [analysisTeamData]);
+  const tierByTeam = useMemo(() => buildTierAssignments(teams, tierPercentages), [teams, tierPercentages]);
+  const rankByTeam = useMemo(() => new Map(teams.map((team, index) => [team.team, index + 1])), [teams]);
+  const ignoredMatchSet = useMemo(() => new Set(ignoredMatches), [ignoredMatches]);
   const hiddenSet = useMemo(() => new Set(hiddenTeams), [hiddenTeams]);
   const visibleTeams = teams.filter((team) => team.team.includes(search.trim()));
-  const selected = dataset.teamData[selectedTeam] ?? teams[0];
+  const selected = analysisTeamData[selectedTeam] ?? teams[0];
+  const selectedOriginal = selected ? dataset.teamData[selected.team] : null;
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
-  const detail = detailTeam ? dataset.teamData[detailTeam] : null;
+  const detail = detailTeam ? analysisTeamData[detailTeam] : null;
+  const detailOriginal = detailTeam ? dataset.teamData[detailTeam] : null;
   const activeTab = tab === "lead" && !isAdmin ? "browser" : tab;
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
 
@@ -144,6 +152,10 @@ export function AnalyticsDashboard({
     setHiddenTeams((current) => toggleValue(current, team));
   }
 
+  function toggleIgnoredMatch(team: string, match: number, matchIndex: number) {
+    setIgnoredMatches((current) => toggleValue(current, matchIgnoreKey(team, match, matchIndex)));
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
       <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 xl:flex-row xl:items-center xl:justify-between">
@@ -152,6 +164,7 @@ export function AnalyticsDashboard({
           <h1 className="truncate text-xl font-semibold text-ink">{dataset.title}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-dim">
             <span>{dataset.eventKey} · {teams.length} 支队伍 · {teams.reduce((sum, team) => sum + team.matchCount, 0)} 条记录</span>
+            {ignoredMatches.length ? <span className="text-xs text-danger">已忽略 {ignoredMatches.length} 场</span> : null}
             <Badge
               className={cn(
                 sourceStatus.source === "cyber-scout" && "border-ok/40 bg-ok/10 text-ok",
@@ -285,13 +298,16 @@ export function AnalyticsDashboard({
             tier={tierByTeam.get(selected.team)}
             photos={photos}
             pitInfo={dataset.teamPitData?.[selected.team]}
+            displayMatches={selectedOriginal?.matches ?? selected.matches}
+            ignoredMatchKeys={ignoredMatchSet}
+            onToggleIgnoreMatch={toggleIgnoredMatch}
             onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
           />
         </div>
       ) : null}
 
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={dataset.teamData} /> : null}
+      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={analysisTeamData} /> : null}
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}
@@ -304,7 +320,7 @@ export function AnalyticsDashboard({
       {activeTab === "proposal" ? (
         <StrategyProposalPanel
           data={{
-            dataset,
+            dataset: analysisDataset,
             events,
             selectedEventKey: resolvedEventKey,
             isAdmin,
@@ -323,6 +339,9 @@ export function AnalyticsDashboard({
           tier={tierByTeam.get(detail.team)}
           photos={dataset.teamPhotos[detail.team] ?? []}
           pitInfo={dataset.teamPitData?.[detail.team]}
+          displayMatches={detailOriginal?.matches ?? detail.matches}
+          ignoredMatchKeys={ignoredMatchSet}
+          onToggleIgnoreMatch={toggleIgnoredMatch}
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
         />
@@ -349,16 +368,23 @@ function TeamDetail({
   tier,
   photos,
   pitInfo,
+  displayMatches,
+  ignoredMatchKeys,
+  onToggleIgnoreMatch,
   onOpenPhoto,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
   photos: string[];
   pitInfo?: TeamPitInfo;
+  displayMatches?: ScoutingMatch[];
+  ignoredMatchKeys?: Set<string>;
+  onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
+  const tableMatches = displayMatches ?? team.matches;
   const trendText = team.trend === "up" ? "上升" : team.trend === "down" ? "下降" : "稳定";
   return (
     <div className="min-w-0 space-y-3">
@@ -497,7 +523,7 @@ function TeamDetail({
           <h3 className="section-label">逐场数据</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] border-collapse text-sm">
+          <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
               <tr>
                 <th className="px-3 py-2 text-left">场次</th>
@@ -511,25 +537,47 @@ function TeamDetail({
               </tr>
             </thead>
             <tbody>
-              {team.matches.map((match) => (
-                <tr key={match.match} className="border-t border-line align-top">
-                  <td className="px-3 py-2 font-semibold">M{match.match}</td>
-                  <td className="px-3 py-2">
-                    <PointsBar value={match.totalPts} max={team.maxPts} />
-                  </td>
-                  <td className="px-3 py-2">{match.autoPts}</td>
-                  <td className="px-3 py-2">{match.telePts}</td>
-                  <td className="px-3 py-2">{(match.transferPieces ?? 0) > 0 ? match.transferPieces : "-"}</td>
-                  <td className="px-3 py-2">{match.accuracy == null ? "-" : `${match.accuracy}%`}</td>
-                  <td className="px-3 py-2">
-                    <StatePill match={match} />
-                  </td>
-                  <td className="max-w-md px-3 py-2 text-ink-dim">
-                    <p>{match.comment || "-"}</p>
-                    {match.scoutName ? <p className="mt-1 text-xs text-ink-faint">记录员：{match.scoutName}</p> : null}
-                  </td>
-                </tr>
-              ))}
+              {tableMatches.map((match, matchIndex) => {
+                const ignored = ignoredMatchKeys?.has(matchIgnoreKey(team.team, match.match, matchIndex)) ?? false;
+                return (
+                  <tr key={`${match.match}:${matchIndex}`} className={cn("border-t border-line align-top", ignored && "bg-danger/5 opacity-55")}>
+                    <td className="px-3 py-2 font-semibold">
+                      <div className="flex items-center gap-2">
+                        {onToggleIgnoreMatch ? (
+                          <button
+                            type="button"
+                            title={ignored ? "恢复此场" : "忽略此场"}
+                            aria-label={ignored ? `恢复 Team ${team.team} M${match.match}` : `忽略 Team ${team.team} M${match.match}`}
+                            className={cn(
+                              "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-line text-ink-faint transition hover:border-brand hover:text-brand",
+                              ignored && "border-danger/40 bg-danger/10 text-danger hover:text-danger",
+                            )}
+                            onClick={() => onToggleIgnoreMatch(team.team, match.match, matchIndex)}
+                          >
+                            {ignored ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                          </button>
+                        ) : null}
+                        <span>M{match.match}</span>
+                        {ignored ? <span className="rounded-full border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[10px] text-danger">已忽略</span> : null}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <PointsBar value={match.totalPts} max={team.maxPts} />
+                    </td>
+                    <td className="px-3 py-2">{match.autoPts}</td>
+                    <td className="px-3 py-2">{match.telePts}</td>
+                    <td className="px-3 py-2">{(match.transferPieces ?? 0) > 0 ? match.transferPieces : "-"}</td>
+                    <td className="px-3 py-2">{match.accuracy == null ? "-" : `${match.accuracy}%`}</td>
+                    <td className="px-3 py-2">
+                      <StatePill match={match} />
+                    </td>
+                    <td className="max-w-md px-3 py-2 text-ink-dim">
+                      <p>{match.comment || "-"}</p>
+                      {match.scoutName ? <p className="mt-1 text-xs text-ink-faint">记录员：{match.scoutName}</p> : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -867,6 +915,9 @@ export function TeamDetailModal({
   tier,
   photos,
   pitInfo,
+  displayMatches,
+  ignoredMatchKeys,
+  onToggleIgnoreMatch,
   onOpenPhoto,
   onClose,
 }: {
@@ -874,6 +925,9 @@ export function TeamDetailModal({
   tier?: TierInfo;
   photos: string[];
   pitInfo?: TeamPitInfo;
+  displayMatches?: ScoutingMatch[];
+  ignoredMatchKeys?: Set<string>;
+  onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
   onClose: () => void;
 }) {
@@ -901,7 +955,16 @@ export function TeamDetailModal({
           </Button>
         </div>
         <div className="overflow-y-auto p-3 md:p-4">
-          <TeamDetail team={team} tier={tier} photos={photos} pitInfo={pitInfo} onOpenPhoto={onOpenPhoto} />
+          <TeamDetail
+            team={team}
+            tier={tier}
+            photos={photos}
+            pitInfo={pitInfo}
+            displayMatches={displayMatches}
+            ignoredMatchKeys={ignoredMatchKeys}
+            onToggleIgnoreMatch={onToggleIgnoreMatch}
+            onOpenPhoto={onOpenPhoto}
+          />
         </div>
       </div>
     </div>
@@ -1097,9 +1160,10 @@ function averagePositive(values: number[]) {
 }
 
 function PointsBar({ value, max }: { value: number; max: number }) {
+  const width = Math.min(72, Math.max(4, (value / Math.max(max, 1)) * 72));
   return (
     <div className="flex min-w-32 items-center gap-2">
-      <span className="h-1.5 rounded-full bg-brand" style={{ width: `${Math.max(4, (value / Math.max(max, 1)) * 72)}px` }} />
+      <span className="h-1.5 rounded-full bg-brand" style={{ width: `${width}px` }} />
       <span>{value}</span>
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseScoutingCsv, processCsvRows, reliability } from "./scouting";
+import { applyIgnoredMatchesToTeamData, matchIgnoreKey, parseScoutingCsv, processCsvRows, reliability } from "./scouting";
 import { buildTierAssignments, DEFAULT_TIER_PERCENTAGES, getTierForRank, normalizeTierPercentages, validateTierPercentages } from "./tier-settings";
 
 describe("scouting data processing", () => {
@@ -43,6 +43,37 @@ describe("scouting data processing", () => {
 
     expect(data["1"].avgAccuracy).toBe(0);
     expect(data["1"].matches[0].accuracy).toBeNull();
+  });
+
+  it("recomputes team summaries after locally ignored matches", () => {
+    const data = processCsvRows([
+      row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2),
+      row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3),
+      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4),
+    ]);
+
+    const filtered = applyIgnoredMatchesToTeamData(data, [matchIgnoreKey("8214", 3, 2)]);
+
+    expect(filtered["8214"]).toMatchObject({
+      avgTotal: 20,
+      avgAuto: 4.5,
+      avgTele: 15.5,
+      matchCount: 2,
+      maxPts: 30,
+    });
+    expect(filtered["8214"].matches.map((match) => match.match)).toEqual([1, 2]);
+  });
+
+  it("keeps a team visible when all of its matches are ignored", () => {
+    const data = processCsvRows([row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2)]);
+
+    const filtered = applyIgnoredMatchesToTeamData(data, [matchIgnoreKey("8214", 1, 0)]);
+
+    expect(filtered["8214"]).toMatchObject({
+      avgTotal: 0,
+      matchCount: 0,
+      matches: [],
+    });
   });
 
   it("assigns tiers by ranking percentages", () => {

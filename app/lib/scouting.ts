@@ -168,6 +168,20 @@ export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): Te
   };
 }
 
+export function matchIgnoreKey(team: string, match: number, matchIndex: number): string {
+  return `${team}:${match}:${matchIndex}`;
+}
+
+export function applyIgnoredMatchesToTeamData(teamData: TeamData, ignoredMatchKeys: string[]): TeamData {
+  const ignored = new Set(ignoredMatchKeys);
+  const result: TeamData = {};
+  for (const [team, summary] of Object.entries(teamData)) {
+    const matches = summary.matches.filter((match, index) => !ignored.has(matchIgnoreKey(team, match.match, index)));
+    result[team] = summarizeTeamMatches(team, matches) ?? emptyTeamSummary(team);
+  }
+  return result;
+}
+
 export function sortedTeams(teamData: TeamData): TeamSummary[] {
   return Object.values(teamData).sort((a, b) => b.avgTotal - a.avgTotal || Number(a.team) - Number(b.team));
 }
@@ -214,6 +228,29 @@ function toMatch(row: CsvRow): ScoutingMatch {
     comment: text(row.Comment).trim(),
     startPos: text(row.StartPosition).trim(),
     scoutName: text(row.ScoutName).trim(),
+  };
+}
+
+function emptyTeamSummary(team: string): TeamSummary {
+  return {
+    team,
+    avgTotal: 0,
+    avgAuto: 0,
+    avgTele: 0,
+    avgAccuracy: 0,
+    avgDriver: 0,
+    avgFuel: 0,
+    malfunctions: 0,
+    commsIssues: 0,
+    disabledEvents: 0,
+    matchCount: 0,
+    trend: "stable",
+    firstHalfAvg: 0,
+    secondHalfAvg: 0,
+    stdDev: 0,
+    minPts: 0,
+    maxPts: 0,
+    matches: [],
   };
 }
 
