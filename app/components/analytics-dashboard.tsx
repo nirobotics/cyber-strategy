@@ -47,6 +47,7 @@ import {
   type PickListId,
 } from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
+import { buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead";
 
@@ -357,6 +358,7 @@ function TeamDetail({
   onOpenPhoto: (index: number) => void;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
+  const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
   const trendText = team.trend === "up" ? "上升" : team.trend === "down" ? "下降" : "稳定";
   return (
     <div className="min-w-0 space-y-3">
@@ -377,7 +379,7 @@ function TeamDetail({
         {pitInfo?.autoRoutes.length ? (
           <Button type="button" className="h-8 px-2" onClick={() => setRouteOpen(true)}>
             <MapIcon className="size-4" />
-            自动路线
+            Pit 自动路线
           </Button>
         ) : null}
         <span className="text-sm text-ink-dim">
@@ -415,6 +417,51 @@ function TeamDetail({
               >
                 <img src={src} alt={`Team ${team.team}`} loading="lazy" className="h-full w-full object-cover" />
               </button>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {matchAutoRoutes.length ? (
+        <Card className="p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="section-label">比赛自动</h3>
+            <span className="text-xs text-ink-dim">{matchAutoRoutes.length} 条路线</span>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {matchAutoRoutes.map((route, index) => (
+              <div key={route.id} className="rounded-md border border-line bg-surface p-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-semibold text-ink">路线 {index + 1}</h4>
+                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-dim">{route.matches.length} 场</span>
+                </div>
+                <AutoRoutePreview points={route.points} />
+                <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
+                  {route.nodes.map((node, nodeIndex) => (
+                    <span key={`${route.id}:${nodeIndex}`} className="rounded-full bg-surface-2 px-2 py-0.5">
+                      {nodeIndex + 1}. {MATCH_AUTO_NODE_LABELS[node] ?? node}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
+                  <Badge className="border-line bg-surface-2 text-ink-dim">{route.alliance === "blue" ? "蓝方" : "红方"}</Badge>
+                  {route.startPosition ? <Badge className="border-line bg-surface-2 text-ink-dim">起点 {route.startPosition}</Badge> : null}
+                  {route.flipped ? <Badge className="border-line bg-surface-2 text-ink-dim">镜像</Badge> : null}
+                  {route.scoutName ? <Badge className="border-line bg-surface-2 text-ink-dim">记录员 {route.scoutName}</Badge> : null}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
+                  <span className="mr-1">使用场次</span>
+                  {route.matches.map((match) => (
+                    <span
+                      key={`${route.id}:${match.match}:${match.scoutName}`}
+                      className="rounded-full bg-surface-2 px-2 py-0.5"
+                      title={[match.alliance, match.startPosition, match.flipped ? "镜像" : "", match.scoutName].filter(Boolean).join(" · ")}
+                    >
+                      M{match.match}
+                    </span>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         </Card>
@@ -925,9 +972,11 @@ function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number
       {points.map((point, index) => (
         <span
           key={`${point.x}-${point.y}-${index}`}
-          className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand shadow-sm"
+          className="absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-brand text-[10px] font-semibold leading-none text-white shadow-sm"
           style={{ left: `${point.x}%`, top: `${point.y}%` }}
-        />
+        >
+          {index + 1}
+        </span>
       ))}
     </div>
   );

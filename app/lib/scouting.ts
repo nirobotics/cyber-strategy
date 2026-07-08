@@ -1,5 +1,7 @@
 import Papa from "papaparse";
 
+export type MatchAutoPathPoint = { node: string; atMs: number };
+
 export type ScoutingMatch = {
   match: number;
   totalPts: number;
@@ -21,6 +23,10 @@ export type ScoutingMatch = {
   comment: string;
   startPos: string;
   scoutName: string;
+  autoPath?: MatchAutoPathPoint[];
+  autoStartPosition?: string;
+  autoAlliance?: "red" | "blue" | string;
+  autoFieldSideFlipped?: boolean;
 };
 
 export type TeamSummary = {

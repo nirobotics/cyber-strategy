@@ -1,5 +1,6 @@
 import {
   summarizeTeamMatches,
+  type MatchAutoPathPoint,
   type ScoutingDataset,
   type ScoutingMatch,
   type TeamPitData,
@@ -40,6 +41,9 @@ type NormalRecord = {
   tbaMatchKey: string | null;
   scoutName: string;
   startPos: string;
+  alliance: string;
+  fieldSideFlipped: boolean;
+  autoPath: MatchAutoPathPoint[];
   noShow: boolean;
   climbPosition: string;
   climbFailed: boolean;
@@ -170,7 +174,10 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
     matchType,
     tbaMatchKey,
     scoutName: stringValue(payload.scout),
-    startPos: stringValue(payload.startPosition),
+    startPos: stringValue(payload.startPosition ?? payload.sp),
+    alliance: stringValue(payload.alliance ?? payload.al ?? row.alliance),
+    fieldSideFlipped: booleanValue(payload.fieldSideFlipped ?? payload.ff),
+    autoPath: autoPathArray(payload.autoPath ?? payload.ap),
     noShow: booleanValue(payload.noShow),
     climbPosition: stringValue(payload.climbPosition),
     climbFailed: booleanValue(payload.climbFailed),
@@ -280,6 +287,10 @@ function toScoutingMatch({
     comment: buildComment(normal, superRecord),
     startPos: normal?.startPos ?? "",
     scoutName: superRecord?.scoutName || normal?.scoutName || "",
+    autoPath: normal?.autoPath.length ? normal.autoPath : undefined,
+    autoStartPosition: normal?.startPos || undefined,
+    autoAlliance: normal?.alliance || undefined,
+    autoFieldSideFlipped: normal ? normal.fieldSideFlipped : undefined,
   };
 }
 
@@ -526,6 +537,17 @@ function autoRouteArray(value: unknown): Array<{ id: string; points: Array<{ x: 
       return points.length ? { id: stringValue(item.id) || `route-${index + 1}`, points } : null;
     })
     .filter((route): route is { id: string; points: Array<{ x: number; y: number }> } => Boolean(route));
+}
+
+function autoPathArray(value: unknown): MatchAutoPathPoint[] {
+  return arrayValue(value)
+    .map((point) => {
+      const item = objectPayload(point);
+      const node = stringValue(item.node ?? item.n);
+      if (!node) return null;
+      return { node, atMs: Math.max(0, numberValue(item.atMs ?? item.a)) };
+    })
+    .filter((point): point is MatchAutoPathPoint => Boolean(point));
 }
 
 function drivetrainValue(value: unknown): string {

@@ -41,6 +41,9 @@ describe("cyber-scout dataset conversion", () => {
           climbPosition: "A",
           climbFailed: false,
           startPosition: "hub-front",
+          alliance: "red",
+          fieldSideFlipped: false,
+          autoPath: [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }],
           manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
           manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
         }),
@@ -102,6 +105,57 @@ describe("cyber-scout dataset conversion", () => {
       climbPts: 5,
       comment: "clean",
       startPos: "hub-front",
+      autoStartPosition: "hub-front",
+      autoAlliance: "red",
+      autoFieldSideFlipped: false,
+      autoPath: [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }],
+    });
+  });
+
+  it("parses compact normal auto path fields", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      tbaMatches: [{
+        comp_level: "qm",
+        match_number: 5,
+        alliances: {
+          blue: { team_keys: ["frc8214"] },
+        },
+        score_breakdown: {
+          blue: {
+            hubScore: {
+              autoPoints: 10,
+              teleopPoints: 20,
+            },
+          },
+        },
+      }],
+      records: [
+        normal(8214, 5, {
+          al: "blue",
+          sp: "right-in",
+          ff: true,
+          ap: [{ n: "neutral-left", a: 0 }, { n: "tower", a: 450 }],
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(5, {
+          teams: [8214],
+          auto: [100],
+          drive: [0],
+          defense: [0],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({
+      autoPath: [{ node: "neutral-left", atMs: 0 }, { node: "tower", atMs: 450 }],
+      autoStartPosition: "right-in",
+      autoAlliance: "blue",
+      autoFieldSideFlipped: true,
     });
   });
 
