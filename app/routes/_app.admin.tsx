@@ -3,8 +3,7 @@ import type { Route } from "./+types/_app.admin";
 import { Badge, Button, Card, Input } from "../components/ui";
 import { requireAdmin } from "../lib/auth.server";
 import { DATA_RANGE_OPTIONS, DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
-import { activateDataset, createDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
-import { parseScoutingCsv } from "../lib/scouting";
+import { activateDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
 import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
@@ -28,25 +27,6 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
   const intent = String(formData.get("intent") || "");
 
   try {
-    if (intent === "upload") {
-      const file = formData.get("csv");
-      if (!(file instanceof File) || !file.size) return { error: "请上传 CSV 文件。" };
-      const text = await file.text();
-      const teamData = parseScoutingCsv(text);
-      await createDataset({
-        actorOpenId: user.feishuOpenId,
-        activate: formData.get("activate") === "on",
-        payload: {
-          title: String(formData.get("title") || file.name.replace(/\.csv$/i, "") || "侦察数据集"),
-          eventKey: String(formData.get("eventKey") || "2026mabil"),
-          sourceFilename: file.name,
-          teamData,
-          teamPhotos: {},
-        },
-      });
-      throw redirect("/admin");
-    }
-
     if (intent === "activate") {
       await activateDataset(String(formData.get("id") || ""), user.feishuOpenId);
       throw redirect("/admin");
@@ -110,38 +90,6 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
       {actionData?.error ? (
         <Card className="border-danger/40 bg-danger/10 p-3 text-danger">{actionData.error}</Card>
       ) : null}
-
-      <Card className="p-4">
-        <h2 className="mb-3 text-lg font-semibold">导入 CSV</h2>
-        <Form method="post" encType="multipart/form-data" className="grid gap-3 md:grid-cols-[1fr_180px]">
-          <input type="hidden" name="intent" value="upload" />
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-ink-dim">标题</span>
-            <Input name="title" placeholder="2026 MABIL" />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-ink-dim">赛事代码</span>
-            <Input name="eventKey" defaultValue="2026mabil" />
-          </label>
-          <label className="grid gap-1 md:col-span-2">
-            <span className="text-sm font-medium text-ink-dim">CSV</span>
-            <input
-              name="csv"
-              type="file"
-              accept=".csv,text/csv"
-              className="block w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand file:px-3 file:py-1.5 file:text-brand-fg"
-              required
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm text-ink-dim">
-            <input name="activate" type="checkbox" defaultChecked className="size-4 accent-[var(--accent)]" />
-            导入后设为当前数据集
-          </label>
-          <Button type="submit" variant="primary" disabled={busy}>
-            导入
-          </Button>
-        </Form>
-      </Card>
 
       <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

@@ -1,5 +1,3 @@
-import Papa from "papaparse";
-
 export type MatchAutoPathPoint = { node: string; atMs: number };
 
 export type ScoutingMatch = {
@@ -99,18 +97,6 @@ export type DatasetSourceStatus = {
 type CsvRow = Record<string, unknown>;
 
 export const MATCH_TOTAL_DURATION_MS = 150_000;
-
-export function parseScoutingCsv(text: string): ScoutingDatasetPayload["teamData"] {
-  const parsed = Papa.parse<CsvRow>(text, {
-    header: true,
-    skipEmptyLines: true,
-    transformHeader: (header) => header.trim(),
-  });
-  if (parsed.errors.length) {
-    throw new Error(parsed.errors[0]?.message || "CSV 解析失败");
-  }
-  return processCsvRows(parsed.data);
-}
 
 export function processCsvRows(rows: CsvRow[]): TeamData {
   const byTeam = new Map<string, CsvRow[]>();

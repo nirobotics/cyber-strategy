@@ -230,7 +230,7 @@ export function AnalyticsDashboard({
 
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
-          当前赛事还没有可分析的队伍记录。请确认 cyber-scout 已上传普通/超级侦察记录，或在管理页保留备用 CSV 数据集。
+          当前赛事还没有可分析的队伍记录。请确认 cyber-scout 已上传普通/超级侦察记录。
         </Card>
       ) : null}
 

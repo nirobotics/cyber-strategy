@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { applyIgnoredMatchesToTeamData, matchIgnoreKey, parseScoutingCsv, processCsvRows, reliability } from "./scouting";
+import { applyIgnoredMatchesToTeamData, matchIgnoreKey, processCsvRows, reliability } from "./scouting";
 import { buildTierAssignments, DEFAULT_TIER_PERCENTAGES, getTierForRank, normalizeTierPercentages, validateTierPercentages } from "./tier-settings";
 
 describe("scouting data processing", () => {
-  it("computes Advantalytics team summaries from CSV rows", () => {
+  it("computes Advantalytics team summaries from scouting rows", () => {
     const result = processCsvRows([
       row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2),
       row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3, 75_000),
@@ -31,18 +31,6 @@ describe("scouting data processing", () => {
       maxPts: 50,
     });
     expect(reliability(result["8214"])).toBe(50);
-  });
-
-  it("parses CSV text and treats empty hub attempts as null accuracy", () => {
-    const data = parseScoutingCsv(
-      [
-        "Team,Match,TotalPoints,AutoPoints,TelePoints,TotalHubFuelSuccess,TotalHubFuelFail,BotState,BotStateText,Disabled,DriverRating,FuelIntakeRating,DefenseRating,Comment,StartPosition,ScoutName",
-        "1,2,0,0,0,0,0,1,No Issue,false,0,0,0,,,",
-      ].join("\n"),
-    );
-
-    expect(data["1"].avgAccuracy).toBe(0);
-    expect(data["1"].matches[0].accuracy).toBeNull();
   });
 
   it("recomputes team summaries after locally ignored matches", () => {
