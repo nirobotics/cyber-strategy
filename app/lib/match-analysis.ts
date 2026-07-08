@@ -40,6 +40,7 @@ export type TbaMatch = {
 
 export type CombinedMatch = StatboticsMatch & {
   tba?: TbaMatch;
+  videos?: Array<{ title: string; url: string }>;
 };
 
 export type TeamEvent = {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, Gauge, RefreshCw, Target, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, Gauge, PlayCircle, RefreshCw, Target, Trophy } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, cn } from "./ui";
 import {
@@ -29,6 +29,11 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ready"; matches: CombinedMatch[]; teamEvents: TeamEvent[] };
 
+type MatchVideoLink = {
+  title: string;
+  url: string;
+};
+
 export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamData: TeamData }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
   const [state, setState] = useState<LoadState>({ status: "idle" });
@@ -42,21 +47,28 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
     });
     Promise.allSettled([
       fetch(`/api/tba/matches?event=${encodeURIComponent(eventKey)}`),
+      fetch(`/api/match-videos?event=${encodeURIComponent(eventKey)}`),
       fetch(`https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`),
       fetch(`https://api.statbotics.io/v3/team_events?event=${encodeURIComponent(eventKey)}&limit=200`),
     ])
-      .then(async ([tbaResult, matchesResult, teamEventsResult]) => {
+      .then(async ([tbaResult, videosResult, matchesResult, teamEventsResult]) => {
         if (!alive) return;
         const tbaMatches = tbaResult.status === "fulfilled" && tbaResult.value.ok
           ? (((await tbaResult.value.json()) as { matches?: TbaMatch[] }).matches ?? [])
           : [];
+        const videos = videosResult.status === "fulfilled" && videosResult.value.ok
+          ? (((await videosResult.value.json()) as { videos?: Record<string, MatchVideoLink[]> }).videos ?? {})
+          : {};
         const matches = matchesResult.status === "fulfilled" && matchesResult.value.ok
           ? ((await matchesResult.value.json()) as StatboticsMatch[])
           : [];
         const teamEvents = teamEventsResult.status === "fulfilled" && teamEventsResult.value.ok
           ? ((await teamEventsResult.value.json()) as TeamEvent[])
           : [];
-        const combinedMatches = mergeMatches(matches, tbaMatches);
+        const combinedMatches = mergeMatches(matches, tbaMatches).map((match) => ({
+          ...match,
+          videos: videos[matchIdentity(match)] ?? [],
+        }));
         if (!combinedMatches.length && !teamEvents.length) {
           setState({ status: "error", message: "暂无可用赛程数据。" });
           return;
@@ -165,21 +177,31 @@ function MatchCard({
   const blueTeams = matchTeams(match, "blue");
   const score = resolveMatchScores({ match, redTeams, blueTeams, teamData });
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
+  const videos = match.videos ?? [];
 
   return (
-    <button
-      type="button"
-      data-testid={`match-card-${matchIdentity(match)}`}
-      onClick={onSelect}
-      className="card w-full p-3 text-left transition hover:border-brand hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-    >
+    <div className="card p-3 transition hover:border-brand hover:bg-surface-2">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase text-ink-faint">{matchLabel(match)}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            data-testid={`match-card-${matchIdentity(match)}`}
+            onClick={onSelect}
+            className="rounded-md text-left text-xs font-semibold uppercase text-ink-faint outline-none hover:text-brand focus-visible:ring-2 focus-visible:ring-brand/50"
+          >
+            {matchLabel(match)}
+          </button>
+          {videos.length ? <VideoButton videos={videos} /> : null}
+        </div>
         <span className={cn("rounded-full px-2 py-0.5 text-xs font-semibold", scoreBadgeClass(score.source))}>
           {score.label}
         </span>
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(72px,auto)_minmax(0,1fr)] items-center gap-2">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="grid w-full grid-cols-[minmax(0,1fr)_minmax(72px,auto)_minmax(0,1fr)] items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+      >
         <AllianceBlock
           color="red"
           winner={score.winner === "red"}
@@ -208,8 +230,27 @@ function MatchCard({
           predictedScore={score.predictedBlue}
           teams={blueTeams}
         />
-      </div>
-    </button>
+      </button>
+    </div>
+  );
+}
+
+function VideoButton({ videos }: { videos: MatchVideoLink[] }) {
+  const first = videos[0];
+  if (!first) return null;
+  return (
+    <a
+      href={first.url}
+      target="_blank"
+      rel="noreferrer"
+      title={videos.length > 1 ? `打开视频：${first.title}（另有 ${videos.length - 1} 个）` : `打开视频：${first.title}`}
+      className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brand/10 px-2 py-1 text-xs font-semibold text-brand outline-none transition hover:border-brand hover:bg-brand/15 focus-visible:ring-2 focus-visible:ring-brand/50"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <PlayCircle className="size-3.5" />
+      视频
+      <ExternalLink className="size-3" />
+    </a>
   );
 }
 
