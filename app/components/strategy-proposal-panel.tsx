@@ -15,7 +15,7 @@ import { PhotoLightbox, TeamDetailModal } from "./analytics-dashboard";
 import { StrategyNavigation } from "./strategy-navigation";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
-import { type ScoutingDataset, type ScoutingEventOption } from "../lib/scouting";
+import { reliability, type ScoutingDataset, type ScoutingEventOption, type TeamPitInfo, type TeamSummary } from "../lib/scouting";
 import {
   firstProposalMatchForTeam,
   proposalMatchForKeyOrFirst,
@@ -26,7 +26,6 @@ import {
 } from "../lib/strategy-proposal-matches";
 import {
   autoWinners,
-  buildStrategyProposalExport,
   canDeleteProposalAs,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
@@ -38,7 +37,6 @@ import {
   proposalStatuses,
   proposalTypes,
   strategyShifts,
-  strategyProposalExportFilename,
   type AutoProposalPayload,
   type AutoWinner,
   type OwnStrategyTeam,
@@ -95,6 +93,7 @@ export function StrategyProposalPanel({
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
+  const [printProposals, setPrintProposals] = useState<StrategyProposal[] | null>(null);
   const selected = data.proposals.find((proposal) => proposal.id === selectedId) ?? null;
   const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset));
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
@@ -145,6 +144,17 @@ export function StrategyProposalPanel({
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [proposalFetcher.data, searchParams, data.matches, data.dataset, embedded]);
+
+  useEffect(() => {
+    if (!printProposals?.length) return;
+    const timeout = window.setTimeout(() => window.print(), 250);
+    const clear = () => setPrintProposals(null);
+    window.addEventListener("afterprint", clear, { once: true });
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("afterprint", clear);
+    };
+  }, [printProposals]);
 
   function selectEvent(eventKey: string) {
     const params = new URLSearchParams(searchParams);
@@ -220,16 +230,7 @@ export function StrategyProposalPanel({
   }
 
   function exportProposals() {
-    const payload = buildStrategyProposalExport(data.selectedEventKey, filteredProposals);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = strategyProposalExportFilename(data.selectedEventKey);
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    setPrintProposals([...filteredProposals]);
   }
 
   return (
@@ -274,9 +275,9 @@ export function StrategyProposalPanel({
             </div>
             <div className="flex gap-2">
               {data.isAdmin ? (
-                <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表">
+                <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表为 PDF">
                   <Download className="size-4" />
-                  导出
+                  导出 PDF
                 </Button>
               ) : null}
               <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
@@ -512,6 +513,14 @@ export function StrategyProposalPanel({
           index={lightbox.index}
           onChange={(index) => setLightbox({ ...lightbox, index })}
           onClose={() => setLightbox(null)}
+        />
+      ) : null}
+      {printProposals?.length ? (
+        <StrategyProposalPrintDocument
+          eventKey={data.selectedEventKey}
+          dataset={data.dataset}
+          matches={data.matches}
+          proposals={printProposals}
         />
       ) : null}
     </div>
@@ -1036,6 +1045,383 @@ function MissingTeamDetailModal({ team, onClose }: { team: string; onClose: () =
   );
 }
 
+function StrategyProposalPrintDocument({
+  eventKey,
+  dataset,
+  matches,
+  proposals,
+}: {
+  eventKey: string;
+  dataset: ScoutingDataset;
+  matches: ProposalMatch[];
+  proposals: StrategyProposal[];
+}) {
+  const exportedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+  return (
+    <div className="proposal-print-root" aria-hidden="true">
+      <style>{PROPOSAL_PRINT_CSS}</style>
+      {proposals.map((proposal, index) => (
+        <PrintableProposal
+          key={proposal.id}
+          eventKey={eventKey}
+          exportedAt={exportedAt}
+          proposal={proposal}
+          match={matches.find((item) => item.key === proposal.matchKey) ?? null}
+          dataset={dataset}
+          index={index + 1}
+          count={proposals.length}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PrintableProposal({
+  eventKey,
+  exportedAt,
+  proposal,
+  match,
+  dataset,
+  index,
+  count,
+}: {
+  eventKey: string;
+  exportedAt: string;
+  proposal: StrategyProposal;
+  match: ProposalMatch | null;
+  dataset: ScoutingDataset;
+  index: number;
+  count: number;
+}) {
+  const teams = printMatchTeams(match, proposal);
+  return (
+    <article className="proposal-print-page">
+      <header className="proposal-print-header">
+        <div className="proposal-print-brand">
+          <img src="/ni-logo.png" alt="" />
+          <div>
+            <p>NI Robotics</p>
+            <strong>Cyber Strategy</strong>
+          </div>
+        </div>
+        <div className="proposal-print-meta">
+          <span>{eventKey}</span>
+          <span>{exportedAt}</span>
+          <span>Proposal {index} / {count}</span>
+        </div>
+      </header>
+
+      <section className="proposal-print-title">
+        <p>Strategy Proposal</p>
+        <h1>{proposal.title}</h1>
+      </section>
+
+      <section className="proposal-print-grid proposal-print-summary">
+        <PrintInfo label="比赛场次" value={proposal.matchLabel || proposal.matchKey || "-"} />
+        <PrintInfo label="类型" value={proposalTypeLabel(proposal.proposalType)} />
+        <PrintInfo label="状态" value={statusLabel(proposal.status)} />
+        <PrintInfo label="己方队伍" value={`Team ${proposal.ownTeam}`} highlight />
+        <PrintInfo label="创建者" value={proposal.createdByName || "-"} />
+        <PrintInfo label="更新时间" value={new Date(proposal.updatedAt).toLocaleString("zh-CN", { hour12: false })} />
+      </section>
+
+      <section className="proposal-print-section">
+        <h2>比赛队伍</h2>
+        {match ? (
+          <div className="proposal-print-alliances">
+            <PrintAlliance label="Red" teams={match.redTeams} tone="red" />
+            <PrintAlliance label="Blue" teams={match.blueTeams} tone="blue" />
+          </div>
+        ) : (
+          <div className="proposal-print-team-row">
+            {teams.map((team) => <PrintTeamPill key={team} team={team} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="proposal-print-section">
+        <h2>六队详细信息</h2>
+        <div className="proposal-print-team-grid">
+          {teams.map((team) => (
+            <PrintTeamDetail
+              key={team}
+              team={team}
+              summary={dataset.teamData[team] ?? null}
+              pitInfo={dataset.teamPitData?.[team] ?? null}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section className="proposal-print-section proposal-print-break-before">
+        <h2>场地图与批注</h2>
+        <PrintableProposalMaps proposal={proposal} match={match} />
+      </section>
+
+      <section className="proposal-print-section">
+        <h2>备注</h2>
+        <PrintProposalNotes proposal={proposal} />
+      </section>
+
+      <footer className="proposal-print-footer">
+        <span>NI Robotics · Cyber Strategy</span>
+        <span className="proposal-print-page-number" />
+      </footer>
+    </article>
+  );
+}
+
+function PrintInfo({ label, value, highlight = false }: { label: string; value: ReactNode; highlight?: boolean }) {
+  return (
+    <div className={cn("proposal-print-info", highlight && "proposal-print-info-highlight")}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PrintAlliance({ label, teams, tone }: { label: string; teams: string[]; tone: "red" | "blue" }) {
+  return (
+    <div className={cn("proposal-print-alliance", tone === "red" ? "proposal-print-red" : "proposal-print-blue")}>
+      <strong>{label}</strong>
+      <div className="proposal-print-team-row">
+        {teams.map((team) => <PrintTeamPill key={team} team={team} />)}
+      </div>
+    </div>
+  );
+}
+
+function PrintTeamPill({ team }: { team: string }) {
+  return <span className={cn("proposal-print-team-pill", isOwnStrategyTeam(team) && "proposal-print-own-team")}>Team {team}</span>;
+}
+
+function PrintTeamDetail({
+  team,
+  summary,
+  pitInfo,
+}: {
+  team: string;
+  summary: TeamSummary | null;
+  pitInfo: TeamPitInfo | null;
+}) {
+  if (!summary) {
+    return (
+      <div className="proposal-print-team-card">
+        <h3><PrintTeamPill team={team} /></h3>
+        <p className="proposal-print-muted">当前数据集没有这支队伍的详细数据。</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="proposal-print-team-card">
+      <div className="proposal-print-team-card-title">
+        <PrintTeamPill team={team} />
+        <span>{summary.matchCount} 场</span>
+      </div>
+      <div className="proposal-print-badges">
+        <span>{teamTrendLabel(summary.trend)}</span>
+        {pitInfo?.canCrossTrench ? <span>trench</span> : null}
+        {pitInfo?.isSwerve ? <span>swerve</span> : null}
+        {pitInfo?.drivetrain ? <span>{pitInfo.drivetrain}</span> : null}
+      </div>
+      <div className="proposal-print-stats">
+        <PrintStat label="综合均分" value={formatPrintNumber(summary.avgTotal)} />
+        <PrintStat label="自动贡献" value={formatPrintNumber(summary.avgAuto)} />
+        <PrintStat label="手动贡献" value={formatPrintNumber(summary.avgTele)} />
+        <PrintStat label="Transfer" value={summary.avgTransferPieces ? formatPrintNumber(summary.avgTransferPieces) : "-"} />
+        <PrintStat label="平均 BPS" value={summary.avgBps ? formatPrintNumber(summary.avgBps) : "-"} />
+        <PrintStat label="命中率" value={summary.avgAccuracy > 0 ? `${formatPrintNumber(summary.avgAccuracy)}%` : "-"} />
+        <PrintStat label="可靠性" value={`${formatPrintNumber(reliability(summary))}%`} />
+        <PrintStat label="标准差" value={`±${formatPrintNumber(summary.stdDev)}`} />
+        <PrintStat label="综合分范围" value={`${formatPrintNumber(summary.minPts)}–${formatPrintNumber(summary.maxPts)}`} />
+        <PrintStat label="Drive score" value={formatPrintNumber(summary.avgDriver)} />
+        <PrintStat label="Defence score" value={formatPrintNumber(printDefenceScore(summary))} />
+      </div>
+    </div>
+  );
+}
+
+function PrintStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PrintableProposalMaps({ proposal, match }: { proposal: StrategyProposal; match: ProposalMatch | null }) {
+  const payload = proposal.payload;
+  if (payload.kind === "self_strategy") {
+    const opponents = opponentTeams(match, proposal.ownTeam);
+    const teams = [proposal.ownTeam, ...opponents, ...routeTeamsForPayload(payload)].filter(uniqueString);
+    return (
+      <div className="proposal-print-map-grid">
+        {strategyShifts.map((shift) => {
+          const current = payload.shifts[shift];
+          return (
+            <PrintRouteMap
+              key={shift}
+              title={`我们自己 · ${shiftLabel(shift)}`}
+              teams={teams}
+              routes={{ ...current.opponentRoutes, [proposal.ownTeam]: current.points }}
+              notes={current.note ? [{ label: "备注", value: current.note }] : []}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (payload.kind === "partner_strategy") {
+    const partners = partnerTeams(match, proposal.ownTeam);
+    const opponents = opponentTeams(match, proposal.ownTeam);
+    const teams = [...partners, ...payload.partners, ...opponents, ...routeTeamsForPayload(payload)].filter(uniqueString);
+    return (
+      <div className="proposal-print-map-grid">
+        {strategyShifts.map((shift) => {
+          const current = payload.shifts[shift];
+          return (
+            <PrintRouteMap
+              key={shift}
+              title={`队友策略 · ${shiftLabel(shift)}`}
+              teams={teams}
+              routes={current.routes}
+              notes={partnerMapNotes(payload, current.note)}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  const teams = printMatchTeams(match, proposal);
+  return (
+    <div className="proposal-print-map-grid">
+      <PrintRouteMap
+        title="Auto 路线"
+        teams={teams}
+        routes={payload.autoRoutes}
+        notes={[
+          { label: "预测 Auto 结果", value: autoWinnerLabel(payload.autoWinner) },
+          ...teamNoteRows(payload.teamNotes),
+        ]}
+      />
+      <PrintRouteMap
+        title="Transition 路线"
+        teams={teams}
+        routes={payload.transitionRoutes}
+        notes={payload.note ? [{ label: "备注", value: payload.note }] : []}
+      />
+    </div>
+  );
+}
+
+function PrintRouteMap({
+  title,
+  teams,
+  routes,
+  notes,
+}: {
+  title: string;
+  teams: string[];
+  routes: RouteMap;
+  notes: Array<{ label: string; value: string }>;
+}) {
+  const orderedTeams = [...teams, ...Object.keys(routes)].filter(uniqueString);
+  const hasRoutes = orderedTeams.some((team) => (routes[team] ?? []).length > 0);
+  return (
+    <div className="proposal-print-map-card">
+      <div className="proposal-print-map-head">
+        <h3>{title}</h3>
+        <div className="proposal-print-map-legend">
+          {orderedTeams.map((team, index) => (
+            <span key={team}>
+              <i style={{ backgroundColor: routeColor(index) }} />
+              Team {team}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="proposal-print-field">
+        <img src="/pit-field-map.webp" alt="" />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+          {orderedTeams.map((team, index) => {
+            const points = routes[team] ?? [];
+            return (
+              <g key={team}>
+                {routeSegments(points).map((segment, segmentIndex) => (
+                  <polyline
+                    key={`${team}:${segmentIndex}`}
+                    points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
+                    fill="none"
+                    stroke={routeColor(index)}
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+                {points.map((point, pointIndex) => point.start || pointIndex === points.length - 1 ? (
+                  <circle
+                    key={`${team}:point:${pointIndex}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r={point.start ? 1.7 : 1.2}
+                    fill={routeColor(index)}
+                    stroke="#fff"
+                    strokeWidth="0.6"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ) : null)}
+              </g>
+            );
+          })}
+        </svg>
+        {!hasRoutes ? <div className="proposal-print-empty-map">暂无路线</div> : null}
+      </div>
+      {notes.length ? (
+        <div className="proposal-print-notes">
+          {notes.map((note) => (
+            <p key={`${note.label}:${note.value}`}><strong>{note.label}</strong>{note.value}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PrintProposalNotes({ proposal }: { proposal: StrategyProposal }) {
+  const payload = proposal.payload;
+  const notes: Array<{ label: string; value: string }> = [];
+  if (payload.kind === "auto") {
+    notes.push({ label: "预测 Auto 结果", value: autoWinnerLabel(payload.autoWinner) });
+    notes.push(...teamNoteRows(payload.teamNotes));
+    if (payload.note) notes.push({ label: "全局备注", value: payload.note });
+  } else if (payload.kind === "self_strategy") {
+    for (const shift of strategyShifts) {
+      const note = payload.shifts[shift].note;
+      if (note) notes.push({ label: `我们自己 ${shiftLabel(shift)}`, value: note });
+    }
+  } else {
+    notes.push(...teamNoteRows(payload.partnerNotes));
+    for (const shift of strategyShifts) {
+      const note = payload.shifts[shift].note;
+      if (note) notes.push({ label: `队友策略 ${shiftLabel(shift)}`, value: note });
+    }
+  }
+
+  if (!notes.length) return <p className="proposal-print-muted">暂无备注。</p>;
+  return (
+    <div className="proposal-print-notes proposal-print-notes-block">
+      {notes.map((note) => (
+        <p key={`${note.label}:${note.value}`}><strong>{note.label}</strong>{note.value}</p>
+      ))}
+    </div>
+  );
+}
+
 function NoteBox({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
   return (
     <label className="grid gap-1">
@@ -1214,6 +1600,68 @@ function autoWinnerLabel(value: AutoWinner) {
   return "未知";
 }
 
+function printMatchTeams(match: ProposalMatch | null, proposal: StrategyProposal) {
+  if (match) return [...match.redTeams, ...match.blueTeams];
+  return [proposal.ownTeam, ...routeTeamsForPayload(proposal.payload)].filter(uniqueString);
+}
+
+function routeTeamsForPayload(payload: StrategyProposalPayload) {
+  const teams: string[] = [];
+  function addRoutes(routes: RouteMap) {
+    teams.push(...Object.keys(routes));
+  }
+
+  if (payload.kind === "auto") {
+    addRoutes(payload.autoRoutes);
+    addRoutes(payload.transitionRoutes);
+    teams.push(...Object.keys(payload.teamNotes));
+  } else if (payload.kind === "self_strategy") {
+    for (const shift of strategyShifts) addRoutes(payload.shifts[shift].opponentRoutes);
+  } else {
+    teams.push(...payload.partners, ...Object.keys(payload.partnerNotes));
+    for (const shift of strategyShifts) addRoutes(payload.shifts[shift].routes);
+  }
+
+  return teams.filter(uniqueString);
+}
+
+function teamNoteRows(notes: Record<string, string>) {
+  return Object.entries(notes)
+    .filter(([, note]) => note.trim())
+    .map(([team, note]) => ({ label: `Team ${team}`, value: note.trim() }));
+}
+
+function partnerMapNotes(payload: PartnerStrategyPayload, shiftNote: string) {
+  return [...teamNoteRows(payload.partnerNotes), ...(shiftNote ? [{ label: "备注", value: shiftNote }] : [])];
+}
+
+function isOwnStrategyTeam(team: string) {
+  return (ownStrategyTeams as readonly string[]).includes(team);
+}
+
+function uniqueString(value: string, index: number, values: string[]) {
+  return Boolean(value) && values.indexOf(value) === index;
+}
+
+function formatPrintNumber(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "-";
+  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+}
+
+function printDefenceScore(team: TeamSummary) {
+  return team.avgDefense || averagePositive(team.matches.map((match) => match.defenseRating));
+}
+
+function averagePositive(values: number[]) {
+  const positive = values.filter((value) => value > 0);
+  if (!positive.length) return 0;
+  return Math.round((positive.reduce((sum, value) => sum + value, 0) / positive.length) * 10) / 10;
+}
+
+function teamTrendLabel(trend: TeamSummary["trend"]) {
+  return trend === "up" ? "趋势上升" : trend === "down" ? "趋势下降" : "趋势稳定";
+}
+
 function routeSegments(points: RoutePoint[]) {
   const segments: RoutePoint[][] = [];
   for (const point of points) {
@@ -1227,3 +1675,402 @@ function routeColor(index: number) {
   const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
   return colors[((index % colors.length) + colors.length) % colors.length];
 }
+
+const PROPOSAL_PRINT_CSS = `
+.proposal-print-root {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 210mm;
+  height: 1px;
+  overflow: hidden;
+  background: #fff;
+  color: #111827;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.proposal-print-root * {
+  box-sizing: border-box;
+}
+
+@page {
+  size: A4;
+  margin: 12mm 10mm 18mm;
+  @bottom-center {
+    content: "NI Robotics · Cyber Strategy · " counter(page) " / " counter(pages);
+    color: #6b7280;
+    font-size: 8.5px;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .proposal-print-root,
+  .proposal-print-root * {
+    visibility: visible !important;
+  }
+
+  .proposal-print-root {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .proposal-print-page {
+    position: relative;
+    min-height: 260mm;
+    padding: 0;
+    page-break-after: always;
+    color: #111827;
+    background: #fff;
+  }
+
+  .proposal-print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .proposal-print-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  .proposal-print-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .proposal-print-brand img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+  }
+
+  .proposal-print-brand p,
+  .proposal-print-title p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+
+  .proposal-print-brand strong {
+    display: block;
+    font-size: 15px;
+    line-height: 1.2;
+  }
+
+  .proposal-print-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    color: #6b7280;
+    font-size: 9px;
+  }
+
+  .proposal-print-title {
+    margin: 12px 0 10px;
+  }
+
+  .proposal-print-title h1 {
+    margin: 2px 0 0;
+    font-size: 24px;
+    line-height: 1.15;
+  }
+
+  .proposal-print-section {
+    margin-top: 12px;
+  }
+
+  .proposal-print-section h2 {
+    margin: 0 0 6px;
+    color: #374151;
+    font-size: 13px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .proposal-print-break-before {
+    page-break-before: auto;
+  }
+
+  .proposal-print-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .proposal-print-info,
+  .proposal-print-team-card,
+  .proposal-print-map-card,
+  .proposal-print-alliance,
+  .proposal-print-notes-block {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .proposal-print-info {
+    padding: 7px 8px;
+  }
+
+  .proposal-print-info span,
+  .proposal-print-stats span {
+    display: block;
+    color: #6b7280;
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .proposal-print-info strong {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+  }
+
+  .proposal-print-info-highlight {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+  }
+
+  .proposal-print-alliances {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .proposal-print-alliance {
+    padding: 8px;
+  }
+
+  .proposal-print-alliance > strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
+  .proposal-print-red > strong {
+    color: #dc2626;
+  }
+
+  .proposal-print-blue > strong {
+    color: #2563eb;
+  }
+
+  .proposal-print-team-row,
+  .proposal-print-badges,
+  .proposal-print-map-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .proposal-print-team-pill,
+  .proposal-print-badges span,
+  .proposal-print-map-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    padding: 2px 7px;
+    color: #374151;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .proposal-print-own-team {
+    border-color: #8b5cf6;
+    background: #ede9fe;
+    color: #6d28d9;
+  }
+
+  .proposal-print-team-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .proposal-print-team-card {
+    break-inside: avoid;
+    padding: 8px;
+  }
+
+  .proposal-print-team-card h3 {
+    margin: 0;
+  }
+
+  .proposal-print-team-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .proposal-print-team-card-title > span {
+    color: #6b7280;
+    font-size: 10px;
+  }
+
+  .proposal-print-badges {
+    margin-bottom: 6px;
+  }
+
+  .proposal-print-badges span {
+    padding: 1px 6px;
+    font-size: 8.5px;
+    font-weight: 600;
+  }
+
+  .proposal-print-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .proposal-print-stats div {
+    min-width: 0;
+    border-radius: 5px;
+    background: #f9fafb;
+    padding: 5px;
+  }
+
+  .proposal-print-stats strong {
+    display: block;
+    margin-top: 1px;
+    overflow: hidden;
+    color: #111827;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .proposal-print-map-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .proposal-print-map-card {
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .proposal-print-map-head {
+    display: grid;
+    gap: 5px;
+    padding: 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .proposal-print-map-head h3 {
+    margin: 0;
+    font-size: 12px;
+  }
+
+  .proposal-print-map-legend span {
+    border: 0;
+    padding: 0;
+    font-size: 8.5px;
+    font-weight: 600;
+  }
+
+  .proposal-print-map-legend i {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+  }
+
+  .proposal-print-field {
+    position: relative;
+    aspect-ratio: 2 / 1;
+    background: #f3f4f6;
+  }
+
+  .proposal-print-field img,
+  .proposal-print-field svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .proposal-print-field img {
+    object-fit: fill;
+  }
+
+  .proposal-print-empty-map {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, .58);
+  }
+
+  .proposal-print-notes {
+    display: grid;
+    gap: 4px;
+    padding: 7px 8px;
+    color: #374151;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .proposal-print-notes p {
+    margin: 0;
+  }
+
+  .proposal-print-notes strong {
+    margin-right: 6px;
+    color: #111827;
+  }
+
+  .proposal-print-muted {
+    margin: 0;
+    color: #6b7280;
+    font-size: 11px;
+  }
+
+  .proposal-print-footer {
+    position: fixed;
+    right: 10mm;
+    bottom: 6mm;
+    left: 10mm;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #6b7280;
+    font-size: 8.5px;
+  }
+
+  .proposal-print-page-number::after {
+    content: counter(page) " / " counter(pages);
+  }
+}
+`;

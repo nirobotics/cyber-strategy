@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildStrategyProposalExport,
   canDeleteProposalAs,
   canEditProposal,
   canEditProposalAs,
@@ -10,7 +9,6 @@ import {
   normalizeProposalPayload,
   proposalMatchesOwnTeamQuery,
   proposalMatchesSnapshot,
-  strategyProposalExportFilename,
   strategyProposalTitle,
   type StrategyProposal,
 } from "./strategy-proposals";
@@ -162,15 +160,6 @@ describe("strategy proposal helpers", () => {
     expect(proposalMatchesOwnTeamQuery({ ownTeam: "8214" }, "Team 82")).toBe(true);
   });
 
-  it("builds admin export payloads and stable filenames", () => {
-    expect(buildStrategyProposalExport("2026cnsh", [], "2026-07-08T00:00:00.000Z")).toEqual({
-      eventKey: "2026cnsh",
-      exportedAt: "2026-07-08T00:00:00.000Z",
-      count: 0,
-      proposals: [],
-    });
-    expect(strategyProposalExportFilename("2026 cn/sh", new Date("2026-07-08T12:00:00.000Z"))).toBe("strategy-proposals-2026-cn-sh-2026-07-08.json");
-  });
 });
 
 function proposal(status: StrategyProposal["status"]): Pick<StrategyProposal, "createdBy" | "status"> {
