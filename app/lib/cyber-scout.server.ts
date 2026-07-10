@@ -404,8 +404,9 @@ export async function downloadCyberScoutPhoto(path: string): Promise<Response> {
 
   return new Response(data, {
     headers: {
-      "Content-Type": data.type || inferImageType(path),
+      "Content-Type": inferImageType(path),
       "Cache-Control": "private, max-age=300",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

@@ -2,7 +2,6 @@ import { matchIdentity, matchLabel, type TbaMatch } from "./match-analysis";
 import { cleanTbaEventKey, fetchTbaMatches } from "./tba.server";
 
 const API_BASE = process.env.FEISHU_API_BASE || "https://open.feishu.cn";
-const DEFAULT_VIDEO_LIBRARY_URL = "https://nirobotics.feishu.cn/wiki/HWUGweQ3iiMQBskoCzjcDcPOnvc?from=from_copylink";
 const DEFAULT_FEISHU_HOST = "https://nirobotics.feishu.cn";
 const MAX_WIKI_NODES = 500;
 const MAX_WIKI_DEPTH = 5;
@@ -138,9 +137,10 @@ async function fetchVideoEntries(rootToken: string): Promise<VideoEntry[]> {
       const nodeToken = child.node_token || "";
       const path = [...current.path, title];
       if (isVideoLikeNode(child, title)) {
+        const fallbackUrl = wikiUrl(nodeToken || child.obj_token || "");
         entries.push({
           title,
-          url: child.url || wikiUrl(nodeToken || child.obj_token || ""),
+          url: safeFeishuUrl(child.url, fallbackUrl),
           path,
         });
       }
@@ -205,7 +205,7 @@ function isVideoLikeNode(node: WikiNode, title: string) {
 }
 
 function videoLibraryNodeToken() {
-  return process.env.FEISHU_VIDEO_LIBRARY_NODE_TOKEN || wikiTokenFromUrl(process.env.FEISHU_VIDEO_LIBRARY_URL || DEFAULT_VIDEO_LIBRARY_URL);
+  return process.env.FEISHU_VIDEO_LIBRARY_NODE_TOKEN || wikiTokenFromUrl(process.env.FEISHU_VIDEO_LIBRARY_URL || "");
 }
 
 function wikiTokenFromUrl(value: string) {
@@ -214,7 +214,17 @@ function wikiTokenFromUrl(value: string) {
 }
 
 function wikiUrl(nodeToken: string) {
-  return nodeToken ? `${DEFAULT_FEISHU_HOST}/wiki/${nodeToken}` : DEFAULT_VIDEO_LIBRARY_URL;
+  return nodeToken ? `${DEFAULT_FEISHU_HOST}/wiki/${nodeToken}` : DEFAULT_FEISHU_HOST;
+}
+
+function safeFeishuUrl(value: string | undefined, fallback: string) {
+  if (!value) return fallback;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname.endsWith(".feishu.cn") ? url.toString() : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function normalizeText(value: unknown) {

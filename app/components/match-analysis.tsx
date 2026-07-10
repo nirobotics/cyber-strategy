@@ -242,7 +242,7 @@ function VideoButton({ videos }: { videos: MatchVideoLink[] }) {
     <a
       href={first.url}
       target="_blank"
-      rel="noreferrer"
+      rel="noopener noreferrer"
       title={videos.length > 1 ? `打开视频：${first.title}（另有 ${videos.length - 1} 个）` : `打开视频：${first.title}`}
       className="inline-flex items-center gap-1 rounded-md border border-brand/40 bg-brand/10 px-2 py-1 text-xs font-semibold text-brand outline-none transition hover:border-brand hover:bg-brand/15 focus-visible:ring-2 focus-visible:ring-brand/50"
       onClick={(event) => event.stopPropagation()}
