@@ -30,6 +30,7 @@ import {
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
+  compactRoutePoints,
   proposalMatchesSnapshot,
   proposalMatchesOwnTeamQuery,
   normalizeProposalPayload,
@@ -124,6 +125,7 @@ export function StrategyProposalPanel({
     proposalMatchesOwnTeamQuery(proposal, teamFilterDigits)
   );
   const teamDetail = detailTeam ? data.dataset.teamData[detailTeam] : null;
+  const editorPayloadJson = useMemo(() => JSON.stringify(editor.payload), [editor.payload]);
 
   useEffect(() => {
     if (!proposalFetcher.data?.ok) return;
@@ -357,7 +359,7 @@ export function StrategyProposalPanel({
             <input type="hidden" name="eventKey" value={data.selectedEventKey} />
             <input type="hidden" name="matchLabel" value={matchLabelValue} />
             <input type="hidden" name="proposalType" value={editor.proposalType} />
-            <input type="hidden" name="payload" value={JSON.stringify(editor.payload)} />
+            <input type="hidden" name="payload" value={editorPayloadJson} />
 
             <div className="grid gap-3 lg:grid-cols-[160px_160px_minmax(0,1fr)]">
               <label className="grid gap-1">
@@ -835,15 +837,18 @@ function RoutePlanner({
 }) {
   const displayGroups = (teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }]).filter((group) => group.teams.length);
   const orderedTeams = displayGroups.flatMap((group) => group.teams);
-  const activePoints = useMemo(() => routes[activeTeam] ?? [], [activeTeam, routes]);
+  const [draftRoutes, setDraftRoutes] = useState(routes);
+  const activePoints = useMemo(() => draftRoutes[activeTeam] ?? [], [activeTeam, draftRoutes]);
   const drawingRef = useRef(false);
   const draftPointsRef = useRef<RoutePoint[]>(activePoints);
   const routesRef = useRef(routes);
 
   useEffect(() => {
+    if (drawingRef.current) return;
     routesRef.current = routes;
-    if (!drawingRef.current) draftPointsRef.current = activePoints;
-  }, [activePoints, routes]);
+    setDraftRoutes(routes);
+    draftPointsRef.current = routes[activeTeam] ?? [];
+  }, [activeTeam, routes]);
 
   function pointFromPointer(event: ReactPointerEvent<HTMLButtonElement>) {
     if (disabled || !activeTeam) return;
@@ -856,11 +861,12 @@ function RoutePlanner({
     return point;
   }
 
-  function setActiveRoute(points: RoutePoint[]) {
+  function setActiveRoute(points: RoutePoint[], commit = false) {
     const nextRoutes = { ...routesRef.current, [activeTeam]: points };
     routesRef.current = nextRoutes;
     draftPointsRef.current = points;
-    onRoutesChange(nextRoutes);
+    setDraftRoutes(nextRoutes);
+    if (commit) onRoutesChange(nextRoutes);
   }
 
   function startStroke(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -886,6 +892,7 @@ function RoutePlanner({
     if (!drawingRef.current) return;
     drawingRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    setActiveRoute(compactRoutePoints(draftPointsRef.current), true);
   }
 
   function undo() {
@@ -896,11 +903,11 @@ function RoutePlanner({
         break;
       }
     }
-    onRoutesChange({ ...routes, [activeTeam]: activePoints.slice(0, Math.max(0, lastStrokeStart)) });
+    setActiveRoute(activePoints.slice(0, Math.max(0, lastStrokeStart)), true);
   }
 
   function clear() {
-    onRoutesChange({ ...routes, [activeTeam]: [] });
+    setActiveRoute([], true);
   }
 
   return (
@@ -976,7 +983,7 @@ function RoutePlanner({
           <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
             {orderedTeams.map((team, index) => {
-              const points = routes[team] ?? [];
+              const points = draftRoutes[team] ?? [];
               if (points.length < 2) return null;
               return routeSegments(points).map((segment, segmentIndex) => (
                 <polyline

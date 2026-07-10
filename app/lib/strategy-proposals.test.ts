@@ -5,6 +5,7 @@ import {
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
+  compactRoutePoints,
   normalizeOwnTeam,
   normalizeProposalPayload,
   proposalMatchesOwnTeamQuery,
@@ -84,6 +85,29 @@ describe("strategy proposal helpers", () => {
         },
       },
     });
+  });
+
+  it("compacts hand-drawn route points before saving", () => {
+    const denseStroke = Array.from({ length: 220 }, (_, index) => ({
+      x: Math.min(99, index * 0.3),
+      y: 20,
+      start: index === 0,
+    }));
+    const compacted = compactRoutePoints(denseStroke);
+
+    expect(compacted.length).toBeLessThan(80);
+    expect(compacted[0]).toEqual({ x: 0, y: 20, start: true });
+    expect(compacted.at(-1)).toEqual({ x: 65.7, y: 20 });
+  });
+
+  it("caps very long strokes to a bounded payload size", () => {
+    const longStroke = Array.from({ length: 220 }, (_, index) => ({
+      x: Math.round(((index % 100) + 0.1) * 10) / 10,
+      y: Math.round((index * 1.3 % 100) * 10) / 10,
+      start: index === 0,
+    }));
+
+    expect(compactRoutePoints(longStroke).length).toBeLessThanOrEqual(100);
   });
 
   it("locks own team choices and permissions", () => {

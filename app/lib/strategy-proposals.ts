@@ -3,6 +3,8 @@ export const proposalTypes = ["auto", "self_strategy", "partner_strategy"] as co
 export const proposalStatuses = ["draft", "submitted", "approved", "rejected"] as const;
 export const strategyShifts = ["active", "inactive", "endgame"] as const;
 export const autoWinners = ["unknown", "red", "blue", "tie"] as const;
+const routePointMinDistance = 1.2;
+const routeMaxPointsPerStroke = 100;
 
 export type OwnStrategyTeam = (typeof ownStrategyTeams)[number];
 export type StrategyProposalType = (typeof proposalTypes)[number];
@@ -162,6 +164,15 @@ export function normalizeRouteMap(value: unknown): RouteMap {
   return routes;
 }
 
+export function compactRoutePoints(points: RoutePoint[]): RoutePoint[] {
+  const strokes: RoutePoint[][] = [];
+  for (const point of points) {
+    if (point.start || !strokes.length) strokes.push([point]);
+    else strokes[strokes.length - 1].push(point);
+  }
+  return strokes.flatMap(compactStroke);
+}
+
 function normalizeNoteMap(value: unknown) {
   const record = objectValue(value);
   const notes: Record<string, string> = {};
@@ -233,7 +244,7 @@ export function proposalMatchesSnapshot(
 
 function normalizePoints(value: unknown): RoutePoint[] {
   if (!Array.isArray(value)) return [];
-  return value
+  const points = value
     .map((point) => {
       const record = objectValue(point);
       const x = boundedPercent(record.x);
@@ -242,6 +253,36 @@ function normalizePoints(value: unknown): RoutePoint[] {
       return record.start === true || record.s === true ? { x, y, start: true } : { x, y };
     })
     .filter((point): point is RoutePoint => Boolean(point));
+  return compactRoutePoints(points);
+}
+
+function compactStroke(points: RoutePoint[]) {
+  if (points.length <= 2) return points;
+  const filtered = [points[0]];
+  for (const point of points.slice(1, -1)) {
+    const previous = filtered[filtered.length - 1];
+    if (Math.hypot(point.x - previous.x, point.y - previous.y) >= routePointMinDistance) {
+      filtered.push({ x: point.x, y: point.y });
+    }
+  }
+  const last = points[points.length - 1];
+  const previous = filtered[filtered.length - 1];
+  if (!previous || previous.x !== last.x || previous.y !== last.y) filtered.push({ x: last.x, y: last.y });
+  if (filtered.length <= routeMaxPointsPerStroke) return filtered;
+
+  const capped: RoutePoint[] = [filtered[0]];
+  let lastIndex = 0;
+  for (let index = 1; index < routeMaxPointsPerStroke - 1; index += 1) {
+    const sourceIndex = Math.round((index * (filtered.length - 1)) / (routeMaxPointsPerStroke - 1));
+    if (sourceIndex > lastIndex && sourceIndex < filtered.length - 1) {
+      const point = filtered[sourceIndex];
+      capped.push({ x: point.x, y: point.y });
+      lastIndex = sourceIndex;
+    }
+  }
+  const cappedLast = filtered[filtered.length - 1];
+  capped.push({ x: cappedLast.x, y: cappedLast.y });
+  return capped;
 }
 
 function boundedPercent(value: unknown) {
