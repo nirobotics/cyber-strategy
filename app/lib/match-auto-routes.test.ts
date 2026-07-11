@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoNodeCenter, autoPathSignature, buildMatchAutoRoutes } from "./match-auto-routes";
+import { analyzeRouteRepetition, autoNodeCenter, autoPathSignature, buildMatchAutoRoutes } from "./match-auto-routes";
 import type { ScoutingMatch, TeamSummary } from "./scouting";
 
 describe("match auto routes", () => {
@@ -59,6 +59,19 @@ describe("match auto routes", () => {
 
     expect(routes[0].scoutName).toBe("Normal Scout");
     expect(routes[0].matches[0].scoutName).toBe("Normal Scout");
+  });
+
+  it("marks repeated node visits and repeated reverse segments", () => {
+    const tower = { x: 6, y: 50 };
+    const center = { x: 17.5, y: 50 };
+    const repetition = analyzeRouteRepetition([tower, center, tower]);
+
+    expect(repetition.visits).toEqual([
+      { ...tower, occurrence: 1, total: 2 },
+      { ...center, occurrence: 1, total: 1 },
+      { ...tower, occurrence: 2, total: 2 },
+    ]);
+    expect(repetition.segments).toEqual([{ from: tower, to: center, count: 2 }]);
   });
 
   it("ignores empty or unknown auto paths", () => {

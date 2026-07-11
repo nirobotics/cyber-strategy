@@ -20,6 +20,17 @@ export type MatchAutoRoute = {
   }>;
 };
 
+export type RoutePointVisit = AutoRoutePoint & {
+  occurrence: number;
+  total: number;
+};
+
+export type RepeatedRouteSegment = {
+  from: AutoRoutePoint;
+  to: AutoRoutePoint;
+  count: number;
+};
+
 export const MATCH_AUTO_NODE_LABELS: Record<string, string> = {
   depot: "depot",
   tower: "tower",
@@ -132,6 +143,43 @@ export function autoPathSignature(match: ScoutingMatch): string {
 
 export function autoNodeCenter(node: string, alliance: string | undefined): AutoRoutePoint {
   return AUTO_NODE_CENTERS[matchAllianceSide(alliance)][node];
+}
+
+export function analyzeRouteRepetition(points: AutoRoutePoint[]): {
+  visits: RoutePointVisit[];
+  segments: RepeatedRouteSegment[];
+} {
+  const pointTotals = new Map<string, number>();
+  const pointSeen = new Map<string, number>();
+  const segmentTotals = new Map<string, RepeatedRouteSegment>();
+
+  for (const point of points) {
+    const key = routePointKey(point);
+    pointTotals.set(key, (pointTotals.get(key) ?? 0) + 1);
+  }
+
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1];
+    const to = points[index];
+    const key = [routePointKey(from), routePointKey(to)].sort().join(">");
+    const existing = segmentTotals.get(key);
+    if (existing) existing.count += 1;
+    else segmentTotals.set(key, { from, to, count: 1 });
+  }
+
+  return {
+    visits: points.map((point) => {
+      const key = routePointKey(point);
+      const occurrence = (pointSeen.get(key) ?? 0) + 1;
+      pointSeen.set(key, occurrence);
+      return { ...point, occurrence, total: pointTotals.get(key) ?? 1 };
+    }),
+    segments: [...segmentTotals.values()].filter((segment) => segment.count > 1),
+  };
+}
+
+function routePointKey(point: AutoRoutePoint): string {
+  return `${point.x}:${point.y}`;
 }
 
 function matchAllianceSide(alliance: string | undefined): AllianceSide {

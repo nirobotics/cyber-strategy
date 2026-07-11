@@ -49,7 +49,7 @@ import {
   type PickListId,
 } from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
-import { buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
+import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead";
 
@@ -461,7 +461,7 @@ function TeamDetail({
                   <h4 className="text-sm font-semibold text-ink">路线 {index + 1}</h4>
                   <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-ink-dim">{route.matches.length} 场</span>
                 </div>
-                <AutoRoutePreview points={route.points} />
+                <AutoRoutePreview points={route.points} showRepetition />
                 <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
                   {route.nodes.map((node, nodeIndex) => (
                     <span key={`${route.id}:${nodeIndex}`} className="rounded-full bg-surface-2 px-2 py-0.5">
@@ -1030,23 +1030,69 @@ function AutoRouteModal({ team, pitInfo, onClose }: { team: string; pitInfo: Tea
   );
 }
 
-function AutoRoutePreview({ points }: { points: TeamPitInfo["autoRoutes"][number]["points"] }) {
+function AutoRoutePreview({
+  points,
+  showRepetition = false,
+}: {
+  points: TeamPitInfo["autoRoutes"][number]["points"];
+  showRepetition?: boolean;
+}) {
   const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const repetition = analyzeRouteRepetition(points);
+  const visits = showRepetition ? repetition.visits : repetition.visits.map((visit) => ({ ...visit, occurrence: 1, total: 1 }));
+  const hasRepeatedVisits = repetition.visits.some((visit) => visit.total > 1);
   return (
-    <div className="relative aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2" aria-label="自动路线预览">
+    <div
+      className="relative aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2"
+      aria-label={showRepetition && hasRepeatedVisits ? "自动路线预览，含重复经过路线" : "自动路线预览"}
+    >
       <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
         <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {showRepetition ? repetition.segments.map((segment) => (
+          <line
+            key={`${segment.from.x}:${segment.from.y}-${segment.to.x}:${segment.to.y}`}
+            x1={segment.from.x}
+            y1={segment.from.y}
+            x2={segment.to.x}
+            y2={segment.to.y}
+            fill="none"
+            stroke="rgb(var(--warn))"
+            strokeWidth="2"
+            strokeDasharray="6 5"
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        )) : null}
       </svg>
-      {points.map((point, index) => (
+      {visits.map((point, index) => {
+        const angle = point.total > 1 ? ((point.occurrence - 1) / point.total) * Math.PI * 2 : 0;
+        const offset = point.total > 1 ? 10 : 0;
+        return (
         <span
           key={`${point.x}-${point.y}-${index}`}
           className="absolute flex size-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-brand text-[10px] font-semibold leading-none text-white shadow-sm"
-          style={{ left: `${point.x}%`, top: `${point.y}%` }}
+          style={{
+            left: `${point.x}%`,
+            top: `${point.y}%`,
+            marginLeft: Math.cos(angle) * offset,
+            marginTop: Math.sin(angle) * offset,
+          }}
+          title={point.total > 1 ? `第 ${point.occurrence}/${point.total} 次经过此点` : undefined}
         >
           {index + 1}
         </span>
-      ))}
+        );
+      })}
+      {showRepetition ? repetition.segments.map((segment) => (
+        <span
+          key={`count:${segment.from.x}:${segment.from.y}-${segment.to.x}:${segment.to.y}`}
+          className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-warn/50 bg-surface px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warn shadow-sm"
+          style={{ left: `${(segment.from.x + segment.to.x) / 2}%`, top: `${(segment.from.y + segment.to.y) / 2}%` }}
+        >
+          ×{segment.count}
+        </span>
+      )) : null}
     </div>
   );
 }
