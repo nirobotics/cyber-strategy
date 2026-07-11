@@ -105,6 +105,8 @@ describe("cyber-scout dataset conversion", () => {
       climbPts: 5,
       comment: "clean",
       startPos: "hub-front",
+      scoutName: "Super Scout",
+      autoScoutName: "Normal Scout",
       autoStartPosition: "hub-front",
       autoAlliance: "red",
       autoFieldSideFlipped: false,

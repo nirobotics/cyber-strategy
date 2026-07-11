@@ -84,13 +84,14 @@ export function buildMatchAutoRoutes(team: TeamSummary): MatchAutoRoute[] {
     if (!nodes.length) continue;
 
     const signature = nodes.join(">");
+    const scoutName = match.autoScoutName || match.scoutName;
     const existing = bySignature.get(signature);
     const matchInfo = {
       match: match.match,
       alliance: match.autoAlliance || "",
       startPosition: match.autoStartPosition || "",
       flipped: Boolean(match.autoFieldSideFlipped),
-      scoutName: match.scoutName,
+      scoutName,
     };
 
     if (existing) {
@@ -107,7 +108,7 @@ export function buildMatchAutoRoutes(team: TeamSummary): MatchAutoRoute[] {
       alliance,
       startPosition: match.autoStartPosition || "",
       flipped: Boolean(match.autoFieldSideFlipped),
-      scoutName: match.scoutName,
+      scoutName,
       matches: [matchInfo],
     });
   }

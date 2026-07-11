@@ -287,6 +287,7 @@ function toScoutingMatch({
     comment: buildComment(normal, superRecord),
     startPos: normal?.startPos ?? "",
     scoutName: superRecord?.scoutName || normal?.scoutName || "",
+    autoScoutName: normal?.scoutName || undefined,
     autoPath: normal?.autoPath.length ? normal.autoPath : undefined,
     autoStartPosition: normal?.startPos || undefined,
     autoAlliance: normal?.alliance || undefined,

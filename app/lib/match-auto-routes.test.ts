@@ -49,6 +49,18 @@ describe("match auto routes", () => {
     expect(routes[1].signature).toBe("tower>alliance-left");
   });
 
+  it("uses the normal match scout name for match-auto routes", () => {
+    const routes = buildMatchAutoRoutes(team([
+      match(1, [{ node: "tower", atMs: 0 }], {
+        autoScoutName: "Normal Scout",
+        scoutName: "Super Scout",
+      }),
+    ]));
+
+    expect(routes[0].scoutName).toBe("Normal Scout");
+    expect(routes[0].matches[0].scoutName).toBe("Normal Scout");
+  });
+
   it("ignores empty or unknown auto paths", () => {
     expect(buildMatchAutoRoutes(team([
       match(1, [], { autoStartPosition: "hub-front" }),

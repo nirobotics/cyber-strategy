@@ -21,6 +21,7 @@ export type ScoutingMatch = {
   comment: string;
   startPos: string;
   scoutName: string;
+  autoScoutName?: string;
   autoPath?: MatchAutoPathPoint[];
   autoStartPosition?: string;
   autoAlliance?: "red" | "blue" | string;
