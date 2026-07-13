@@ -87,7 +87,6 @@ export function StrategyProposalPanel({
   const proposalFetcher = useFetcher<StrategyProposalActionData>();
   const [searchParams] = useSearchParams();
   const actionData = proposalFetcher.data;
-  const [typeFilter, setTypeFilter] = useState<StrategyProposalType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
   const [matchFilter, setMatchFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("");
@@ -119,7 +118,6 @@ export function StrategyProposalPanel({
     payload: editor.payload,
   }));
   const filteredProposals = data.proposals.filter((proposal) =>
-    (typeFilter === "all" || proposal.proposalType === typeFilter) &&
     (statusFilter === "all" || proposal.status === statusFilter) &&
     (matchFilter === "all" || proposal.matchKey === matchFilter) &&
     proposalMatchesOwnTeamQuery(proposal, teamFilterDigits)
@@ -289,10 +287,6 @@ export function StrategyProposalPanel({
             </div>
           </div>
           <div className="grid gap-2 border-b border-line p-3">
-            <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as StrategyProposalType | "all")} className="input h-9 font-sans">
-              <option value="all">所有类型</option>
-              {proposalTypes.map((type) => <option key={type} value={type}>{proposalTypeLabel(type)}</option>)}
-            </select>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StrategyProposalStatus | "all")} className="input h-9 font-sans">
               <option value="all">所有状态</option>
               {proposalStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}

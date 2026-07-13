@@ -2,7 +2,6 @@ import {
   CheckCircle2,
   ClipboardList,
   Save,
-  ShieldCheck,
   Target,
   Trash2,
   Trophy,
@@ -176,12 +175,6 @@ function RecordsView({
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard icon={<ClipboardList className="size-4" />} label="全部提交" value={schedule.totalRecords} />
-        <StatCard icon={<Users className="size-4" />} label="普通 Scout" value={schedule.normalRecords} />
-        <StatCard icon={<ShieldCheck className="size-4" />} label="超级 Scout" value={schedule.superRecords} />
-      </div>
-
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>

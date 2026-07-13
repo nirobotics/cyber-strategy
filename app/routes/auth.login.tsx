@@ -51,7 +51,7 @@ export default function LoginPage() {
           </button>
         </Form>
       </main>
-      <AppFooter version="1.0.11" />
+      <AppFooter version="1.0.12" />
     </>
   );
 }
