@@ -156,7 +156,7 @@ export function AnalyticsDashboard({
   return (
     <div className="flex w-full flex-col">
       <div className="-mx-2.5 -mt-2.5 border-b border-line bg-surface">
-        <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-3 sm:px-4">
+        <div className="mx-auto grid w-full max-w-[1500px] grid-cols-[minmax(0,1fr)] gap-2 px-3 py-3 sm:px-4">
           <nav aria-label="功能选择" className="flex items-center gap-2 overflow-x-auto">
             <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
               队伍浏览
@@ -185,12 +185,12 @@ export function AnalyticsDashboard({
               </>
             ) : null}
           </nav>
-          <label className="grid max-w-xl gap-1 text-sm">
+          <label className="grid w-full max-w-full gap-1 text-sm sm:w-fit">
             <span className="sr-only">赛事</span>
             <select
               value={selectedEventKey ?? dataset.eventKey}
               onChange={(event) => selectEvent(event.target.value)}
-              className="input h-9 font-sans"
+              className="input h-9 max-w-full font-sans sm:w-fit sm:[field-sizing:content]"
               disabled={!events.length}
               title="选择 cyber-scout 赛事"
             >
