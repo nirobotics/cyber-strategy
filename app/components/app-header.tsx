@@ -28,7 +28,7 @@ export function AppHeader({
 }) {
   return (
     <header className="border-b border-[var(--border)] bg-[var(--panel)]">
-      <div className="grid w-full gap-2 px-3 py-3 sm:px-4">
+      <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-3 sm:px-4">
         <div className="relative flex min-w-0 items-center gap-3">
           <NavLink
             to="/"

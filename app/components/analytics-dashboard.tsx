@@ -154,36 +154,39 @@ export function AnalyticsDashboard({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-      <nav aria-label="功能选择" className="flex items-center gap-2 overflow-x-auto border-y border-line bg-surface px-3 py-3">
-        <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-5" />}>
-          队伍浏览
-        </SegmentedTab>
-        <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-5" />}>
-          队伍对比
-        </SegmentedTab>
-        <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-5" />}>
-          赛程分析
-        </SegmentedTab>
-        <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-5" />}>
-          Picklist
-        </SegmentedTab>
-        <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-5" />}>
-          Strategy Proposal
-        </SegmentedTab>
-        {isAdmin ? (
-          <>
-            <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-5" />}>
-              Scouting Lead
-            </SegmentedTab>
-            <NavLink to="/admin" className={dashboardNavItemClass()}>
-              <Settings className="size-5" />
-              管理
-            </NavLink>
-          </>
-        ) : null}
-      </nav>
+    <div className="flex w-full flex-col">
+      <div className="-mx-2.5 -mt-2.5 border-b border-line bg-surface">
+        <nav aria-label="功能选择" className="mx-auto flex w-full max-w-[1500px] items-center gap-2 overflow-x-auto px-3 py-3 sm:px-4">
+          <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-5" />}>
+            队伍浏览
+          </SegmentedTab>
+          <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-5" />}>
+            队伍对比
+          </SegmentedTab>
+          <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-5" />}>
+            赛程分析
+          </SegmentedTab>
+          <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-5" />}>
+            Picklist
+          </SegmentedTab>
+          <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-5" />}>
+            Strategy Proposal
+          </SegmentedTab>
+          {isAdmin ? (
+            <>
+              <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-5" />}>
+                Scouting Lead
+              </SegmentedTab>
+              <NavLink to="/admin" className={dashboardNavItemClass()}>
+                <Settings className="size-5" />
+                管理
+              </NavLink>
+            </>
+          ) : null}
+        </nav>
+      </div>
 
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 pt-3">
       <div className="rounded-card border border-line bg-surface p-3">
         <label className="grid max-w-xl gap-1 text-sm">
           <span className="sr-only">赛事</span>
@@ -333,6 +336,7 @@ export function AnalyticsDashboard({
           onClose={() => setLightbox(null)}
         />
       ) : null}
+      </div>
     </div>
   );
 }
