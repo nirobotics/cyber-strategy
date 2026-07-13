@@ -1,12 +1,10 @@
 import {
-  CheckCircle2,
   ClipboardList,
   Save,
   Target,
   Trash2,
   Trophy,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -464,9 +462,7 @@ function AssignmentDeleteForm({ eventKey, assignmentId, busy }: { eventKey: stri
 
 function SummaryGrid({ report }: { report: ScoutConfidenceReport }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard icon={<Users className="size-4" />} label="预测记录" value={report.summary.totalRecords} />
-      <StatCard icon={<CheckCircle2 className="size-4" />} label="已计分" value={report.summary.scoredRecords} />
+    <div className="grid gap-3 sm:grid-cols-2">
       <StatCard icon={<Trophy className="size-4" />} label="全员净分" value={signed(report.summary.totalNetScore)} tone={report.summary.totalNetScore >= 0 ? "ok" : "danger"} />
       <StatCard icon={<Target className="size-4" />} label="准确率" value={percent(report.summary.accuracy)} />
     </div>
