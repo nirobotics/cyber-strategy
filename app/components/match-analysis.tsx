@@ -89,13 +89,6 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
 
   return (
     <div className="space-y-3">
-      <Card className="flex flex-wrap items-center justify-between gap-2 p-3">
-        <div>
-          <p className="section-label">TBA / Strategy / Statbotics</p>
-          <h2 className="text-lg font-semibold text-ink">{eventKey}</h2>
-        </div>
-      </Card>
-
       {state.status === "loading" || state.status === "idle" ? (
         <Card className="grid place-items-center p-10 text-ink-dim">
           <RefreshCw className="mb-3 size-6 animate-spin" />
