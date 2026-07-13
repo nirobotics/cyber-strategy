@@ -49,7 +49,6 @@ export default function IndexRoute({ loaderData }: Route.ComponentProps) {
       dataset={loaderData.dataset}
       events={loaderData.events}
       selectedEventKey={loaderData.selectedEventKey}
-      sourceStatus={loaderData.sourceStatus}
       isAdmin={loaderData.isAdmin}
       tierPercentages={loaderData.tierPercentages}
       user={loaderData.user}

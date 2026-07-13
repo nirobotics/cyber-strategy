@@ -33,7 +33,6 @@ import {
   matchIgnoreKey,
   reliability,
   sortedTeams,
-  type DatasetSourceStatus,
   type ScoutingDataset,
   type ScoutingEventOption,
   type ScoutingMatch,
@@ -61,7 +60,6 @@ export function AnalyticsDashboard({
   dataset,
   events,
   selectedEventKey,
-  sourceStatus,
   isAdmin,
   tierPercentages,
   user,
@@ -71,7 +69,6 @@ export function AnalyticsDashboard({
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
   selectedEventKey: string | null;
-  sourceStatus: DatasetSourceStatus;
   isAdmin: boolean;
   tierPercentages: TierPercentages;
   user: SessionUser;
@@ -159,26 +156,6 @@ export function AnalyticsDashboard({
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
       <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="min-w-0">
-          <p className="section-label">当前数据集</p>
-          <h1 className="truncate text-xl font-semibold text-ink">{dataset.title}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-dim">
-            <span>{dataset.eventKey} · {teams.length} 支队伍 · {teams.reduce((sum, team) => sum + team.matchCount, 0)} 条记录</span>
-            {ignoredMatches.length ? <span className="text-xs text-danger">已忽略 {ignoredMatches.length} 场</span> : null}
-            <Badge
-              className={cn(
-                sourceStatus.source === "cyber-scout" && "border-ok/40 bg-ok/10 text-ok",
-                sourceStatus.source === "fallback" && "border-warn/40 bg-warn/10 text-warn",
-              )}
-            >
-              {sourceStatus.label}
-            </Badge>
-            <span className="text-xs text-ink-faint">
-              {sourceStatus.updatedAt ? new Date(sourceStatus.updatedAt).toLocaleString() : sourceStatus.message}
-            </span>
-          </div>
-          {sourceStatus.error ? <p className="mt-1 text-xs text-danger">{sourceStatus.error}</p> : null}
-        </div>
         <div className="flex flex-wrap items-center gap-2">
           <label className="grid min-w-[170px] gap-1 text-sm">
             <span className="sr-only">赛事</span>

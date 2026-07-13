@@ -24,7 +24,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
       appName="Cyber Strategy"
       appSubtitle="选队与比赛策略"
       centerTitle="数据分析"
-      version="1.0.0"
+      version="1.0.1"
       user={user}
       authLoading={auth.loading}
       allowGuest={AUTH_MODE === "guest-compatible"}
