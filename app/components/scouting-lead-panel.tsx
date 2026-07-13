@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   ClipboardList,
-  Gauge,
   Save,
   ShieldCheck,
   Target,
@@ -472,12 +471,11 @@ function AssignmentDeleteForm({ eventKey, assignmentId, busy }: { eventKey: stri
 
 function SummaryGrid({ report }: { report: ScoutConfidenceReport }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard icon={<Users className="size-4" />} label="预测记录" value={report.summary.totalRecords} />
       <StatCard icon={<CheckCircle2 className="size-4" />} label="已计分" value={report.summary.scoredRecords} />
       <StatCard icon={<Trophy className="size-4" />} label="全员净分" value={signed(report.summary.totalNetScore)} tone={report.summary.totalNetScore >= 0 ? "ok" : "danger"} />
       <StatCard icon={<Target className="size-4" />} label="准确率" value={percent(report.summary.accuracy)} />
-      <StatCard icon={<Gauge className="size-4" />} label="待验证 / 未完成" value={`${report.summary.pendingRecords} / ${report.summary.incompleteRecords}`} />
     </div>
   );
 }
