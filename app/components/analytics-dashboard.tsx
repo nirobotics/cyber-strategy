@@ -156,59 +156,58 @@ export function AnalyticsDashboard({
   return (
     <div className="flex w-full flex-col">
       <div className="-mx-2.5 -mt-2.5 border-b border-line bg-surface">
-        <nav aria-label="功能选择" className="mx-auto flex w-full max-w-[1500px] items-center gap-2 overflow-x-auto px-3 py-3 sm:px-4">
-          <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
-            队伍浏览
-          </SegmentedTab>
-          <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-4" />}>
-            队伍对比
-          </SegmentedTab>
-          <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-4" />}>
-            赛程分析
-          </SegmentedTab>
-          <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
-            Picklist
-          </SegmentedTab>
-          <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
-            Strategy Proposal
-          </SegmentedTab>
-          {isAdmin ? (
-            <>
-              <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
-                Scouting Lead
-              </SegmentedTab>
-              <NavLink to="/admin" className={dashboardNavItemClass()}>
-                <Settings className="size-4" />
-                管理
-              </NavLink>
-            </>
-          ) : null}
-        </nav>
+        <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-3 sm:px-4">
+          <nav aria-label="功能选择" className="flex items-center gap-2 overflow-x-auto">
+            <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
+              队伍浏览
+            </SegmentedTab>
+            <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-4" />}>
+              队伍对比
+            </SegmentedTab>
+            <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-4" />}>
+              赛程分析
+            </SegmentedTab>
+            <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
+              Picklist
+            </SegmentedTab>
+            <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
+              Strategy Proposal
+            </SegmentedTab>
+            {isAdmin ? (
+              <>
+                <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
+                  Scouting Lead
+                </SegmentedTab>
+                <NavLink to="/admin" className={dashboardNavItemClass()}>
+                  <Settings className="size-4" />
+                  管理
+                </NavLink>
+              </>
+            ) : null}
+          </nav>
+          <label className="grid max-w-xl gap-1 text-sm">
+            <span className="sr-only">赛事</span>
+            <select
+              value={selectedEventKey ?? dataset.eventKey}
+              onChange={(event) => selectEvent(event.target.value)}
+              className="input h-9 font-sans"
+              disabled={!events.length}
+              title="选择 cyber-scout 赛事"
+            >
+              {!events.some((event) => event.eventKey === (selectedEventKey ?? dataset.eventKey)) ? (
+                <option value={selectedEventKey ?? dataset.eventKey}>{selectedEventKey ?? dataset.eventKey}</option>
+              ) : null}
+              {events.map((event) => (
+                <option key={event.eventKey} value={event.eventKey}>
+                  {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 pt-3">
-      <div className="rounded-card border border-line bg-surface p-3">
-        <label className="grid max-w-xl gap-1 text-sm">
-          <span className="sr-only">赛事</span>
-          <select
-            value={selectedEventKey ?? dataset.eventKey}
-            onChange={(event) => selectEvent(event.target.value)}
-            className="input h-9 font-sans"
-            disabled={!events.length}
-            title="选择 cyber-scout 赛事"
-          >
-            {!events.some((event) => event.eventKey === (selectedEventKey ?? dataset.eventKey)) ? (
-              <option value={selectedEventKey ?? dataset.eventKey}>{selectedEventKey ?? dataset.eventKey}</option>
-            ) : null}
-            {events.map((event) => (
-              <option key={event.eventKey} value={event.eventKey}>
-                {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
           当前赛事还没有可分析的队伍记录。请确认 cyber-scout 已上传普通/超级侦察记录。
