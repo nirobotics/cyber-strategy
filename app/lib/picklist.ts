@@ -1,8 +1,13 @@
 export type PickListId = "first" | "second";
 
-export function orderPickPool<T extends { team: string; avgTotal: number }>(teams: T[], crossedTeams: string[]) {
+export function orderPickPool<T extends { team: string; avgTotal: number }>(
+  teams: T[],
+  crossedTeams: string[],
+  pickedTeams: string[] = [],
+) {
   const crossed = new Set(crossedTeams);
-  return [...teams].sort((a, b) => {
+  const picked = new Set(pickedTeams);
+  return teams.filter((team) => !picked.has(team.team)).sort((a, b) => {
     const aCrossed = crossed.has(a.team) ? 1 : 0;
     const bCrossed = crossed.has(b.team) ? 1 : 0;
     if (aCrossed !== bCrossed) return aCrossed - bCrossed;

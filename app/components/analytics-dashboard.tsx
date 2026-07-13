@@ -678,12 +678,12 @@ function PicklistBoard({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const validTeamIds = useMemo(() => teams.map((team) => team.team), [teams]);
   const crossedSet = useMemo(() => new Set(sanitizePickList(crossedTeams, validTeamIds)), [crossedTeams, validTeamIds]);
-  const poolTeams = useMemo(() => orderPickPool(teams, crossedTeams), [teams, crossedTeams]);
   const pickTeams = useMemo(
     () => sanitizePickList(activePick === "first" ? firstPick : secondPick, validTeamIds),
     [activePick, firstPick, secondPick, validTeamIds],
   );
-  const pickTitle = activePick === "first" ? "1st Pick" : "2nd Pick";
+  const poolTeams = useMemo(() => orderPickPool(teams, crossedTeams, pickTeams), [teams, crossedTeams, pickTeams]);
+  const pickTitle = activePick === "first" ? "1st Pick List" : "2nd Pick List";
 
   function updateCurrentPick(updater: (current: string[]) => string[]) {
     const apply = (current: string[]) => sanitizePickList(updater(current), validTeamIds);
@@ -727,10 +727,10 @@ function PicklistBoard({
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>
-            <p className="section-label">队伍池</p>
-            <h2 className="text-base font-semibold text-ink">综合分排名</h2>
+            <p className="section-label">{pickTitle}</p>
+            <h2 className="text-base font-semibold text-ink">候选队伍池</h2>
           </div>
-          <span className="text-sm text-ink-dim">{teams.length} 支队伍</span>
+          <span className="text-sm text-ink-dim">{poolTeams.length} 支队伍</span>
         </div>
         <div className="max-h-[68dvh] overflow-y-auto p-2">
           {poolTeams.map((team) => {
@@ -809,10 +809,10 @@ function PicklistBoard({
           </div>
           <div className="flex gap-2">
             <Button type="button" variant={activePick === "first" ? "active" : "default"} onClick={() => setActivePick("first")}>
-              1st Pick
+              1st Pick List
             </Button>
             <Button type="button" variant={activePick === "second" ? "active" : "default"} onClick={() => setActivePick("second")}>
-              2nd Pick
+              2nd Pick List
             </Button>
           </div>
         </div>

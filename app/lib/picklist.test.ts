@@ -13,6 +13,11 @@ describe("picklist helpers", () => {
     expect(orderPickPool(teams, ["2"]).map((team) => team.team)).toEqual(["1", "4", "3", "2"]);
   });
 
+  it("builds independent pools from each pick list while sharing crossed teams", () => {
+    expect(orderPickPool(teams, ["2"], ["1"]).map((team) => team.team)).toEqual(["4", "3", "2"]);
+    expect(orderPickPool(teams, ["2"], ["4"]).map((team) => team.team)).toEqual(["1", "3", "2"]);
+  });
+
   it("does not duplicate teams in one pick list", () => {
     expect(addPickListTeam(["1", "2"], "2")).toEqual(["1", "2"]);
     expect(addPickListTeam(["1", "2"], "3")).toEqual(["1", "2", "3"]);
