@@ -28,7 +28,7 @@ function appSecret(): string {
 /** 规范回调地址：canonical-origin redirect（模式 13）。 */
 export function redirectUri(): string {
   const base = process.env.APP_BASE_URL || "http://localhost:3000";
-  return `${base.replace(/\/$/, "")}/api/auth/callback`;
+  return `${base.replace(/\/$/, "")}/auth/feishu/callback`;
 }
 
 /** 构造飞书授权 URL（带 PKCE S256 + sealed state）。 */

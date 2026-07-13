@@ -55,7 +55,7 @@ pnpm dev
 打开 `http://localhost:3000`。飞书后台需要配置 OAuth 回调地址：
 
 ```text
-http://localhost:3000/api/auth/callback
+http://localhost:3000/auth/feishu/callback
 ```
 
 根据 `.env.example` 配置服务端环境变量。所有密钥只允许放在 `.env.local`、Vercel 环境变量或其他受控密钥存储中，禁止添加 `VITE_` 前缀或提交到 Git。
