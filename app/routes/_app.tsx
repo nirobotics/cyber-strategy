@@ -23,8 +23,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="选队与比赛策略"
-      centerTitle="数据分析"
-      version="1.0.1"
+      version="1.0.2"
       user={user}
       authLoading={auth.loading}
       allowGuest={AUTH_MODE === "guest-compatible"}
