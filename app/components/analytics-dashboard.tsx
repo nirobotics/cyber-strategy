@@ -157,28 +157,28 @@ export function AnalyticsDashboard({
     <div className="flex w-full flex-col">
       <div className="-mx-2.5 -mt-2.5 border-b border-line bg-surface">
         <nav aria-label="功能选择" className="mx-auto flex w-full max-w-[1500px] items-center gap-2 overflow-x-auto px-3 py-3 sm:px-4">
-          <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-5" />}>
+          <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
             队伍浏览
           </SegmentedTab>
-          <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-5" />}>
+          <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-4" />}>
             队伍对比
           </SegmentedTab>
-          <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-5" />}>
+          <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-4" />}>
             赛程分析
           </SegmentedTab>
-          <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-5" />}>
+          <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
             Picklist
           </SegmentedTab>
-          <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-5" />}>
+          <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
             Strategy Proposal
           </SegmentedTab>
           {isAdmin ? (
             <>
-              <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-5" />}>
+              <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
                 Scouting Lead
               </SegmentedTab>
               <NavLink to="/admin" className={dashboardNavItemClass()}>
-                <Settings className="size-5" />
+                <Settings className="size-4" />
                 管理
               </NavLink>
             </>
@@ -1152,7 +1152,7 @@ function SegmentedTab({
 
 function dashboardNavItemClass(active = false) {
   return cn(
-    "inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-md px-4 text-base font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/50",
+    "inline-flex shrink-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/50",
     active ? "bg-brand text-brand-fg" : "text-ink-dim hover:bg-surface-2 hover:text-ink",
   );
 }
