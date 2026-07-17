@@ -7,7 +7,6 @@ import { isAdmin } from "../lib/profiles.server";
 import { getDataRange, getTierPercentages } from "../lib/settings.server";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import { listStrategyProposals } from "../lib/strategy-proposals.server";
-import { fetchTbaMatches } from "../lib/tba.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = requireUser(request, { redirectToLogin: true });
@@ -17,19 +16,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     getDataRange(),
   ]);
   const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
+  const { matches, ...strategyData } = data;
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
+  const activeTab = new URL(request.url).searchParams.get("tab");
   let proposalError: string | null = null;
-  const [proposals, tbaMatches, scoutingLead] = await Promise.all([
-    listStrategyProposals(selectedEventKey).catch((error) => {
+  const [proposals, scoutingLead] = await Promise.all([
+    activeTab === "proposal" ? listStrategyProposals(selectedEventKey).catch((error) => {
       proposalError = error instanceof Error ? error.message : "Strategy Proposal 数据表不可用。";
       return [];
-    }),
-    fetchTbaMatches(selectedEventKey).catch(() => []),
-    admin ? loadScoutConfidenceReport(selectedEventKey, { includedMatchTypes: dataRange }).catch(() => null) : Promise.resolve(null),
+    }) : Promise.resolve([]),
+    admin && activeTab === "lead" ? loadScoutConfidenceReport(selectedEventKey, { includedMatchTypes: dataRange, tbaMatches: matches }).catch(() => null) : Promise.resolve(null),
   ]);
 
   return {
-    ...data,
+    ...strategyData,
     selectedEventKey,
     isAdmin: admin,
     tierPercentages,
@@ -37,7 +37,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     strategyProposal: {
       proposals,
       proposalError,
-      matches: toProposalMatches(tbaMatches as CombinedMatch[]),
+      matches: activeTab === "proposal" ? toProposalMatches(matches as CombinedMatch[]) : [],
+      loaded: activeTab === "proposal",
     },
     scoutingLead,
   };

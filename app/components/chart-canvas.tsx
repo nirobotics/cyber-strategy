@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChartConfiguration } from "chart.js";
 
+let chartPromise: Promise<typeof import("chart.js")["Chart"]> | null = null;
+
 type ChartPalette = {
   accent: string;
   text: string;
@@ -33,7 +35,7 @@ export function ChartCanvas({
     let chart: { destroy: () => void } | null = null;
     let cancelled = false;
 
-    import("chart.js/auto").then(({ default: Chart }) => {
+    loadChart().then((Chart) => {
       if (cancelled || !canvasRef.current) return;
       chart = new Chart(canvasRef.current, buildRef.current(readPalette()));
     });
@@ -49,6 +51,42 @@ export function ChartCanvas({
       <canvas ref={canvasRef} aria-label={label} role="img" />
     </div>
   );
+}
+
+function loadChart() {
+  if (chartPromise) return chartPromise;
+  chartPromise = import("chart.js").then(({
+    BarController,
+    BarElement,
+    CategoryScale,
+    Chart,
+    Filler,
+    Legend,
+    LinearScale,
+    LineController,
+    LineElement,
+    PointElement,
+    RadarController,
+    RadialLinearScale,
+    Tooltip,
+  }) => {
+    Chart.register(
+      BarController,
+      BarElement,
+      CategoryScale,
+      Filler,
+      Legend,
+      LinearScale,
+      LineController,
+      LineElement,
+      PointElement,
+      RadarController,
+      RadialLinearScale,
+      Tooltip,
+    );
+    return Chart;
+  });
+  return chartPromise;
 }
 
 function useThemeRevision() {

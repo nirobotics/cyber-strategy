@@ -1,5 +1,5 @@
 import { Route as StrategyIcon } from "lucide-react";
-import { useLocation, useNavigation } from "react-router";
+import { useNavigation } from "react-router";
 import type { Route } from "./+types/demo";
 import { AnalyticsDashboard } from "../components/analytics-dashboard";
 import { AppShell } from "../components/app-shell";
@@ -37,19 +37,18 @@ export async function loader() {
 }
 
 export default function DemoRoute({ loaderData }: Route.ComponentProps) {
-  const location = useLocation();
   const navigation = useNavigation();
 
   return (
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.15"
+      version="1.0.17"
       user={null}
       authLoading={false}
       allowGuest
       busy={navigation.state !== "idle"}
-      onLogin={() => startFeishuLogin(`${location.pathname}${location.search}`)}
+      onLogin={() => startFeishuLogin("/")}
       Icon={StrategyIcon}
       demoHref="/demo"
     >
@@ -61,7 +60,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           isAdmin={false}
           tierPercentages={DEFAULT_TIER_PERCENTAGES}
           user={DEMO_USER}
-          strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS) }}
+          strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS), loaded: true }}
           scoutingLead={loaderData.demo.scoutingLead}
           demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"] }}
         />

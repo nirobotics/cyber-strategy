@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
 import {
   BarChart3,
@@ -24,10 +24,8 @@ import {
 import { NavLink, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
-import { MatchAnalysis } from "./match-analysis";
-import { ScoutingLeadPanel, type ScoutingLeadPanelData } from "./scouting-lead-panel";
-import { StrategySettingsPanel } from "./strategy-settings-panel";
-import { StrategyProposalPanel, type StrategyProposalPanelData } from "./strategy-proposal-panel";
+import type { ScoutingLeadPanelData } from "./scouting-lead-panel";
+import type { StrategyProposalPanelData } from "./strategy-proposal-panel";
 import type { SessionUser } from "../lib/auth-types";
 import {
   applyIgnoredMatchesToTeamData,
@@ -58,6 +56,10 @@ type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
 const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
 const PICK_DRAG_SOURCE_TYPE = "application/x-cyber-strategy-source";
+const MatchAnalysis = lazy(() => import("./match-analysis").then((module) => ({ default: module.MatchAnalysis })));
+const ScoutingLeadPanel = lazy(() => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel })));
+const StrategyProposalPanel = lazy(() => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel })));
+const StrategySettingsPanel = lazy(() => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel })));
 
 export function AnalyticsDashboard({
   dataset,
@@ -76,7 +78,7 @@ export function AnalyticsDashboard({
   isAdmin: boolean;
   tierPercentages: TierPercentages;
   user: SessionUser;
-  strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches">;
+  strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
   scoutingLead: ScoutingLeadPanelData | null;
   demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[] };
 }) {
@@ -152,7 +154,12 @@ export function AnalyticsDashboard({
     if (next !== "proposal") params.delete("proposal");
     if (next !== "lead") params.delete("view");
     const search = params.toString();
-    window.history.replaceState(null, "", search ? `${routeBase}?${search}` : routeBase);
+    const path = search ? `${routeBase}?${search}` : routeBase;
+    if (!demoMode && ((next === "proposal" && !strategyProposal.loaded) || (next === "lead" && !scoutingLead))) {
+      navigate(path);
+    } else {
+      window.history.replaceState(null, "", path);
+    }
   }
 
   function toggleHidden(team: string) {
@@ -224,6 +231,7 @@ export function AnalyticsDashboard({
       </div>
 
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 pt-3">
+      <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
           当前赛事还没有可分析的队伍记录。请确认 cyber-scout 已上传普通/超级侦察记录。
@@ -359,6 +367,7 @@ export function AnalyticsDashboard({
           onClose={() => setLightbox(null)}
         />
       ) : null}
+      </Suspense>
       </div>
     </div>
   );

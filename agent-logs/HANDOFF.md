@@ -370,3 +370,42 @@
 - 真实浏览器确认登录页 Demo 入口、`v1.0.15`、公开 Demo 安全降级状态和 390px 移动端无横向溢出；页面未显示 Apollo/FIT 名称，控制台无错误。
 
 **风险 / 待办**：本机未配置生产 Cyber Scout Supabase 与 TBA 密钥，Scouting Lead 和设置的真实数据态需在部署环境复核；本地仅能浏览安全降级状态。
+
+---
+
+## 2026-07-17 · 项目清理与加载性能优化
+
+**当前状态**：删除重复认证链，复用服务端赛程数据，并将非当前页签组件和数据改为按需加载，版本升级为 `1.0.16`。
+
+**本轮完成**：
+- 删除未再使用的 `useAuth` hook 和 `/api/auth/me` 路由；受保护页面直接使用 `_app` loader 已验证的用户，避免 hydration 后重复认证请求。
+- `getStrategyDatasetForRequest` 返回已加载的 TBA 赛程；首页、Proposal 和 Scouting Lead 复用该结果，不再重复请求同一赛事。
+- 首页不再把原始 TBA matches 作为未使用字段发送到浏览器；Proposal 与 Scouting Lead 数据只在对应页签首次打开时查询。
+- Match Analysis、Strategy Proposal、Scouting Lead 和设置组件改为 React 原生按需加载。
+- Chart.js 从 `auto` 全量注册改为仅注册实际使用的 bar、line、radar 相关模块，并复用同一个加载 Promise。
+- 同步更新包版本、应用页脚、登录页页脚和 Demo 页脚至 `1.0.16`。
+
+**验证**：
+- `pnpm typecheck`、`pnpm lint`、66 项测试和生产构建通过。
+- Dashboard 客户端包由 115.09 kB / gzip 30.44 kB 降至约 49 kB / gzip 13.7 kB；Chart.js 由 gzip 69.31 kB 降至 62.51 kB；服务端主包由 374.80 kB 降至 331.39 kB。
+- 真实浏览器确认 `v1.0.16`、Demo 入口、深浅色切换和 390px 登录/Demo 布局正常，无横向溢出或控制台错误。
+
+**风险 / 待办**：本机未配置生产数据源，真实数据页签的请求时序和图表渲染仍需在部署环境复核；React Router 8 future flag 与 Vite `envFile` 警告为既有升级提示，本轮未处理。
+
+---
+
+## 2026-07-18 · 修复 Demo 登录返回路径
+
+**当前状态**：Demo 顶部“登录”完成飞书授权后进入正式首页，不再返回固定游客身份的 `/demo`，版本升级为 `1.0.17`。
+
+**本轮完成**：
+- Demo 登录的 OAuth `returnTo` 由当前 `/demo` 改为正式首页 `/`。
+- 删除 Demo 路由不再使用的 `useLocation` 状态。
+- 同步更新包版本、应用页脚、登录页页脚和 Demo 页脚至 `1.0.17`。
+
+**验证**：
+- `pnpm typecheck`、`pnpm lint`、66 项测试和生产构建通过。
+- 源码与构建产物确认 Demo 登录目标为正式首页 `/`。
+- 真实浏览器确认登录入口、`v1.0.17`、390px 布局正常，无横向溢出或控制台错误。
+
+**风险 / 待办**：本机无法代替真实飞书账号完成生产 OAuth 授权，最终账号登录仍需部署环境复核。

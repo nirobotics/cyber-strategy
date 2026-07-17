@@ -24,6 +24,7 @@ type CyberScoutLoadResult = {
 export type StrategyDatasetResult = {
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
+  matches: TbaMatch[];
   selectedEventKey: string | null;
   sourceStatus: DatasetSourceStatus;
 };
@@ -146,16 +147,20 @@ export async function getStrategyDatasetForRequest(
     return {
       dataset: scout.dataset,
       events: scout.events,
+      matches: scout.matches,
       selectedEventKey: scout.dataset.eventKey,
       sourceStatus: scout.status,
     };
   }
 
   const fallback = await getActiveDataset();
+  const selectedEventKey = requestedEventKey ?? fallback.eventKey;
+  const matches = selectedEventKey ? await fetchTbaMatches(selectedEventKey).catch(() => []) : [];
   return {
     dataset: fallback,
     events: scout.events,
-    selectedEventKey: requestedEventKey ?? fallback.eventKey,
+    matches,
+    selectedEventKey,
     sourceStatus: {
       source: "fallback",
       label: "备用数据",
@@ -247,7 +252,7 @@ export async function loadScoutConfidenceForRequest(request: Request): Promise<S
 
 export async function loadScoutConfidenceReport(
   eventKey: string | null,
-  opts: { includedMatchTypes?: DataRange[] } = {},
+  opts: { includedMatchTypes?: DataRange[]; tbaMatches?: TbaMatch[] } = {},
 ): Promise<ScoutConfidenceResult> {
   const db = getCyberScoutClient();
   if (!db) {
@@ -285,12 +290,14 @@ export async function loadScoutConfidenceReport(
       fetchScoutUsers(db),
       fetchScoutEventConfig(db),
     ]);
-    let tbaMatches: TbaMatch[] = [];
+    let tbaMatches = opts.tbaMatches ?? [];
     let tbaError: string | null = null;
-    try {
-      tbaMatches = await fetchTbaMatches(event.tba_event_key);
-    } catch (error) {
-      tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
+    if (!opts.tbaMatches) {
+      try {
+        tbaMatches = await fetchTbaMatches(event.tba_event_key);
+      } catch (error) {
+        tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
+      }
     }
     const includedTypes = new Set(opts.includedMatchTypes ?? DEFAULT_DATA_RANGE);
     const confidenceRecords = records.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));

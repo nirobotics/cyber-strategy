@@ -14,7 +14,6 @@ import {
   restoreApprovedStrategyProposal,
   saveStrategyProposal,
 } from "../lib/strategy-proposals.server";
-import { fetchTbaMatches } from "../lib/tba.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = requireUser(request, { redirectToLogin: true });
@@ -22,13 +21,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   let proposalError: string | null = null;
-  const [admin, proposals, tbaMatches] = await Promise.all([
+  const [admin, proposals] = await Promise.all([
     isAdmin(user.feishuOpenId),
     listStrategyProposals(selectedEventKey).catch((error) => {
       proposalError = error instanceof Error ? error.message : "Strategy Proposal 数据表不可用。";
       return [];
     }),
-    fetchTbaMatches(selectedEventKey).catch(() => []),
   ]);
 
   return {
@@ -38,7 +36,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     user,
     proposals,
     proposalError,
-    matches: toProposalMatches(tbaMatches as CombinedMatch[]),
+    matches: toProposalMatches(data.matches as CombinedMatch[]),
   };
 }
 
