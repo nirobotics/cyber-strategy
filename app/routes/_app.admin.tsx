@@ -1,15 +1,14 @@
 import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/_app.admin";
-import { Badge, Button, Card, Input } from "../components/ui";
+import { Badge, Button, Card } from "../components/ui";
+import { StrategySettingsPanel } from "../components/strategy-settings-panel";
 import { requireAdmin } from "../lib/auth.server";
-import { DATA_RANGE_OPTIONS, DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
+import { DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
 import { activateDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
 import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
-  RANKED_TIER_ORDER,
   parseTierPercentages,
-  tierDisplayLabel,
   validateTierPercentages,
 } from "../lib/tier-settings";
 
@@ -91,94 +90,7 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
         <Card className="border-danger/40 bg-danger/10 p-3 text-danger">{actionData.error}</Card>
       ) : null}
 
-      <Card className="p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="section-label">分档比例</p>
-            <h2 className="text-lg font-semibold">综合均分排名</h2>
-            <p className="mt-1 text-sm text-ink-dim">综合分为 0 的队伍固定为待观察，不参与比例分档。</p>
-          </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">
-            合计 {RANKED_TIER_ORDER.reduce((sum, label) => sum + loaderData.tierPercentages[label], 0)}%
-          </Badge>
-        </div>
-        <Form method="post" className="grid gap-3">
-          <input type="hidden" name="intent" value="save-tier-percentages" />
-          <div className="grid gap-2 sm:grid-cols-4">
-            {RANKED_TIER_ORDER.map((label) => (
-              <label key={label} className="grid gap-1 text-sm">
-                <span className="font-medium text-ink-dim">{tierDisplayLabel(label)}</span>
-                <div className="flex items-center gap-1">
-                  <Input
-                    name={`tier_${label}`}
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    defaultValue={loaderData.tierPercentages[label]}
-                    className="h-10"
-                  />
-                  <span className="text-sm text-ink-faint">%</span>
-                </div>
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" disabled={busy}>
-              保存比例
-            </Button>
-          </div>
-        </Form>
-        <Form method="post" className="mt-2">
-          <input type="hidden" name="intent" value="reset-tier-percentages" />
-          <Button type="submit" disabled={busy}>
-            恢复默认
-          </Button>
-        </Form>
-      </Card>
-
-      <Card className="p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="section-label">数据范围</p>
-            <h2 className="text-lg font-semibold">参与计算的比赛类型</h2>
-          </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">
-            {loaderData.dataRange.length} / {DATA_RANGE_OPTIONS.length}
-          </Badge>
-        </div>
-        <Form method="post" className="grid gap-3">
-          <input type="hidden" name="intent" value="save-data-range" />
-          <div className="grid gap-2 sm:grid-cols-3">
-            {DATA_RANGE_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className="flex items-center gap-2 rounded-md border border-line bg-surface-2 px-3 py-2 text-sm font-medium text-ink-dim"
-              >
-                <input
-                  name="dataRange"
-                  type="checkbox"
-                  value={option.value}
-                  defaultChecked={loaderData.dataRange.includes(option.value)}
-                  className="size-4 accent-[var(--accent)]"
-                />
-                {option.label}
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="primary" disabled={busy}>
-              保存范围
-            </Button>
-          </div>
-        </Form>
-        <Form method="post" className="mt-2">
-          <input type="hidden" name="intent" value="reset-data-range" />
-          <Button type="submit" disabled={busy}>
-            恢复默认
-          </Button>
-        </Form>
-      </Card>
+      <StrategySettingsPanel tierPercentages={loaderData.tierPercentages} dataRange={loaderData.dataRange} busy={busy} />
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-line p-3">

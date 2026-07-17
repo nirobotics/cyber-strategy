@@ -38,9 +38,13 @@ const scoutPositions = ["R1", "R2", "R3", "B1", "B2", "B3"] as const;
 export function ScoutingLeadPanel({
   data,
   embedded = false,
+  readOnly = false,
+  routeBase = "/",
 }: {
   data: ScoutingLeadPanelData;
   embedded?: boolean;
+  readOnly?: boolean;
+  routeBase?: string;
 }) {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -50,16 +54,17 @@ export function ScoutingLeadPanel({
   const busy = navigation.state !== "idle";
 
   function selectEvent(eventKey: string) {
+    if (readOnly) return;
     const params = new URLSearchParams(searchParams);
     if (eventKey) params.set("event", eventKey);
     else params.delete("event");
     if (embedded) params.set("tab", "lead");
-    navigate(`${embedded ? "/" : "/scouting-lead"}?${params.toString()}`);
+    navigate(`${embedded ? routeBase : "/scouting-lead"}?${params.toString()}`);
   }
 
   function selectView(next: LeadView) {
     setView(next);
-    replaceLeadViewUrl(searchParams, next, embedded);
+    replaceLeadViewUrl(searchParams, next, embedded, routeBase);
   }
 
   return (
@@ -80,7 +85,7 @@ export function ScoutingLeadPanel({
             value={selectedEventKey ?? ""}
             onChange={(event) => selectEvent(event.target.value)}
             className="input h-9 min-w-[180px] font-sans"
-            disabled={!events.length}
+            disabled={readOnly || !events.length}
             title="选择 cyber-scout 赛事"
           >
             {!events.some((event) => event.eventKey === selectedEventKey) ? (
@@ -106,7 +111,7 @@ export function ScoutingLeadPanel({
       </div>
 
       {view === "confidence" ? <ConfidenceView report={report} /> : null}
-      {view === "records" ? <RecordsView eventKey={selectedEventKey} schedule={leadData.recordSchedule} busy={busy} /> : null}
+      {view === "records" ? <RecordsView eventKey={selectedEventKey} schedule={leadData.recordSchedule} busy={busy} readOnly={readOnly} /> : null}
       {view === "assignments" ? (
         <AssignmentsView
           eventKey={selectedEventKey}
@@ -115,6 +120,7 @@ export function ScoutingLeadPanel({
           configEventKey={leadData.configEventKey}
           configSavedAt={leadData.configSavedAt}
           busy={busy}
+          readOnly={readOnly}
         />
       ) : null}
     </div>
@@ -164,10 +170,12 @@ function RecordsView({
   eventKey,
   schedule,
   busy,
+  readOnly,
 }: {
   eventKey: string | null;
   schedule: ScoutingLeadPanelData["leadData"]["recordSchedule"];
   busy: boolean;
+  readOnly: boolean;
 }) {
   const [selected, setSelected] = useState<{ matchNumber: number; cell: ScoutScheduleCell } | null>(null);
 
@@ -211,7 +219,7 @@ function RecordsView({
         )}
       </Card>
 
-      {selected ? <RecordModal eventKey={eventKey} selected={selected} busy={busy} onClose={() => setSelected(null)} /> : null}
+      {selected ? <RecordModal eventKey={eventKey} selected={selected} busy={busy} readOnly={readOnly} onClose={() => setSelected(null)} /> : null}
     </>
   );
 }
@@ -253,11 +261,13 @@ function RecordModal({
   eventKey,
   selected,
   busy,
+  readOnly,
   onClose,
 }: {
   eventKey: string | null;
   selected: { matchNumber: number; cell: ScoutScheduleCell };
   busy: boolean;
+  readOnly: boolean;
   onClose: () => void;
 }) {
   const recordFetcher = useFetcher<ScoutingLeadActionData>();
@@ -297,7 +307,7 @@ function RecordModal({
                     上传 {formatDate(record.uploadedAt)} · 本地创建 {formatDate(record.clientCreatedAt)}
                   </p>
                 </div>
-                <recordFetcher.Form method="post" action="/scouting-lead">
+                {!readOnly ? <recordFetcher.Form method="post" action="/scouting-lead">
                   <input type="hidden" name="intent" value="delete-record" />
                   <input type="hidden" name="event" value={eventKey ?? ""} />
                   <input type="hidden" name="view" value="records" />
@@ -313,7 +323,7 @@ function RecordModal({
                     <Trash2 className="size-4" />
                     删除
                   </Button>
-                </recordFetcher.Form>
+                </recordFetcher.Form> : null}
               </div>
             </div>
           )) : (
@@ -332,6 +342,7 @@ function AssignmentsView({
   configEventKey,
   configSavedAt,
   busy,
+  readOnly,
 }: {
   eventKey: string | null;
   assignments: ScoutLeadAssignment[];
@@ -339,10 +350,11 @@ function AssignmentsView({
   configEventKey: string | null;
   configSavedAt: string | null;
   busy: boolean;
+  readOnly: boolean;
 }) {
   return (
     <div className="grid gap-3">
-      <Card className="p-4">
+      {!readOnly ? <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="section-label">人员分配</p>
@@ -353,7 +365,7 @@ function AssignmentsView({
           </Badge>
         </div>
         <AssignmentForm eventKey={eventKey} users={users} busy={busy} />
-      </Card>
+      </Card> : null}
 
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
@@ -369,13 +381,29 @@ function AssignmentsView({
           <div className="divide-y divide-line">
             {assignments.map((assignment) => (
               <div key={assignment.id} className="grid gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <AssignmentForm eventKey={eventKey} assignment={assignment} users={users} busy={busy} compact />
-                <AssignmentDeleteForm eventKey={eventKey} assignmentId={assignment.id} busy={busy} />
+                {readOnly ? (
+                  <AssignmentSummary assignment={assignment} />
+                ) : (
+                  <>
+                    <AssignmentForm eventKey={eventKey} assignment={assignment} users={users} busy={busy} compact />
+                    <AssignmentDeleteForm eventKey={eventKey} assignmentId={assignment.id} busy={busy} />
+                  </>
+                )}
               </div>
             ))}
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+function AssignmentSummary({ assignment }: { assignment: ScoutLeadAssignment }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm">
+      <Badge className="border-brand/40 bg-brand/10 text-brand">Q{assignment.startMatch}–Q{assignment.endMatch}</Badge>
+      <Badge className="border-line bg-surface-2 text-ink-dim">{assignment.position}</Badge>
+      <span className="font-semibold text-ink">{assignment.userName}</span>
     </div>
   );
 }
@@ -633,11 +661,11 @@ function viewTitle(view: LeadView) {
   return "信心分排行";
 }
 
-function replaceLeadViewUrl(searchParams: URLSearchParams, view: LeadView, embedded: boolean) {
+function replaceLeadViewUrl(searchParams: URLSearchParams, view: LeadView, embedded: boolean, routeBase: string) {
   const params = new URLSearchParams(searchParams);
   params.set("view", view);
   if (embedded) params.set("tab", "lead");
-  window.history.replaceState(null, "", `${embedded ? "/" : "/scouting-lead"}?${params.toString()}`);
+  window.history.replaceState(null, "", `${embedded ? routeBase : "/scouting-lead"}?${params.toString()}`);
 }
 
 function formatDate(value: string | null) {

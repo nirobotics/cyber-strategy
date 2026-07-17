@@ -4,7 +4,7 @@ import type { Route } from "./+types/demo";
 import { AnalyticsDashboard } from "../components/analytics-dashboard";
 import { AppShell } from "../components/app-shell";
 import { Card } from "../components/ui";
-import { loadCyberScoutDataset } from "../lib/cyber-scout.server";
+import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
 import { startFeishuLogin } from "../lib/feishu";
 import { mergeMatches } from "../lib/match-analysis";
@@ -19,13 +19,16 @@ const DEMO_USER = {
 };
 
 export async function loader() {
-  const source = await loadCyberScoutDataset(DEMO_EVENT_KEY);
+  const [source, scoutingLead] = await Promise.all([
+    loadCyberScoutDataset(DEMO_EVENT_KEY),
+    loadScoutConfidenceReport(DEMO_EVENT_KEY),
+  ]);
 
   if (!source.dataset) return { demo: null, error: "Demo 数据源暂不可用。" };
 
   try {
     return {
-      demo: buildDemoData(source.dataset, mergeMatches([], source.matches)),
+      demo: buildDemoData(source.dataset, mergeMatches([], source.matches), scoutingLead),
       error: null,
     };
   } catch (error) {
@@ -40,8 +43,8 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
   return (
     <AppShell
       appName="Cyber Strategy"
-      appSubtitle="Apollo Demo"
-      version="1.0.14"
+      appSubtitle="Demo"
+      version="1.0.15"
       user={null}
       authLoading={false}
       allowGuest
@@ -53,14 +56,14 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
       {loaderData.demo ? (
         <AnalyticsDashboard
           dataset={loaderData.demo.dataset}
-          events={[{ eventKey: DEMO_EVENT_KEY, name: `${DEMO_EVENT_NAME} · Demo`, isActive: true, updatedAt: loaderData.demo.dataset.updatedAt }]}
+          events={[{ eventKey: DEMO_EVENT_KEY, name: DEMO_EVENT_NAME, isActive: true, updatedAt: loaderData.demo.dataset.updatedAt }]}
           selectedEventKey={DEMO_EVENT_KEY}
           isAdmin={false}
           tierPercentages={DEFAULT_TIER_PERCENTAGES}
           user={DEMO_USER}
           strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS) }}
-          scoutingLead={null}
-          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo" }}
+          scoutingLead={loaderData.demo.scoutingLead}
+          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"] }}
         />
       ) : (
         <Card className="mx-auto max-w-2xl p-6 text-sm text-ink-dim">{loaderData.error}</Card>

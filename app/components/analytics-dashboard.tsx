@@ -26,6 +26,7 @@ import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import { MatchAnalysis } from "./match-analysis";
 import { ScoutingLeadPanel, type ScoutingLeadPanelData } from "./scouting-lead-panel";
+import { StrategySettingsPanel } from "./strategy-settings-panel";
 import { StrategyProposalPanel, type StrategyProposalPanelData } from "./strategy-proposal-panel";
 import type { SessionUser } from "../lib/auth-types";
 import {
@@ -50,8 +51,9 @@ import {
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
 import type { CombinedMatch } from "../lib/match-analysis";
+import type { DataRange } from "../lib/data-range";
 
-type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead";
+type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
 const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
@@ -76,7 +78,7 @@ export function AnalyticsDashboard({
   user: SessionUser;
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches">;
   scoutingLead: ScoutingLeadPanelData | null;
-  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string };
+  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[] };
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -101,10 +103,11 @@ export function AnalyticsDashboard({
   const photos = selected ? dataset.teamPhotos[selected.team] ?? [] : [];
   const detail = detailTeam ? analysisTeamData[detailTeam] : null;
   const detailOriginal = detailTeam ? dataset.teamData[detailTeam] : null;
-  const activeTab = tab === "lead" && !isAdmin ? "browser" : tab;
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
   const demoMode = Boolean(demo);
   const routeBase = demo?.routeBase ?? "/";
+  const canViewLead = isAdmin || demoMode;
+  const activeTab = (tab === "lead" || tab === "settings") && !canViewLead ? "browser" : tab;
 
   useEffect(() => {
     if (demoMode) return;
@@ -180,15 +183,21 @@ export function AnalyticsDashboard({
             <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
               Strategy Proposal
             </SegmentedTab>
-            {isAdmin ? (
+            {canViewLead ? (
               <>
                 <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
                   Scouting Lead
                 </SegmentedTab>
-                <NavLink to="/admin" className={dashboardNavItemClass()}>
-                  <Settings className="size-4" />
-                  管理
-                </NavLink>
+                {isAdmin ? (
+                  <NavLink to="/admin" className={dashboardNavItemClass()}>
+                    <Settings className="size-4" />
+                    管理
+                  </NavLink>
+                ) : (
+                  <SegmentedTab active={tab} value="settings" onClick={selectTab} icon={<Settings className="size-4" />}>
+                    设置
+                  </SegmentedTab>
+                )}
               </>
             ) : null}
           </nav>
@@ -322,7 +331,10 @@ export function AnalyticsDashboard({
           routeBase={routeBase}
         />
       ) : null}
-      {activeTab === "lead" && scoutingLead ? <ScoutingLeadPanel data={scoutingLead} embedded /> : null}
+      {activeTab === "lead" && scoutingLead ? <ScoutingLeadPanel data={scoutingLead} embedded readOnly={demoMode} routeBase={routeBase} /> : null}
+      {activeTab === "settings" && demo ? (
+        <StrategySettingsPanel tierPercentages={tierPercentages} dataRange={demo.dataRange} readOnly />
+      ) : null}
 
       {detail ? (
         <TeamDetailModal
@@ -353,7 +365,7 @@ export function AnalyticsDashboard({
 }
 
 function readDashboardTab(value: string | null): Tab {
-  return value === "compare" || value === "match" || value === "picklist" || value === "proposal" || value === "lead" ? value : "browser";
+  return value === "compare" || value === "match" || value === "picklist" || value === "proposal" || value === "lead" || value === "settings" ? value : "browser";
 }
 
 function TeamDetail({
