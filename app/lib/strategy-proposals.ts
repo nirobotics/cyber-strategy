@@ -223,7 +223,7 @@ export function canRestoreApprovedSnapshot(
 }
 
 export function proposalMatchesSnapshot(
-  proposal: Pick<StrategyProposal, "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "ownTeam" | "proposalType" | "payload">,
+  proposal: Pick<StrategyProposal, "lastApprovedSnapshot" | "matchKey" | "matchLabel" | "proposalType" | "payload"> & { ownTeam: string },
 ) {
   const snapshot = proposal.lastApprovedSnapshot;
   if (!snapshot) return false;

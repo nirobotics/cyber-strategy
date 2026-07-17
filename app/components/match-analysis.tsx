@@ -34,11 +34,22 @@ type MatchVideoLink = {
   url: string;
 };
 
-export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamData: TeamData }) {
+export function MatchAnalysis({
+  eventKey,
+  teamData,
+  initialMatches,
+}: {
+  eventKey: string;
+  teamData: TeamData;
+  initialMatches?: CombinedMatch[];
+}) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
-  const [state, setState] = useState<LoadState>({ status: "idle" });
+  const [state, setState] = useState<LoadState>(() => initialMatches
+    ? { status: "ready", matches: initialMatches, teamEvents: [] }
+    : { status: "idle" });
 
   useEffect(() => {
+    if (initialMatches) return;
     let alive = true;
     queueMicrotask(() => {
       if (!alive) return;
@@ -81,7 +92,7 @@ export function MatchAnalysis({ eventKey, teamData }: { eventKey: string; teamDa
     return () => {
       alive = false;
     };
-  }, [eventKey]);
+  }, [eventKey, initialMatches]);
 
   const selectedMatch = state.status === "ready" && selectedMatchKey
     ? state.matches.find((match) => matchIdentity(match) === selectedMatchKey) ?? null

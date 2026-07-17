@@ -16,6 +16,7 @@ import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 type CyberScoutLoadResult = {
   dataset: ScoutingDataset | null;
   events: ScoutingEventOption[];
+  matches: TbaMatch[];
   selectedEventKey: string | null;
   status: DatasetSourceStatus;
 };
@@ -183,6 +184,7 @@ export async function loadCyberScoutDataset(
       return {
         dataset: null,
         events,
+        matches: [],
         selectedEventKey: eventKey,
         status: {
           source: "fallback",
@@ -210,6 +212,7 @@ export async function loadCyberScoutDataset(
     return {
       dataset,
       events,
+      matches: tbaMatches,
       selectedEventKey: event.tba_event_key,
       status: {
         source: "cyber-scout",
@@ -223,6 +226,7 @@ export async function loadCyberScoutDataset(
     return {
       dataset: null,
       events,
+      matches: [],
       selectedEventKey: eventKey,
       status: {
         source: "fallback",
@@ -419,6 +423,7 @@ function unavailable(eventKey: string | null, message: string): CyberScoutLoadRe
   return {
     dataset: null,
     events: [],
+    matches: [],
     selectedEventKey: eventKey,
     status: {
       source: "fallback",

@@ -1,4 +1,4 @@
-import { Form, redirect, useSearchParams } from "react-router";
+import { Form, Link, redirect, useSearchParams } from "react-router";
 import { Route as StrategyIcon } from "lucide-react";
 import type { Route } from "./+types/auth.login";
 import { AppFooter } from "../components/app-footer";
@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   return (
     <>
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+      <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
         <div className="fixed right-4 top-4 sm:right-6 sm:top-6">
           <ThemeToggle />
         </div>
@@ -50,8 +50,14 @@ export default function LoginPage() {
             飞书登录
           </button>
         </Form>
+        <Link
+          to="/demo"
+          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-base font-medium text-[var(--foreground)] transition hover:bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--background)]"
+        >
+          进入 Demo
+        </Link>
       </main>
-      <AppFooter version="1.0.13" />
+      <AppFooter version="1.0.14" />
     </>
   );
 }

@@ -49,6 +49,7 @@ import {
 } from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
+import type { CombinedMatch } from "../lib/match-analysis";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead";
 
@@ -65,6 +66,7 @@ export function AnalyticsDashboard({
   user,
   strategyProposal,
   scoutingLead,
+  demo,
 }: {
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
@@ -74,6 +76,7 @@ export function AnalyticsDashboard({
   user: SessionUser;
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches">;
   scoutingLead: ScoutingLeadPanelData | null;
+  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string };
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -100,8 +103,11 @@ export function AnalyticsDashboard({
   const detailOriginal = detailTeam ? dataset.teamData[detailTeam] : null;
   const activeTab = tab === "lead" && !isAdmin ? "browser" : tab;
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
+  const demoMode = Boolean(demo);
+  const routeBase = demo?.routeBase ?? "/";
 
   useEffect(() => {
+    if (demoMode) return;
     const params = new URLSearchParams(window.location.search);
     const eventFromUrl = params.get("event")?.trim();
     if (eventFromUrl) {
@@ -118,10 +124,11 @@ export function AnalyticsDashboard({
     }
 
     params.set("event", storedEvent);
-    navigate(`/?${params.toString()}`, { replace: true });
-  }, [events, navigate]);
+    navigate(`${routeBase}?${params.toString()}`, { replace: true });
+  }, [demoMode, events, navigate, routeBase]);
 
   function selectEvent(eventKey: string) {
+    if (demoMode) return;
     const params = new URLSearchParams(window.location.search);
     if (eventKey) {
       storeSelectedEvent(eventKey);
@@ -131,7 +138,7 @@ export function AnalyticsDashboard({
       params.delete("event");
     }
     const search = params.toString();
-    navigate(search ? `/?${search}` : "/");
+    navigate(search ? `${routeBase}?${search}` : routeBase);
   }
 
   function selectTab(next: Tab) {
@@ -142,7 +149,7 @@ export function AnalyticsDashboard({
     if (next !== "proposal") params.delete("proposal");
     if (next !== "lead") params.delete("view");
     const search = params.toString();
-    window.history.replaceState(null, "", search ? `/?${search}` : "/");
+    window.history.replaceState(null, "", search ? `${routeBase}?${search}` : routeBase);
   }
 
   function toggleHidden(team: string) {
@@ -191,7 +198,7 @@ export function AnalyticsDashboard({
               value={selectedEventKey ?? dataset.eventKey}
               onChange={(event) => selectEvent(event.target.value)}
               className="input h-9 max-w-full font-sans sm:w-fit sm:[field-sizing:content]"
-              disabled={!events.length}
+              disabled={demoMode || !events.length}
               title="选择 cyber-scout 赛事"
             >
               {!events.some((event) => event.eventKey === (selectedEventKey ?? dataset.eventKey)) ? (
@@ -282,12 +289,13 @@ export function AnalyticsDashboard({
             ignoredMatchKeys={ignoredMatchSet}
             onToggleIgnoreMatch={toggleIgnoredMatch}
             onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
+            hideComments={demoMode}
           />
         </div>
       ) : null}
 
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={analysisTeamData} /> : null}
+      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={analysisTeamData} initialMatches={demo?.matches} /> : null}
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}
@@ -309,6 +317,9 @@ export function AnalyticsDashboard({
           }}
           initialSelectedId={searchParams.get("proposal")}
           embedded
+          demoMode={demoMode}
+          ownTeams={demo?.ownTeams}
+          routeBase={routeBase}
         />
       ) : null}
       {activeTab === "lead" && scoutingLead ? <ScoutingLeadPanel data={scoutingLead} embedded /> : null}
@@ -324,6 +335,7 @@ export function AnalyticsDashboard({
           onToggleIgnoreMatch={toggleIgnoredMatch}
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
+          hideComments={demoMode}
         />
       ) : null}
 
@@ -353,6 +365,7 @@ function TeamDetail({
   ignoredMatchKeys,
   onToggleIgnoreMatch,
   onOpenPhoto,
+  hideComments = false,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
@@ -362,6 +375,7 @@ function TeamDetail({
   ignoredMatchKeys?: Set<string>;
   onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
+  hideComments?: boolean;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
@@ -514,7 +528,7 @@ function TeamDetail({
                 <th className="px-3 py-2 text-left">Transfer</th>
                 <th className="px-3 py-2 text-left">命中率</th>
                 <th className="px-3 py-2 text-left">状态</th>
-                <th className="px-3 py-2 text-left">备注</th>
+                {!hideComments ? <th className="px-3 py-2 text-left">备注</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -552,10 +566,12 @@ function TeamDetail({
                     <td className="px-3 py-2">
                       <StatePill match={match} />
                     </td>
-                    <td className="max-w-md px-3 py-2 text-ink-dim">
-                      <p>{match.comment || "-"}</p>
-                      {match.scoutName ? <p className="mt-1 text-xs text-ink-faint">记录员：{match.scoutName}</p> : null}
-                    </td>
+                    {!hideComments ? (
+                      <td className="max-w-md px-3 py-2 text-ink-dim">
+                        <p>{match.comment || "-"}</p>
+                        {match.scoutName ? <p className="mt-1 text-xs text-ink-faint">记录员：{match.scoutName}</p> : null}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
@@ -907,6 +923,7 @@ export function TeamDetailModal({
   onToggleIgnoreMatch,
   onOpenPhoto,
   onClose,
+  hideComments = false,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
@@ -917,6 +934,7 @@ export function TeamDetailModal({
   onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
   onClose: () => void;
+  hideComments?: boolean;
 }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -951,6 +969,7 @@ export function TeamDetailModal({
             ignoredMatchKeys={ignoredMatchKeys}
             onToggleIgnoreMatch={onToggleIgnoreMatch}
             onOpenPhoto={onOpenPhoto}
+            hideComments={hideComments}
           />
         </div>
       </div>

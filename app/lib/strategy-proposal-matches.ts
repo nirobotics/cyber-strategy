@@ -3,7 +3,7 @@ import { ownStrategyTeams } from "./strategy-proposals";
 
 export type ProposalMatch = { key: string; label: string; redTeams: string[]; blueTeams: string[] };
 
-export function toProposalMatches(matches: CombinedMatch[]): ProposalMatch[] {
+export function toProposalMatches(matches: CombinedMatch[], ownTeams: readonly string[] = ownStrategyTeams): ProposalMatch[] {
   return sortedMatches(matches)
     .map((match) => ({
       key: matchIdentity(match),
@@ -11,7 +11,7 @@ export function toProposalMatches(matches: CombinedMatch[]): ProposalMatch[] {
       redTeams: matchTeams(match, "red"),
       blueTeams: matchTeams(match, "blue"),
     }))
-    .filter((match) => match.redTeams.length === 3 && match.blueTeams.length === 3 && matchHasOwnTeam(match));
+    .filter((match) => match.redTeams.length === 3 && match.blueTeams.length === 3 && matchHasOwnTeam(match, ownTeams));
 }
 
 export function proposalMatchesForTeam(matches: ProposalMatch[], team: string) {
@@ -36,6 +36,6 @@ export function proposalMatchMatchesTeamQuery(match: ProposalMatch, query: strin
   return [...match.redTeams, ...match.blueTeams].some((team) => team.includes(teamQuery));
 }
 
-function matchHasOwnTeam(match: ProposalMatch) {
-  return ownStrategyTeams.some((team) => proposalMatchIncludesTeam(match, team));
+function matchHasOwnTeam(match: ProposalMatch, ownTeams: readonly string[]) {
+  return ownTeams.some((team) => proposalMatchIncludesTeam(match, team));
 }

@@ -40,7 +40,6 @@ import {
   strategyShifts,
   type AutoProposalPayload,
   type AutoWinner,
-  type OwnStrategyTeam,
   type PartnerStrategyPayload,
   type RoutePoint,
   type RouteMap,
@@ -68,7 +67,7 @@ type TeamGroup = { label: string; tone: "red" | "blue" | "neutral"; teams: strin
 type EditorState = {
   id: string | null;
   proposalType: StrategyProposalType;
-  ownTeam: OwnStrategyTeam;
+  ownTeam: string;
   matchKey: string;
   payload: StrategyProposalPayload;
 };
@@ -77,10 +76,16 @@ export function StrategyProposalPanel({
   data,
   initialSelectedId,
   embedded = false,
+  demoMode = false,
+  ownTeams = ownStrategyTeams,
+  routeBase = "/",
 }: {
   data: StrategyProposalPanelData;
   initialSelectedId: string | null;
   embedded?: boolean;
+  demoMode?: boolean;
+  ownTeams?: readonly string[];
+  routeBase?: string;
 }) {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -95,7 +100,7 @@ export function StrategyProposalPanel({
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [printProposals, setPrintProposals] = useState<StrategyProposal[] | null>(null);
   const selected = data.proposals.find((proposal) => proposal.id === selectedId) ?? null;
-  const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset));
+  const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset, ownTeams));
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const editorMatches = proposalMatchesForTeam(data.matches, editor.ownTeam);
   const selectedMatch = proposalMatchForKeyOrFirst(editorMatches, editor.matchKey);
@@ -130,8 +135,8 @@ export function StrategyProposalPanel({
     if (proposalFetcher.data.deleted) {
       const timeout = window.setTimeout(() => {
         setSelectedId(null);
-        setEditor(initialEditorState(null, data.matches, data.dataset));
-        replaceProposalUrl(searchParams, null, embedded);
+        setEditor(initialEditorState(null, data.matches, data.dataset, ownTeams));
+        replaceProposalUrl(searchParams, null, embedded, routeBase);
       }, 0);
       return () => window.clearTimeout(timeout);
     }
@@ -140,10 +145,10 @@ export function StrategyProposalPanel({
     const timeout = window.setTimeout(() => {
       setSelectedId(proposalId);
       setEditor((current) => ({ ...current, id: proposalId }));
-      replaceProposalUrl(searchParams, proposalId, embedded);
+      replaceProposalUrl(searchParams, proposalId, embedded, routeBase);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, embedded]);
+  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, embedded, ownTeams, routeBase]);
 
   useEffect(() => {
     if (!printProposals?.length) return;
@@ -161,20 +166,20 @@ export function StrategyProposalPanel({
     params.set("event", eventKey);
     params.delete("proposal");
     if (embedded) params.set("tab", "proposal");
-    navigate(`${embedded ? "/" : "/strategy-proposal"}?${params.toString()}`);
+    navigate(`${embedded ? routeBase : "/strategy-proposal"}?${params.toString()}`);
   }
 
   function newProposal() {
     setSelectedId(null);
-    setEditor(initialEditorState(null, data.matches, data.dataset));
-    replaceProposalUrl(searchParams, null, embedded);
+    setEditor(initialEditorState(null, data.matches, data.dataset, ownTeams));
+    replaceProposalUrl(searchParams, null, embedded, routeBase);
   }
 
   function openProposal(id: string) {
     const proposal = data.proposals.find((item) => item.id === id) ?? null;
     setSelectedId(id);
-    setEditor(initialEditorState(proposal, data.matches, data.dataset));
-    replaceProposalUrl(searchParams, id, embedded);
+    setEditor(initialEditorState(proposal, data.matches, data.dataset, ownTeams));
+    replaceProposalUrl(searchParams, id, embedded, routeBase);
   }
 
   function updateType(type: StrategyProposalType) {
@@ -185,7 +190,7 @@ export function StrategyProposalPanel({
     }));
   }
 
-  function updateOwnTeam(ownTeam: OwnStrategyTeam) {
+  function updateOwnTeam(ownTeam: string) {
     setEditor((current) => {
       const currentMatch = data.matches.find((item) => item.key === current.matchKey) ?? null;
       const nextMatch = currentMatch && proposalMatchIncludesTeam(currentMatch, ownTeam)
@@ -348,7 +353,12 @@ export function StrategyProposalPanel({
             </div>
           ) : null}
 
-          <proposalFetcher.Form method="post" action="/strategy-proposal" className="grid gap-4 p-3 md:p-4">
+          <proposalFetcher.Form
+            method="post"
+            action="/strategy-proposal"
+            className="grid gap-4 p-3 md:p-4"
+            onSubmit={demoMode ? (event) => event.preventDefault() : undefined}
+          >
             <input type="hidden" name="id" value={editor.id ?? ""} />
             <input type="hidden" name="eventKey" value={data.selectedEventKey} />
             <input type="hidden" name="matchLabel" value={matchLabelValue} />
@@ -373,10 +383,10 @@ export function StrategyProposalPanel({
                   name="ownTeam"
                   value={editor.ownTeam}
                   disabled={!editable}
-                  onChange={(event) => updateOwnTeam(event.target.value as OwnStrategyTeam)}
+                  onChange={(event) => updateOwnTeam(event.target.value)}
                   className="input h-10 font-sans"
                 >
-                  {ownStrategyTeams.map((team) => <option key={team} value={team}>Team {team}</option>)}
+                  {ownTeams.map((team) => <option key={team} value={team}>Team {team}</option>)}
                 </select>
               </label>
               <label className="grid gap-1">
@@ -415,7 +425,7 @@ export function StrategyProposalPanel({
             />
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
-              {deletable ? (
+              {demoMode ? <span className="text-sm text-ink-dim">Demo 中的修改不会保存。</span> : deletable ? (
                 <Button
                   type="submit"
                   name="intent"
@@ -430,13 +440,13 @@ export function StrategyProposalPanel({
                   删除
                 </Button>
               ) : null}
-              {restorable ? (
+              {!demoMode && restorable ? (
                 <Button type="submit" name="intent" value="restore" disabled={busy}>
                   <Undo2 className="size-4" />
                   恢复到已通过版本
                 </Button>
               ) : null}
-              {editable ? (
+              {!demoMode && editable ? (
                 selected?.status === "approved" ? (
                   adminEditingApproved && approvedEditorChanged ? (
                     <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
@@ -463,9 +473,9 @@ export function StrategyProposalPanel({
                     </Button>
                   </>
                 )
-              ) : (
+              ) : !demoMode ? (
                 <span className="text-sm text-ink-dim">当前状态不可编辑。</span>
-              )}
+              ) : null}
             </div>
           </proposalFetcher.Form>
 
@@ -500,6 +510,7 @@ export function StrategyProposalPanel({
           pitInfo={data.dataset.teamPitData?.[teamDetail.team]}
           onOpenPhoto={(index) => setLightbox({ team: teamDetail.team, index })}
           onClose={() => setDetailTeam(null)}
+          hideComments={demoMode}
         />
       ) : null}
       {detailTeam && !teamDetail ? <MissingTeamDetailModal team={detailTeam} onClose={() => setDetailTeam(null)} /> : null}
@@ -533,7 +544,7 @@ function PayloadEditor({
   onChange,
 }: {
   proposalType: StrategyProposalType;
-  ownTeam: OwnStrategyTeam;
+  ownTeam: string;
   match: ProposalMatch | null;
   payload: StrategyProposalPayload;
   disabled: boolean;
@@ -1447,9 +1458,14 @@ function StatusBadge({ status }: { status: StrategyProposalStatus }) {
   );
 }
 
-function initialEditorState(proposal: StrategyProposal | null, matches: ProposalMatch[], dataset: ScoutingDataset): EditorState {
+function initialEditorState(
+  proposal: StrategyProposal | null,
+  matches: ProposalMatch[],
+  dataset: ScoutingDataset,
+  ownTeams: readonly string[],
+): EditorState {
   const proposalType = proposal?.proposalType ?? "auto";
-  const ownTeam = proposal?.ownTeam ?? "8214";
+  const ownTeam = proposal?.ownTeam ?? ownTeams[0] ?? ownStrategyTeams[0];
   const ownMatches = proposalMatchesForTeam(matches, ownTeam);
   const match = proposal ? proposalMatchForKeyOrFirst(ownMatches, proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
   const teams = match ? [...match.redTeams, ...match.blueTeams] : Object.keys(dataset.teamData).slice(0, 6);
@@ -1565,13 +1581,13 @@ function allianceGroups(match: ProposalMatch): TeamGroup[] {
   ];
 }
 
-function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, embedded: boolean) {
+function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, embedded: boolean, routeBase: string) {
   const params = new URLSearchParams(searchParams);
   if (id) params.set("proposal", id);
   else params.delete("proposal");
   if (embedded) params.set("tab", "proposal");
   const search = params.toString();
-  const path = embedded ? "/" : "/strategy-proposal";
+  const path = embedded ? routeBase : "/strategy-proposal";
   window.history.replaceState(null, "", search ? `${path}?${search}` : path);
 }
 
