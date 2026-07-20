@@ -273,27 +273,34 @@ describe("cyber-scout dataset conversion", () => {
     }]);
   });
 
-  it("does not use Super Scout scores when phase weights cannot allocate them", () => {
+  it("equally allocates Super Scout phase scores when all team weights are zero", () => {
     const dataset = buildCyberScoutDataset({
       event,
       records: [
         normal(8214, 1),
+        normal(6328, 1),
+        normal(157, 1),
         superRecord(1, {
-          teams: [8214],
-          auto: [0],
-          drive: [0],
-          defense: [0],
-          bps: [0],
-          accuracy: [0],
-          comments: [""],
-          autoScore: 10,
-          teleopScore: 20,
+          teams: [8214, 6328, 157],
+          auto: [0, 0, 0],
+          drive: [0, 0, 0],
+          defense: [0, 0, 0],
+          bps: [0, 0, 0],
+          accuracy: [0, 0, 0],
+          comments: ["", "", ""],
+          autoScore: 17,
+          teleopScore: 395,
         }),
       ],
     });
 
-    expect(dataset.teamData["8214"]).toBeUndefined();
-    expect(dataset.scoringIgnoredMatches).toBe(1);
+    const matches = ["8214", "6328", "157"].map((team) => dataset.teamData[team].matches[0]);
+    expect(matches.map((match) => match.autoPts)).toEqual([5.7, 5.7, 5.6]);
+    expect(matches.map((match) => match.telePts)).toEqual([131.7, 131.7, 131.6]);
+    expect(matches.reduce((sum, match) => sum + match.autoPts, 0)).toBe(17);
+    expect(matches.reduce((sum, match) => sum + match.telePts, 0)).toBe(395);
+    expect(dataset.scoringFallbackMatches).toBe(3);
+    expect(dataset.scoringIgnoredMatches).toBe(0);
   });
 
   it("does not score TBA matches from legacy top-level breakdown fields", () => {

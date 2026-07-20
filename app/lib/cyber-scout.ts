@@ -416,12 +416,16 @@ function buildSuperScoutTeamScores(
       const noShow = normal?.noShow ?? false;
       return {
         key,
+        noShow,
         autoWeight: noShow ? 0 : clamp(teamSuperRecord?.auto ?? 0, 0, 100),
         teleWeight: noShow ? 0 : predictedGamePieces(normal, teamSuperRecord),
       };
     });
-    const autoAllocations = allocateByWeight(superRecord.autoScore, rows.map((row) => row.autoWeight));
-    const teleAllocations = allocateByWeight(superRecord.teleopScore, rows.map((row) => row.teleWeight));
+    const activeWeights = rows.map((row) => row.noShow ? 0 : 1);
+    const autoWeights = rows.map((row) => row.autoWeight);
+    const teleWeights = rows.map((row) => row.teleWeight);
+    const autoAllocations = allocateByWeight(superRecord.autoScore, autoWeights.some((weight) => weight > 0) ? autoWeights : activeWeights);
+    const teleAllocations = allocateByWeight(superRecord.teleopScore, teleWeights.some((weight) => weight > 0) ? teleWeights : activeWeights);
 
     rows.forEach((row, index) => {
       const autoPts = autoAllocations[index];
@@ -496,9 +500,18 @@ function zoneKind(value: unknown): "alliance" | "transfer" | null {
 function allocateByWeight(total: number | null, weights: number[]) {
   if (total == null) return weights.map(() => null);
   if (total === 0) return weights.map(() => 0);
-  const sum = weights.reduce((value, weight) => value + Math.max(0, weight), 0);
+  const normalized = weights.map((weight) => Math.max(0, weight));
+  const sum = normalized.reduce((value, weight) => value + weight, 0);
   if (sum <= 0) return weights.map(() => null);
-  return weights.map((weight) => round1((total * Math.max(0, weight)) / sum));
+  const lastWeightedIndex = normalized.reduce((last, weight, index) => weight > 0 ? index : last, -1);
+  let remaining = round1(total);
+  return normalized.map((weight, index) => {
+    if (weight <= 0) return 0;
+    if (index === lastWeightedIndex) return remaining;
+    const allocated = round1((total * weight) / sum);
+    remaining = round1(remaining - allocated);
+    return allocated;
+  });
 }
 
 function tbaAutoPoints(breakdown: Record<string, unknown>) {
