@@ -8,6 +8,7 @@ import {
   type TeamPhotos,
 } from "./scouting";
 import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
+import type { MatchResult } from "./match-analysis";
 import type { TbaMatch } from "./tba.server";
 
 export type CyberScoutEventRow = {
@@ -157,6 +158,40 @@ export function buildCyberScoutDataset({
     scoringFallbackMatches,
     scoringIgnoredMatches,
   };
+}
+
+export function buildSuperScoutMatchResults(records: CyberScoutRecordRow[]): MatchResult[] {
+  const latestByAlliance = new Map<string, { result: MatchResult; alliance: "red" | "blue"; score: number; sourceAt: number }>();
+  for (const row of records) {
+    if (row.record_type !== "super_match") continue;
+    const payload = objectPayload(row.payload);
+    const autoScore = finiteOrNull(payload.autoScore ?? payload.asc);
+    const teleopScore = finiteOrNull(payload.teleopScore ?? payload.tsc);
+    const alliance = allianceValue(row.alliance ?? payload.alliance ?? payload.al);
+    const identity = resultMatchIdentity(row, payload);
+    if (autoScore == null || teleopScore == null || !alliance || !identity) continue;
+    const key = `${identity.comp_level}:${identity.set_number ?? 0}:${identity.match_number}:${alliance}`;
+    const sourceAt = rowTimestamp(row);
+    if ((latestByAlliance.get(key)?.sourceAt ?? -1) > sourceAt) continue;
+    latestByAlliance.set(key, {
+      result: { source: "super-scout", ...identity, alliances: {} },
+      alliance,
+      score: autoScore + teleopScore,
+      sourceAt,
+    });
+  }
+
+  const results = new Map<string, MatchResult>();
+  for (const { result, alliance, score } of latestByAlliance.values()) {
+    const key = `${result.comp_level}:${result.set_number ?? 0}:${result.match_number}`;
+    const current = results.get(key) ?? result;
+    current.alliances[alliance] = { score };
+    const red = current.alliances.red?.score;
+    const blue = current.alliances.blue?.score;
+    current.winning_alliance = red == null || blue == null ? undefined : red > blue ? "red" : blue > red ? "blue" : "tie";
+    results.set(key, current);
+  }
+  return [...results.values()];
 }
 
 export function isSafeCyberScoutPhotoPath(path: string): boolean {
@@ -538,6 +573,23 @@ function recordMatchType(row: CyberScoutRecordRow, payload: Record<string, unkno
 
 function recordTbaMatchKey(payload: Record<string, unknown>): string | null {
   return stringValue(payload.tbaMatchKey ?? payload.tba_match_key ?? payload.matchKey ?? payload.key) || null;
+}
+
+function resultMatchIdentity(row: CyberScoutRecordRow, payload: Record<string, unknown>) {
+  const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber ?? payload.mn);
+  if (!match) return null;
+  const type = stringValue(row.match_type ?? payload.matchType ?? payload.mt).toLowerCase();
+  if (["p", "pr", "practice", "practice_match"].includes(type)) return { comp_level: "practice", match_number: match };
+  if (type === "sf") return { comp_level: "sf", set_number: match, match_number: 1 };
+  if (["f", "final", "finals"].includes(type)) return { comp_level: "f", set_number: match, match_number: 1 };
+  return { comp_level: "qm", match_number: match };
+}
+
+function allianceValue(value: unknown): "red" | "blue" | null {
+  const alliance = stringValue(value).toLowerCase();
+  if (alliance === "red" || alliance === "r") return "red";
+  if (alliance === "blue" || alliance === "b") return "blue";
+  return null;
 }
 
 function objectPayload(value: unknown): Record<string, unknown> {

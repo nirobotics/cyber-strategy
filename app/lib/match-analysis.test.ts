@@ -3,6 +3,7 @@ import {
   buildTeamEventMap,
   enrichScheduledMatches,
   matchTeams,
+  mergeMatchResults,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -76,13 +77,16 @@ describe("match analysis calculations", () => {
     expect(probability).toMatchObject({ source: "statbotics", red: 0.72, blue: 0.28 });
   });
 
-  it("uses only TBA for actual match score", () => {
+  it("uses FRC Events for actual match score", () => {
     const match = schedule(["1", "2", "3"], ["4", "5", "6"], {
       pred: { red_score: 111, blue_score: 222 },
-      tba: {
+      result: {
+        source: "frc-events",
+        comp_level: "qm",
+        match_number: 1,
         alliances: {
-          red: { team_keys: ["frc1", "frc2", "frc3"], score: 123 },
-          blue: { team_keys: ["frc4", "frc5", "frc6"], score: 456 },
+          red: { score: 123 },
+          blue: { score: 456 },
         },
         winning_alliance: "blue",
       },
@@ -100,9 +104,53 @@ describe("match analysis calculations", () => {
       actualBlue: 456,
       displayRed: 123,
       displayBlue: 456,
-      source: "tba",
+      source: "frc-events",
       winner: "blue",
     });
+  });
+
+  it("uses Super Scout result when official result is missing", () => {
+    const match = schedule(["1", "2", "3"], ["4", "5", "6"], {
+      result: {
+        source: "super-scout",
+        comp_level: "qm",
+        match_number: 1,
+        alliances: { red: { score: 300 }, blue: { score: 250 } },
+      },
+    });
+
+    expect(resolveMatchScores({
+      match,
+      redTeams: ["1", "2", "3"],
+      blueTeams: ["4", "5", "6"],
+      teamData: {},
+    })).toMatchObject({ actualRed: 300, actualBlue: 250, source: "super-scout", winner: "red" });
+  });
+
+  it("shows a partial Super Scout result without fabricating a winner", () => {
+    const match = schedule(["1", "2", "3"], ["4", "5", "6"], {
+      result: {
+        source: "super-scout",
+        comp_level: "qm",
+        match_number: 1,
+        alliances: { red: { score: 500 } },
+      },
+    });
+
+    expect(resolveMatchScores({ match, redTeams: ["1", "2", "3"], blueTeams: ["4", "5", "6"], teamData: {} })).toMatchObject({
+      actualRed: 500,
+      actualBlue: null,
+      source: "super-scout",
+      label: "Super Scout 部分结果",
+      winner: null,
+    });
+  });
+
+  it("prefers FRC Events over Super Scout for the same match", () => {
+    const official = result("frc-events", 123, 98);
+    const fallback = result("super-scout", 500, 400);
+
+    expect(mergeMatchResults([official], [fallback])).toEqual([official]);
   });
 
   it("falls back to EPA for a team without Strategy data", () => {
@@ -178,8 +226,8 @@ describe("match analysis calculations", () => {
         { key: "2026test_qm2", pred: { red_win_prob: 0.9 } },
       ],
       [
-        { key: "2026test_qm1", alliances: { red: { score: 100 }, blue: { score: 90 } } },
-        { key: "2026test_qm3" },
+        result("frc-events", 100, 90),
+        { ...result("frc-events", 80, 70), match_number: 3 },
       ],
     );
 
@@ -187,7 +235,7 @@ describe("match analysis calculations", () => {
     expect(matches[0]).toMatchObject({
       key: "manual-qm1",
       pred: { red_win_prob: 0.7 },
-      tba: { alliances: { red: { score: 100 }, blue: { score: 90 } } },
+      result: { source: "frc-events", alliances: { red: { score: 100 }, blue: { score: 90 } } },
     });
     expect(matchTeams(matches[0], "red")).toEqual(["1", "2", "3"]);
   });
@@ -263,4 +311,13 @@ function cyberScoutMatch(id: string, matchType: string, matchNumber: number, tea
     matchNumber,
     teams: { R1: teams[0], R2: teams[1], R3: teams[2], B1: teams[3], B2: teams[4], B3: teams[5] },
   };
+}
+
+function result(source: "frc-events" | "super-scout", red: number, blue: number) {
+  return {
+    source,
+    comp_level: "qm",
+    match_number: 1,
+    alliances: { red: { score: red }, blue: { score: blue } },
+  } as const;
 }

@@ -42,7 +42,8 @@ Cyber Strategy 面向 Team 8214 的侦查分析、选队和比赛策略工作：
 - NI Corporate Vercel 项目
 - 飞书自建应用
 - Cyber Scout Supabase 只读访问凭据
-- TBA API key
+- FIRST FRC Events API username/token
+- TBA API key（队伍综合分分项）
 
 ## 给人看的使用方法
 

@@ -39,7 +39,20 @@ export type TbaMatch = {
   };
 };
 
+export type MatchResult = {
+  source: "frc-events" | "super-scout";
+  comp_level: string;
+  match_number: number;
+  set_number?: number;
+  winning_alliance?: "red" | "blue" | "tie";
+  alliances: {
+    red?: { score?: number };
+    blue?: { score?: number };
+  };
+};
+
 export type CombinedMatch = StatboticsMatch & {
+  result?: MatchResult;
   tba?: TbaMatch;
   videos?: Array<{ title: string; url: string }>;
 };
@@ -64,7 +77,7 @@ export type TeamEvent = {
   ties?: number;
 };
 
-export type MatchScoreSource = "tba" | "strategy" | "statbotics" | "none";
+export type MatchScoreSource = MatchResult["source"] | "strategy" | "statbotics" | "none";
 
 export type MatchScores = {
   actualRed: number | null;
@@ -111,15 +124,21 @@ export function toCyberScoutMatches(matches: unknown[], includedMatchTypes?: Dat
 export function enrichScheduledMatches(
   schedule: CombinedMatch[],
   statboticsMatches: StatboticsMatch[],
-  tbaMatches: TbaMatch[],
+  results: MatchResult[] = [],
 ): CombinedMatch[] {
   const statboticsByKey = indexMatches(statboticsMatches);
-  const tbaByKey = indexMatches(tbaMatches);
+  const resultsByKey = indexMatches(results);
   return schedule.map((match) => ({
     ...findIndexedMatch(statboticsByKey, match),
     ...match,
-    tba: findIndexedMatch(tbaByKey, match),
+    result: findIndexedMatch(resultsByKey, match) ?? match.result,
   }));
+}
+
+export function mergeMatchResults(primary: MatchResult[], fallback: MatchResult[]) {
+  const results = new Map(fallback.map((result) => [matchScheduleIdentity(result), result]));
+  for (const result of primary) results.set(matchScheduleIdentity(result), result);
+  return [...results.values()];
 }
 
 export function sortedMatches(matches: CombinedMatch[]): CombinedMatch[] {
@@ -179,7 +198,7 @@ export function resolveMatchScores({
   blueTeams: string[];
   teamData: TeamData;
 }): MatchScores {
-  const actual = tbaActualScore(match);
+  const actual = matchActualScore(match);
   const strategy = strategyPrediction(redTeams, blueTeams, teamData);
   const statbotics = statboticsPrediction(match);
   const predicted = strategy ?? statbotics;
@@ -190,10 +209,12 @@ export function resolveMatchScores({
       actualBlue: actual.blue,
       predictedRed: predicted?.red ?? null,
       predictedBlue: predicted?.blue ?? null,
-      displayRed: actual.red,
-      displayBlue: actual.blue,
-      source: "tba",
-      label: "已完成",
+      displayRed: actual.red ?? predicted?.red ?? null,
+      displayBlue: actual.blue ?? predicted?.blue ?? null,
+      source: actual.source,
+      label: actual.source === "frc-events"
+        ? "FRC Events 结果"
+        : actual.red != null && actual.blue != null ? "Super Scout 结果" : "Super Scout 部分结果",
       winner: actual.winner,
     };
   }
@@ -434,7 +455,7 @@ function findIndexedMatch<T extends StatboticsMatch>(index: Map<string, T>, matc
   return index.get(matchIdentity(match)) ?? index.get(matchScheduleIdentity(match));
 }
 
-function matchScheduleIdentity(match: Pick<StatboticsMatch, "key" | "comp_level" | "set_number" | "match_number">) {
+export function matchScheduleIdentity(match: Pick<StatboticsMatch, "key" | "comp_level" | "set_number" | "match_number">) {
   const suffix = match.key?.split("_").at(-1) ?? "";
   const qualification = /^qm(\d+)$/.exec(suffix);
   const playoff = /^(ef|qf|sf|f)(\d+)m(\d+)$/.exec(suffix);
@@ -444,14 +465,21 @@ function matchScheduleIdentity(match: Pick<StatboticsMatch, "key" | "comp_level"
   return `${level}-${setNumber}-${matchNumber}`;
 }
 
-function tbaActualScore(match: CombinedMatch): { red: number; blue: number; winner: "red" | "blue" | "tie" } | null {
-  const red = match.tba?.alliances?.red?.score ?? null;
-  const blue = match.tba?.alliances?.blue?.score ?? null;
-  if (red == null || blue == null || red < 0 || blue < 0) return null;
-  const winner = match.tba?.winning_alliance === "red" || match.tba?.winning_alliance === "blue" || match.tba?.winning_alliance === "tie"
-    ? match.tba.winning_alliance
-    : red > blue ? "red" : blue > red ? "blue" : "tie";
-  return { red, blue, winner };
+function matchActualScore(match: CombinedMatch): {
+  red: number | null;
+  blue: number | null;
+  winner: "red" | "blue" | "tie" | null;
+  source: MatchResult["source"];
+} | null {
+  const source = match.result?.source;
+  if (!source) return null;
+  const red = nonNegativeOrNull(match.result?.alliances.red?.score);
+  const blue = nonNegativeOrNull(match.result?.alliances.blue?.score);
+  if (red == null && blue == null) return null;
+  const winner = red == null || blue == null
+    ? null
+    : match.result?.winning_alliance ?? (red > blue ? "red" : blue > red ? "blue" : "tie");
+  return { red, blue, winner, source };
 }
 
 function strategyPrediction(redTeams: string[], blueTeams: string[], teamData: TeamData) {
@@ -481,6 +509,11 @@ function standardDeviation(values: number[]): number | null {
 
 function finiteOrNull(value: number | null | undefined): number | null {
   return value != null && Number.isFinite(value) ? value : null;
+}
+
+function nonNegativeOrNull(value: number | null | undefined): number | null {
+  const parsed = finiteOrNull(value);
+  return parsed != null && parsed >= 0 ? parsed : null;
 }
 
 function clamp(value: number, min: number, max: number) {

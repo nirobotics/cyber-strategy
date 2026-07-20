@@ -1,4 +1,4 @@
-import { matchIdentity, matchLabel, type TbaMatch } from "./match-analysis";
+import { matchIdentity, matchLabel, matchScheduleIdentity, type TbaMatch } from "./match-analysis";
 import { cleanTbaEventKey, fetchTbaMatches } from "./tba.server";
 
 const API_BASE = process.env.FEISHU_API_BASE || "https://open.feishu.cn";
@@ -52,7 +52,11 @@ export function indexVideoEntries(entries: VideoEntry[], matches: TbaMatch[]): R
     const links = entries
       .filter((entry) => entryMatchesTbaMatch(entry, match))
       .map((entry) => ({ title: entry.title, url: entry.url }));
-    if (links.length) output[matchIdentity(match)] = dedupeLinks(links);
+    if (links.length) {
+      const deduped = dedupeLinks(links);
+      output[matchIdentity(match)] = deduped;
+      output[matchScheduleIdentity(match)] = deduped;
+    }
   }
   return output;
 }

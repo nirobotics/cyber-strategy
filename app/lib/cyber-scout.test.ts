@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildCyberScoutDataset, isSafeCyberScoutPhotoPath, type CyberScoutRecordRow } from "./cyber-scout";
+import { buildCyberScoutDataset, buildSuperScoutMatchResults, isSafeCyberScoutPhotoPath, type CyberScoutRecordRow } from "./cyber-scout";
 import { __resetCyberScoutClientForTests, loadCyberScoutDataset, resolveEvent } from "./cyber-scout.server";
 import { reliability } from "./scouting";
 
@@ -243,6 +243,34 @@ describe("cyber-scout dataset conversion", () => {
     });
 
     expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 20, telePts: 30, totalPts: 50 });
+  });
+
+  it("builds complete match results from the latest Super Scout alliance scores", () => {
+    const results = buildSuperScoutMatchResults([
+      superRecord(1, { alliance: "red", autoScore: 10, teleopScore: 20, teams: [1, 2, 3] }, "2026-07-04T00:01:00.000Z"),
+      superRecord(1, { alliance: "red", autoScore: 30, teleopScore: 40, teams: [1, 2, 3] }, "2026-07-04T00:02:00.000Z"),
+      superRecord(1, { alliance: "blue", asc: 20, tsc: 30, teams: [4, 5, 6] }, "2026-07-04T00:03:00.000Z"),
+    ]);
+
+    expect(results).toEqual([{
+      source: "super-scout",
+      comp_level: "qm",
+      match_number: 1,
+      winning_alliance: "red",
+      alliances: { red: { score: 70 }, blue: { score: 50 } },
+    }]);
+  });
+
+  it("keeps one Super Scout alliance score as a partial result", () => {
+    expect(buildSuperScoutMatchResults([
+      superRecord(1, { alliance: "red", autoScore: 10, teleopScore: 20, teams: [1, 2, 3] }),
+    ])).toEqual([{
+      source: "super-scout",
+      comp_level: "qm",
+      match_number: 1,
+      winning_alliance: undefined,
+      alliances: { red: { score: 30 } },
+    }]);
   });
 
   it("does not use Super Scout scores when phase weights cannot allocate them", () => {

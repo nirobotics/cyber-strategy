@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import {
   buildCyberScoutDataset,
+  buildSuperScoutMatchResults,
   isSafeCyberScoutPhotoPath,
   type CyberScoutEventRow,
   type CyberScoutRecordRow,
@@ -11,7 +12,7 @@ import { getActiveDataset } from "./datasets.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
 import { getDataRange } from "./settings.server";
-import { toCyberScoutMatches, type CombinedMatch } from "./match-analysis";
+import { toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
 import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
@@ -263,6 +264,15 @@ export async function loadCyberScoutMatches(eventKey: string, includedMatchTypes
   return toCyberScoutMatches(config.matches, includedMatchTypes);
 }
 
+export async function loadSuperScoutMatchResults(eventKey: string): Promise<MatchResult[]> {
+  const db = getCyberScoutClient();
+  if (!db) return [];
+  const eventRows = await fetchEvents(db);
+  const event = resolveEvent(eventRows, eventKey);
+  if (!event) return [];
+  return buildSuperScoutMatchResults(await fetchSuperRecords(db, event.id));
+}
+
 export async function loadScoutConfidenceForRequest(request: Request): Promise<ScoutConfidenceResult> {
   const url = new URL(request.url);
   const dataRange = await getDataRange();
@@ -487,6 +497,17 @@ async function fetchNormalRecords(db: SupabaseClient, eventId: string): Promise<
     .select("id,record_type,match_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
     .eq("record_type", "normal_match")
+    .order("uploaded_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as CyberScoutRecordRow[];
+}
+
+async function fetchSuperRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
+  const { data, error } = await db
+    .from("scouting_records")
+    .select("id,record_type,match_type,match_number,alliance,team_number,payload,uploaded_at,client_created_at,created_at")
+    .eq("event_id", eventId)
+    .eq("record_type", "super_match")
     .order("uploaded_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as CyberScoutRecordRow[];

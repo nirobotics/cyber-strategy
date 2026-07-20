@@ -10,14 +10,15 @@ import {
   levelLabel,
   matchIdentity,
   matchLabel,
+  matchScheduleIdentity,
   matchTeams,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
   sortedMatches,
   type CombinedMatch,
+  type MatchResult,
   type StatboticsMatch,
-  type TbaMatch,
   type TeamEvent,
   type TeamMetric,
   type WinProbability,
@@ -65,15 +66,15 @@ export function MatchAnalysis({
       setState({ status: "loading" });
     });
     Promise.allSettled([
-      fetch(`/api/tba/matches?event=${encodeURIComponent(eventKey)}`),
+      fetch(`/api/match-results?event=${encodeURIComponent(eventKey)}`),
       fetch(`/api/match-videos?event=${encodeURIComponent(eventKey)}`),
       fetch(`https://api.statbotics.io/v3/matches?event=${encodeURIComponent(eventKey)}&limit=500`),
       fetch(`https://api.statbotics.io/v3/team_events?event=${encodeURIComponent(eventKey)}&limit=200`),
     ])
-      .then(async ([tbaResult, videosResult, matchesResult, teamEventsResult]) => {
+      .then(async ([resultsResponse, videosResult, matchesResult, teamEventsResult]) => {
         if (!alive) return;
-        const tbaMatches = tbaResult.status === "fulfilled" && tbaResult.value.ok
-          ? (((await tbaResult.value.json()) as { matches?: TbaMatch[] }).matches ?? [])
+        const results = resultsResponse.status === "fulfilled" && resultsResponse.value.ok
+          ? (((await resultsResponse.value.json()) as { results?: MatchResult[] }).results ?? [])
           : [];
         const videos = videosResult.status === "fulfilled" && videosResult.value.ok
           ? (((await videosResult.value.json()) as { videos?: Record<string, MatchVideoLink[]> }).videos ?? {})
@@ -84,9 +85,9 @@ export function MatchAnalysis({
         const teamEvents = teamEventsResult.status === "fulfilled" && teamEventsResult.value.ok
           ? ((await teamEventsResult.value.json()) as TeamEvent[])
           : [];
-        const combinedMatches = enrichScheduledMatches(schedule, matches, tbaMatches).map((match) => ({
+        const combinedMatches = enrichScheduledMatches(schedule, matches, results).map((match) => ({
           ...match,
-          videos: videos[match.tba?.key ?? matchIdentity(match)] ?? [],
+          videos: videos[matchIdentity(match)] ?? videos[matchScheduleIdentity(match)] ?? [],
         }));
         if (!combinedMatches.length && !teamEvents.length) {
           setState({ status: "error", message: "暂无可用赛程数据。" });
@@ -231,7 +232,7 @@ function MatchCard({
               <span>红方 {Math.round(probability.red * 100)}%</span>
             </>
           ) : null}
-          {score.source !== "tba" && score.displayRed != null && score.displayBlue != null ? (
+          {!isActualScoreSource(score.source) && score.displayRed != null && score.displayBlue != null ? (
             <span>{Math.round(score.displayRed)} - {Math.round(score.displayBlue)}</span>
           ) : null}
         </div>
@@ -336,7 +337,7 @@ function MatchDetail({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <StatusPill label={actualLabel(score.actualRed, score.actualBlue)} tone={score.source === "tba" ? "ok" : "muted"} />
+          <StatusPill label={actualLabel(score.actualRed, score.actualBlue)} tone={isActualScoreSource(score.source) ? "ok" : "muted"} />
           <StatusPill label={predictedLabel(score.predictedRed, score.predictedBlue)} tone="warn" />
           <StatusPill label={probabilityLabel(probability)} tone={probability?.source === "strategy" ? "brand" : "info"} />
         </div>
@@ -530,7 +531,8 @@ function StatusPill({ label, tone }: { label: string; tone: "brand" | "info" | "
 }
 
 function actualLabel(red: number | null, blue: number | null) {
-  return red == null || blue == null ? "实际 暂无" : `实际 ${Math.round(red)}-${Math.round(blue)}`;
+  if (red == null && blue == null) return "实际 暂无";
+  return `实际 ${red == null ? "-" : Math.round(red)}-${blue == null ? "-" : Math.round(blue)}`;
 }
 
 function predictedLabel(red: number | null, blue: number | null) {
@@ -543,10 +545,15 @@ function probabilityLabel(probability: WinProbability | null) {
 }
 
 function scoreBadgeClass(source: string) {
-  if (source === "tba") return "bg-ok/10 text-ok";
+  if (source === "frc-events") return "bg-ok/10 text-ok";
+  if (source === "super-scout") return "bg-brand/10 text-brand";
   if (source === "strategy") return "bg-warn/10 text-warn";
   if (source === "statbotics") return "bg-info/10 text-info";
   return "bg-surface-2 text-ink-dim";
+}
+
+function isActualScoreSource(source: string) {
+  return source === "frc-events" || source === "super-scout";
 }
 
 function toneClass(tone: "brand" | "info" | "muted" | "ok" | "warn") {
