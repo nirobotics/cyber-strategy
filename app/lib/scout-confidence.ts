@@ -1,10 +1,11 @@
 import type { CyberScoutRecordRow } from "./cyber-scout";
+import { matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
 
 type Alliance = "red" | "blue";
 type ActualWinner = Alliance | "tie";
 type PredictionOutcome = "correct" | "wrong" | "pending" | "incomplete";
 
-export type ConfidenceTbaMatch = {
+export type ConfidenceMatchResult = {
   comp_level?: string;
   match_number?: number;
   winning_alliance?: string;
@@ -18,6 +19,7 @@ export type ScoutConfidencePrediction = {
   id: string;
   scoutName: string;
   team: string;
+  matchType: DataRange;
   matchNumber: number;
   predictedWinner: Alliance | null;
   confidence: number | null;
@@ -42,6 +44,7 @@ export type ScoutConfidencePerson = {
 };
 
 export type ScoutConfidenceMatch = {
+  matchType: DataRange;
   matchNumber: number;
   predictionCount: number;
   redPredictions: number;
@@ -101,14 +104,14 @@ export function emptyScoutConfidenceReport(): ScoutConfidenceReport {
 
 export function buildScoutConfidenceReport({
   records,
-  tbaMatches,
+  matchResults,
 }: {
   records: CyberScoutRecordRow[];
-  tbaMatches: ConfidenceTbaMatch[];
+  matchResults: ConfidenceMatchResult[];
 }): ScoutConfidenceReport {
-  const actualByMatch = buildActualWinnerMap(tbaMatches);
+  const actualByMatch = buildActualWinnerMap(matchResults);
   const predictions = latestConfidencePredictions(records).map((prediction) =>
-    scorePrediction(prediction, actualByMatch.get(prediction.matchNumber) ?? null),
+    scorePrediction(prediction, actualByMatch.get(matchKey(prediction.matchType, prediction.matchNumber)) ?? null),
   );
 
   return {
@@ -122,23 +125,27 @@ export function buildScoutConfidenceReport({
 function latestConfidencePredictions(records: CyberScoutRecordRow[]) {
   const latest = new Map<string, Omit<ScoutConfidencePrediction, "actualWinner" | "outcome" | "netScore">>();
   for (const row of records) {
-    if (row.record_type !== "normal_match") continue;
+    if (row.record_type !== "normal_match" && row.record_type !== "super_match") continue;
     const payload = objectPayload(row.payload);
     const team = positiveId(row.team_number) ?? positiveId(payload.teamNumber);
+    const alliance = parseWinner(row.alliance ?? payload.alliance ?? payload.al);
+    const matchType = matchTypeFromValue(row.match_type ?? payload.matchType ?? payload.mt);
     const matchNumber = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
-    if (!team || !matchNumber) continue;
+    const subject = row.record_type === "normal_match" ? team : alliance;
+    if (!subject || !matchNumber) continue;
 
     const scoutName = stringValue(payload.scout) || "未知 Scout";
     const prediction = {
       id: row.id,
       scoutName,
-      team,
+      team: team ?? `${alliance} alliance`,
+      matchType,
       matchNumber,
       predictedWinner: parseWinner(payload.predictionWinner ?? payload.pw),
       confidence: parseConfidence(payload.predictionConfidence ?? payload.pc),
       sourceAt: rowTimestamp(row),
     };
-    const key = `${scoutName}:${matchNumber}:${team}`;
+    const key = `${scoutName}:${matchType}:${matchNumber}:${row.record_type}:${subject}`;
     const current = latest.get(key);
     if (!current || prediction.sourceAt >= current.sourceAt) latest.set(key, prediction);
   }
@@ -210,18 +217,21 @@ function buildPeople(predictions: ScoutConfidencePrediction[]): ScoutConfidenceP
 }
 
 function buildMatches(predictions: ScoutConfidencePrediction[]): ScoutConfidenceMatch[] {
-  const byMatch = new Map<number, ScoutConfidencePrediction[]>();
+  const byMatch = new Map<string, ScoutConfidencePrediction[]>();
   for (const prediction of predictions) {
-    byMatch.set(prediction.matchNumber, [...(byMatch.get(prediction.matchNumber) ?? []), prediction]);
+    const key = matchKey(prediction.matchType, prediction.matchNumber);
+    byMatch.set(key, [...(byMatch.get(key) ?? []), prediction]);
   }
 
   return [...byMatch.entries()]
-    .map(([matchNumber, values]) => {
+    .map(([, values]) => {
+      const { matchType, matchNumber } = values[0];
       const complete = values.filter((prediction) => prediction.predictedWinner && prediction.confidence != null);
       const redPredictions = complete.filter((prediction) => prediction.predictedWinner === "red").length;
       const bluePredictions = complete.filter((prediction) => prediction.predictedWinner === "blue").length;
       const averageConfidence = average(complete.map((prediction) => prediction.confidence ?? 0));
       return {
+        matchType,
         matchNumber,
         predictionCount: complete.length,
         redPredictions,
@@ -233,7 +243,7 @@ function buildMatches(predictions: ScoutConfidencePrediction[]): ScoutConfidence
         isLowConfidence: averageConfidence != null && averageConfidence < 3,
       };
     })
-    .sort((a, b) => a.matchNumber - b.matchNumber);
+    .sort((a, b) => matchTypeOrder(a.matchType) - matchTypeOrder(b.matchType) || a.matchNumber - b.matchNumber);
 }
 
 function buildCalibration(predictions: ScoutConfidencePrediction[]): ScoutConfidenceCalibration[] {
@@ -253,17 +263,26 @@ function buildCalibration(predictions: ScoutConfidencePrediction[]): ScoutConfid
   });
 }
 
-function buildActualWinnerMap(matches: ConfidenceTbaMatch[]): Map<number, ActualWinner> {
-  const values = new Map<number, ActualWinner>();
+function buildActualWinnerMap(matches: ConfidenceMatchResult[]): Map<string, ActualWinner> {
+  const values = new Map<string, ActualWinner>();
   for (const match of matches) {
     if (!match.match_number) continue;
+    const matchType = matchTypeFromTbaCompLevel(match.comp_level);
     const winner = actualWinner(match);
-    if (winner) values.set(match.match_number, winner);
+    if (matchType && winner) values.set(matchKey(matchType, match.match_number), winner);
   }
   return values;
 }
 
-function actualWinner(match: ConfidenceTbaMatch): ActualWinner | null {
+function matchKey(matchType: DataRange, matchNumber: number) {
+  return `${matchType}:${matchNumber}`;
+}
+
+function matchTypeOrder(matchType: DataRange) {
+  return matchType === "practice" ? 0 : matchType === "qualification" ? 1 : 2;
+}
+
+function actualWinner(match: ConfidenceMatchResult): ActualWinner | null {
   const red = match.alliances?.red?.score ?? null;
   const blue = match.alliances?.blue?.score ?? null;
   if (red == null || blue == null || red < 0 || blue < 0) return null;

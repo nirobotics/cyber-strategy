@@ -9,10 +9,11 @@ import {
 } from "./cyber-scout";
 import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
 import { getActiveDataset } from "./datasets.server";
+import { fetchFrcMatchResults } from "./frc-events.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
 import { getDataRange } from "./settings.server";
-import { toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
+import { mergeMatchResults, toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
 import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
@@ -313,11 +314,12 @@ export async function loadScoutConfidenceReport(
       };
     }
 
-    const records = await fetchNormalRecords(db, event.id);
-    const [leadRecords, users, eventConfig] = await Promise.all([
+    const records = await fetchConfidenceRecords(db, event.id);
+    const [leadRecords, users, eventConfig, officialResults] = await Promise.all([
       fetchLeadRecords(db, event.id),
       fetchScoutUsers(db),
       fetchScoutEventConfig(db),
+      fetchFrcMatchResults(event.tba_event_key).catch(() => []),
     ]);
     let tbaMatches = opts.tbaMatches ?? [];
     let tbaError: string | null = null;
@@ -330,13 +332,13 @@ export async function loadScoutConfidenceReport(
     }
     const includedTypes = new Set(opts.includedMatchTypes ?? DEFAULT_DATA_RANGE);
     const confidenceRecords = records.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
-    const confidenceTbaMatches = tbaMatches.filter((match) => {
+    const confidenceResults = mergeMatchResults(officialResults, buildSuperScoutMatchResults(confidenceRecords)).filter((match) => {
       const type = matchTypeFromTbaCompLevel(match.comp_level);
       return type ? includedTypes.has(type) : false;
     });
 
     return {
-      report: buildScoutConfidenceReport({ records: confidenceRecords, tbaMatches: confidenceTbaMatches }),
+      report: buildScoutConfidenceReport({ records: confidenceRecords, matchResults: confidenceResults }),
       events,
       selectedEventKey: event.tba_event_key,
       sourceStatus: {
@@ -491,12 +493,12 @@ async function fetchRecords(db: SupabaseClient, eventId: string): Promise<CyberS
   return (data ?? []) as CyberScoutRecordRow[];
 }
 
-async function fetchNormalRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
+async function fetchConfidenceRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
   const { data, error } = await db
     .from("scouting_records")
-    .select("id,record_type,match_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
+    .select("id,record_type,match_type,match_number,alliance,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
-    .eq("record_type", "normal_match")
+    .in("record_type", ["normal_match", "super_match"])
     .order("uploaded_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as CyberScoutRecordRow[];

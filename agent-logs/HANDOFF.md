@@ -451,3 +451,24 @@
 - Vercel Production 部署 `dpl_Ht1R4GFFyYBARfca5YbvRQYZFTPM` Ready，alias 已绑定 `https://strategy.team8214.com`。
 
 **风险 / 待办**：等分是没有队伍贡献权重时的降级估算；联盟总分准确，但队伍分项不代表真实贡献比例。
+
+---
+
+## 2026-07-20 · 信心分纳入 Super Scout
+
+**当前状态**：普通 Scout 与 Super Scout 的完整预测统一使用“正确加信心值、错误减信心值”计算个人净信心分、准确率、比赛分布和信心校准，版本升级为 `1.0.21`。
+
+**本轮完成**：
+- 信心分数据源由仅 `normal_match` 扩展为 `normal_match + super_match`。
+- Super Scout 按比赛、联盟和 Scout 去重，不覆盖普通 Scout 或另一联盟的预测。
+- 实际胜方优先使用 FRC Events 结果；官方无结果时使用 Super Scout `Auto + Teleop` 联盟比分。
+- 补充 Practice 比赛类型映射，避免 Practice 结果在信心分计算前被过滤。
+- 预测与结果按比赛类型和场号联合匹配，避免 P1 与 Q1 互相覆盖；信心分比赛表分别显示 P/Q/E。
+
+**验证**：
+- 回归测试覆盖 Super Scout 预测使用相同加减分公式。
+- 使用 `2026otsan` Practice 当前数据复验：208 条预测参与，189 条已计分、19 条等待完整比赛结果，21 人均有已计分记录，总净分 176，准确率约 60.85%。
+- 13 个测试文件、82 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+- 待完成：生产部署确认。
+
+**风险 / 待办**：同一名 Super Scout 分别提交红蓝联盟时，两条预测各自计分，与普通 Scout 按队伍分别计分的规则一致。

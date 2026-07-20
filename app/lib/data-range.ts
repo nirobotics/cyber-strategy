@@ -39,6 +39,7 @@ export function matchTypeFromValue(value: unknown): DataRange {
 
 export function matchTypeFromTbaCompLevel(value: unknown): DataRange | null {
   const compLevel = String(value ?? "").trim().toLowerCase();
+  if (compLevel === "practice") return "practice";
   if (compLevel === "qm") return "qualification";
   if (["ef", "qf", "sf", "f"].includes(compLevel)) return "playoff";
   return null;

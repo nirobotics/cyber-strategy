@@ -588,8 +588,8 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
         </thead>
         <tbody className="divide-y divide-line">
           {matches.map((match) => (
-            <tr key={match.matchNumber} className="hover:bg-surface-2/70">
-              <td className="px-3 py-2 font-semibold text-ink">Q{match.matchNumber}</td>
+            <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
+              <td className="px-3 py-2 font-semibold text-ink">{confidenceMatchLabel(match)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-danger">{match.redPredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-info">{match.bluePredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
@@ -685,6 +685,12 @@ function winnerLabel(value: ScoutConfidenceMatch["actualWinner"]) {
   if (value === "blue") return "蓝方";
   if (value === "tie") return "平局";
   return "暂无";
+}
+
+function confidenceMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber">) {
+  if (match.matchType === "practice") return `P${match.matchNumber}`;
+  if (match.matchType === "qualification") return `Q${match.matchNumber}`;
+  return `E${match.matchNumber}`;
 }
 
 function round1(value: number) {
