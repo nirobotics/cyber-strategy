@@ -432,3 +432,22 @@
 **风险 / 待办**：
 - Cyber Strategy 的 Vercel 项目尚未配置 `FRC_EVENTS_USERNAME` 和 `FRC_EVENTS_API_KEY`，因此线上目前会进入 Super Scout 回退。Cyber Scout 项目中的同名值是 Vercel sensitive env，无法读取或复制；需在 Cyber Strategy 的 Production 和 Preview 环境手动填入真实凭据后再做官方接口线上验证。
 - 当前 Cyber Scout `2026otsan` 赛程全部是 Practice，而 Strategy 默认数据范围仅含 Qualification，所以赛程分析会显示没有可分析记录。需要在设置的数据范围中启用 Practice，或在 Cyber Scout 导入 Qualification 赛程。
+
+---
+
+## 2026-07-20 · 修复 Super Scout 零权重队伍数据丢失
+
+**当前状态**：Super Scout 已提供联盟 Auto/Teleop 总分、但队伍分配权重全为 0 时，Strategy 会在未标记 No Show 的队伍间等分该阶段总分，不再丢弃整场队伍记录，版本升级为 `1.0.20`。
+
+**本轮完成**：
+- Super Scout Auto 或 Teleop 阶段的队伍权重合计为 0 时，回退为未缺席队伍等权分配；存在有效权重时保持原有比例分配。
+- 调整分配余数处理，使所有队伍的一位小数分配值之和与联盟阶段总分一致。
+- 将原有“零权重时忽略记录”测试改为 `17 Auto + 395 Teleop` 三队等分回归测试。
+
+**验证**：
+- 13 个测试文件、81 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+- 使用 `2026otsan` 当前数据复验 Practice 9：8214、9995、8015 三支蓝方队伍均生成记录，Auto 分配合计 17、Teleop 分配合计 395。
+- 全赛事使用 Super Scout 回退的队伍比赛记录为 132 条，因缺少可用分项仍被忽略的记录由 39 条降为 9 条。
+- Vercel Production 部署 `dpl_Ht1R4GFFyYBARfca5YbvRQYZFTPM` Ready，alias 已绑定 `https://strategy.team8214.com`。
+
+**风险 / 待办**：等分是没有队伍贡献权重时的降级估算；联盟总分准确，但队伍分项不代表真实贡献比例。
