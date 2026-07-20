@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTeamEventMap,
+  enrichScheduledMatches,
+  matchTeams,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
   sortedMatches,
   strategyScoreSd,
   strategyWinProbability,
+  toCyberScoutMatches,
   type CombinedMatch,
 } from "./match-analysis";
 import type { TeamData, TeamSummary } from "./scouting";
@@ -147,6 +150,47 @@ describe("match analysis calculations", () => {
       "ef:13",
     ]);
   });
+
+  it("converts Cyber Scout configured matches into the analysis schedule", () => {
+    const matches = toCyberScoutMatches([
+      cyberScoutMatch("2026test_sf2m1", "sf", 2, [7, 8, 9, 10, 11, 12]),
+      cyberScoutMatch("2026test_qm1", "qm", 1, [1, 2, 3, 4, 5, 6]),
+      { matchType: "qm", matchNumber: 2, teams: { R1: 1 } },
+    ], ["qualification"]);
+
+    expect(matches).toEqual([{
+      key: "2026test_qm1",
+      comp_level: "qm",
+      match_number: 1,
+      alliances: {
+        red: { team_keys: ["1", "2", "3"] },
+        blue: { team_keys: ["4", "5", "6"] },
+      },
+    }]);
+  });
+
+  it("enriches only Cyber Scout scheduled matches", () => {
+    const scheduled = toCyberScoutMatches([cyberScoutMatch("manual-qm1", "qm", 1, [1, 2, 3, 4, 5, 6])]);
+    const matches = enrichScheduledMatches(
+      scheduled,
+      [
+        { key: "2026test_qm1", pred: { red_win_prob: 0.7 } },
+        { key: "2026test_qm2", pred: { red_win_prob: 0.9 } },
+      ],
+      [
+        { key: "2026test_qm1", alliances: { red: { score: 100 }, blue: { score: 90 } } },
+        { key: "2026test_qm3" },
+      ],
+    );
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0]).toMatchObject({
+      key: "manual-qm1",
+      pred: { red_win_prob: 0.7 },
+      tba: { alliances: { red: { score: 100 }, blue: { score: 90 } } },
+    });
+    expect(matchTeams(matches[0], "red")).toEqual(["1", "2", "3"]);
+  });
 });
 
 function teams(values: Record<string, number>): TeamData {
@@ -209,5 +253,14 @@ function schedule(red: string[], blue: string[], extra: Partial<CombinedMatch> =
       blue: { team_keys: blue.map((team) => `frc${team}`) },
     },
     ...extra,
+  };
+}
+
+function cyberScoutMatch(id: string, matchType: string, matchNumber: number, teams: number[]) {
+  return {
+    id,
+    matchType,
+    matchNumber,
+    teams: { R1: teams[0], R2: teams[1], R3: teams[2], B1: teams[3], B2: teams[4], B3: teams[5] },
   };
 }

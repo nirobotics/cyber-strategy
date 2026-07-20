@@ -68,6 +68,7 @@ export function AnalyticsDashboard({
   isAdmin,
   tierPercentages,
   user,
+  matchSchedule,
   strategyProposal,
   scoutingLead,
   demo,
@@ -78,6 +79,7 @@ export function AnalyticsDashboard({
   isAdmin: boolean;
   tierPercentages: TierPercentages;
   user: SessionUser;
+  matchSchedule: CombinedMatch[];
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
   scoutingLead: ScoutingLeadPanelData | null;
   demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[] };
@@ -312,7 +314,9 @@ export function AnalyticsDashboard({
       ) : null}
 
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {activeTab === "match" ? <MatchAnalysis eventKey={dataset.eventKey} teamData={analysisTeamData} initialMatches={demo?.matches} /> : null}
+      {activeTab === "match" ? (
+        <MatchAnalysis eventKey={dataset.eventKey} schedule={demo?.matches ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
+      ) : null}
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}

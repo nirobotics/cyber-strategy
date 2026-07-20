@@ -1,4 +1,5 @@
 import { reliability, type TeamData, type TeamSummary } from "./scouting";
+import type { DataRange } from "./data-range";
 
 export type StatboticsMatch = {
   key?: string;
@@ -99,25 +100,30 @@ export type TeamMetric = {
   scoutMatch: TeamSummary["matches"][number] | null;
 };
 
-export function mergeMatches(statboticsMatches: StatboticsMatch[], tbaMatches: TbaMatch[]): CombinedMatch[] {
-  const byKey = new Map<string, CombinedMatch>();
-  for (const match of statboticsMatches) byKey.set(matchIdentity(match), { ...match });
-  for (const tba of tbaMatches) {
-    const key = matchIdentity(tba);
-    const existing = byKey.get(key);
-    byKey.set(key, {
-      ...existing,
-      ...copyScheduleFields(tba),
-      tba,
-      pred: existing?.pred,
-      epa: existing?.epa,
-    });
-  }
-  return [...byKey.values()];
+export function toCyberScoutMatches(matches: unknown[], includedMatchTypes?: DataRange[]): CombinedMatch[] {
+  const includedTypes = includedMatchTypes ? new Set(includedMatchTypes) : null;
+  return sortedMatches(matches.flatMap((value) => {
+    const normalized = normalizeCyberScoutMatch(value);
+    return normalized && (!includedTypes || includedTypes.has(normalized.dataRange)) ? [normalized.match] : [];
+  }));
+}
+
+export function enrichScheduledMatches(
+  schedule: CombinedMatch[],
+  statboticsMatches: StatboticsMatch[],
+  tbaMatches: TbaMatch[],
+): CombinedMatch[] {
+  const statboticsByKey = indexMatches(statboticsMatches);
+  const tbaByKey = indexMatches(tbaMatches);
+  return schedule.map((match) => ({
+    ...findIndexedMatch(statboticsByKey, match),
+    ...match,
+    tba: findIndexedMatch(tbaByKey, match),
+  }));
 }
 
 export function sortedMatches(matches: CombinedMatch[]): CombinedMatch[] {
-  const levelOrder: Record<string, number> = { qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
+  const levelOrder: Record<string, number> = { practice: -1, qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
   return [...matches].sort((a, b) => {
     const levelDiff = (levelOrder[a.comp_level ?? "qm"] ?? 0) - (levelOrder[b.comp_level ?? "qm"] ?? 0);
     if (levelDiff) return levelDiff;
@@ -134,8 +140,8 @@ function matchSortNumbers(match: Pick<CombinedMatch, "comp_level" | "match_numbe
 
 export function matchTeams(match: CombinedMatch, color: "red" | "blue"): string[] {
   const values = color === "red"
-    ? match.tba?.alliances?.red?.team_keys ?? match.alliances?.red?.team_keys ?? match.red_alliance
-    : match.tba?.alliances?.blue?.team_keys ?? match.alliances?.blue?.team_keys ?? match.blue_alliance;
+    ? match.alliances?.red?.team_keys ?? match.tba?.alliances?.red?.team_keys ?? match.red_alliance
+    : match.alliances?.blue?.team_keys ?? match.tba?.alliances?.blue?.team_keys ?? match.blue_alliance;
   return teamNumbers(values);
 }
 
@@ -150,6 +156,7 @@ export function matchIdentity(match: Pick<StatboticsMatch, "key" | "comp_level" 
 export function matchLabel(match: Pick<StatboticsMatch, "key" | "comp_level" | "set_number" | "match_number">) {
   const level = match.comp_level ?? "qm";
   const number = match.match_number ?? match.set_number ?? match.key?.split("_").pop() ?? "?";
+  if (level === "practice") return `P${number}`;
   if (level === "qm") return `Q${number}`;
   if (level === "qf") return `QF${match.set_number ?? ""}-${number}`;
   if (level === "sf") return `SF${match.set_number ?? ""}-${number}`;
@@ -158,7 +165,7 @@ export function matchLabel(match: Pick<StatboticsMatch, "key" | "comp_level" | "
 }
 
 export function levelLabel(level: string) {
-  return { qm: "资格赛", ef: "淘汰赛", qf: "四分之一决赛", sf: "半决赛", f: "决赛" }[level] ?? level.toUpperCase();
+  return { practice: "练习赛", qm: "资格赛", ef: "淘汰赛", qf: "四分之一决赛", sf: "半决赛", f: "决赛" }[level] ?? level.toUpperCase();
 }
 
 export function resolveMatchScores({
@@ -383,15 +390,58 @@ export function fmt(value: number | null | undefined) {
   return value == null ? "-" : value.toFixed(1);
 }
 
-function copyScheduleFields(match: TbaMatch): StatboticsMatch {
+function normalizeCyberScoutMatch(value: unknown): { match: CombinedMatch; dataRange: DataRange } | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const matchType = String(record.matchType ?? "");
+  const matchNumber = Number(record.matchNumber);
+  const teams = record.teams && typeof record.teams === "object" ? record.teams as Record<string, unknown> : {};
+  const redTeams = [teams.R1, teams.R2, teams.R3].map(cyberScoutTeamNumber);
+  const blueTeams = [teams.B1, teams.B2, teams.B3].map(cyberScoutTeamNumber);
+  if (!["practice", "qm", "sf", "f"].includes(matchType) || !Number.isInteger(matchNumber) || matchNumber <= 0) return null;
+  if ([...redTeams, ...blueTeams].some((team) => !team)) return null;
+
   return {
-    key: match.key,
-    comp_level: match.comp_level,
-    set_number: match.set_number,
-    match_number: match.match_number,
-    winning_alliance: match.winning_alliance,
-    alliances: match.alliances,
+    match: {
+      key: typeof record.id === "string" && record.id ? record.id : `${matchType}-${matchNumber}`,
+      comp_level: matchType,
+      set_number: matchType === "sf" || matchType === "f" ? matchNumber : undefined,
+      match_number: matchType === "sf" || matchType === "f" ? 1 : matchNumber,
+      alliances: {
+        red: { team_keys: redTeams },
+        blue: { team_keys: blueTeams },
+      },
+    },
+    dataRange: matchType === "practice" ? "practice" : matchType === "qm" ? "qualification" : "playoff",
   };
+}
+
+function cyberScoutTeamNumber(value: unknown) {
+  const number = String(value ?? "").replace(/^frc/, "");
+  return /^\d+$/.test(number) && Number(number) > 0 ? number : "";
+}
+
+function indexMatches<T extends StatboticsMatch>(matches: T[]) {
+  const index = new Map<string, T>();
+  for (const match of matches) {
+    index.set(matchIdentity(match), match);
+    index.set(matchScheduleIdentity(match), match);
+  }
+  return index;
+}
+
+function findIndexedMatch<T extends StatboticsMatch>(index: Map<string, T>, match: StatboticsMatch) {
+  return index.get(matchIdentity(match)) ?? index.get(matchScheduleIdentity(match));
+}
+
+function matchScheduleIdentity(match: Pick<StatboticsMatch, "key" | "comp_level" | "set_number" | "match_number">) {
+  const suffix = match.key?.split("_").at(-1) ?? "";
+  const qualification = /^qm(\d+)$/.exec(suffix);
+  const playoff = /^(ef|qf|sf|f)(\d+)m(\d+)$/.exec(suffix);
+  const level = match.comp_level ?? qualification?.[0].replace(/\d+$/, "") ?? playoff?.[1] ?? "qm";
+  const setNumber = match.set_number ?? Number(playoff?.[2] ?? 0);
+  const matchNumber = match.match_number ?? Number(qualification?.[1] ?? playoff?.[3] ?? 0);
+  return `${level}-${setNumber}-${matchNumber}`;
 }
 
 function tbaActualScore(match: CombinedMatch): { red: number; blue: number; winner: "red" | "blue" | "tie" } | null {

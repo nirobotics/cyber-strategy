@@ -2,11 +2,9 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.strategy-proposal";
 import { StrategyProposalPanel, type StrategyProposalActionData } from "../components/strategy-proposal-panel";
 import { requireUser } from "../lib/auth.server";
-import { getStrategyDatasetForRequest } from "../lib/cyber-scout.server";
-import type { CombinedMatch } from "../lib/match-analysis";
+import { getStrategyDatasetForRequest, loadCyberScoutProposalMatches } from "../lib/cyber-scout.server";
 import { isAdmin } from "../lib/profiles.server";
 import { getDataRange } from "../lib/settings.server";
-import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import {
   deleteStrategyProposal,
   listStrategyProposals,
@@ -21,12 +19,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   let proposalError: string | null = null;
-  const [admin, proposals] = await Promise.all([
+  const [admin, proposals, matches] = await Promise.all([
     isAdmin(user.feishuOpenId),
     listStrategyProposals(selectedEventKey).catch((error) => {
       proposalError = error instanceof Error ? error.message : "Strategy Proposal 数据表不可用。";
       return [];
     }),
+    loadCyberScoutProposalMatches(selectedEventKey, dataRange).catch(() => []),
   ]);
 
   return {
@@ -36,7 +35,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     user,
     proposals,
     proposalError,
-    matches: toProposalMatches(data.matches as CombinedMatch[]),
+    matches,
   };
 }
 

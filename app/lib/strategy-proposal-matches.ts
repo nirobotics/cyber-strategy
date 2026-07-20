@@ -1,7 +1,16 @@
-import { matchIdentity, matchLabel, matchTeams, sortedMatches, type CombinedMatch } from "./match-analysis";
+import { matchIdentity, matchLabel, matchTeams, sortedMatches, toCyberScoutMatches, type CombinedMatch } from "./match-analysis";
+import type { DataRange } from "./data-range";
 import { ownStrategyTeams } from "./strategy-proposals";
 
 export type ProposalMatch = { key: string; label: string; redTeams: string[]; blueTeams: string[] };
+
+export function toCyberScoutProposalMatches(
+  matches: unknown[],
+  includedMatchTypes?: DataRange[],
+  ownTeams: readonly string[] = ownStrategyTeams,
+): ProposalMatch[] {
+  return toProposalMatches(toCyberScoutMatches(matches, includedMatchTypes), ownTeams);
+}
 
 export function toProposalMatches(matches: CombinedMatch[], ownTeams: readonly string[] = ownStrategyTeams): ProposalMatch[] {
   return sortedMatches(matches)

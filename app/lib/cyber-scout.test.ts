@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildCyberScoutDataset, isSafeCyberScoutPhotoPath, type CyberScoutRecordRow } from "./cyber-scout";
-import { __resetCyberScoutClientForTests, loadCyberScoutDataset } from "./cyber-scout.server";
+import { __resetCyberScoutClientForTests, loadCyberScoutDataset, resolveEvent } from "./cyber-scout.server";
 import { reliability } from "./scouting";
 
 const event = {
@@ -182,6 +182,92 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.scoringIgnoredMatches).toBe(1);
   });
 
+  it("uses Super Scout Auto and Teleop scores when TBA scoring is unavailable", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      records: [
+        normal(8214, 1, {
+          climbPosition: "A",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(6328, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(157, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214, 6328, 157],
+          auto: [50, 30, 20],
+          drive: [0, 0, 0],
+          defense: [0, 0, 0],
+          bps: [2, 1, 4],
+          accuracy: [50, 100, 0],
+          comments: ["", "", ""],
+          autoScore: 30,
+          teleopScore: 80,
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 15, telePts: 45, totalPts: 60, climbPts: 5 });
+    expect(dataset.teamData["6328"].matches[0]).toMatchObject({ autoPts: 9, telePts: 40, totalPts: 49 });
+    expect(dataset.teamData["157"].matches[0]).toMatchObject({ autoPts: 6, telePts: 0, totalPts: 6 });
+    expect(dataset.scoringFallbackMatches).toBe(3);
+    expect(dataset.scoringIgnoredMatches).toBe(0);
+  });
+
+  it("reads compact Super Scout phase score fields", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      records: [
+        normal(8214, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214],
+          auto: [100],
+          drive: [0],
+          defense: [0],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+          asc: 20,
+          tsc: 30,
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 20, telePts: 30, totalPts: 50 });
+  });
+
+  it("does not use Super Scout scores when phase weights cannot allocate them", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      records: [
+        normal(8214, 1),
+        superRecord(1, {
+          teams: [8214],
+          auto: [0],
+          drive: [0],
+          defense: [0],
+          bps: [0],
+          accuracy: [0],
+          comments: [""],
+          autoScore: 10,
+          teleopScore: 20,
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"]).toBeUndefined();
+    expect(dataset.scoringIgnoredMatches).toBe(1);
+  });
+
   it("does not score TBA matches from legacy top-level breakdown fields", () => {
     const dataset = buildCyberScoutDataset({
       event,
@@ -260,6 +346,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [2, 1, 4],
           accuracy: [50, 100, 0],
           comments: ["", "", ""],
+          autoScore: 999,
+          teleopScore: 999,
         }),
       ],
     });
@@ -280,6 +368,7 @@ describe("cyber-scout dataset conversion", () => {
       telePts: 0,
       totalPts: 6,
     });
+    expect(dataset.scoringFallbackMatches).toBe(0);
   });
 
   it("does not let playoff matches with the same match number override qualification scout records", () => {
@@ -646,6 +735,15 @@ describe("cyber-scout dataset conversion", () => {
     expect(result.dataset).toBeNull();
     expect(result.status.source).toBe("fallback");
     expect(result.status.message).toContain("未配置");
+  });
+
+  it("uses the newest event when none is active", () => {
+    const inactiveEvents = [
+      { ...event, id: "new", tba_event_key: "2026new", is_active: false },
+      { ...event, id: "old", tba_event_key: "2026old", is_active: false },
+    ];
+
+    expect(resolveEvent(inactiveEvents, null)?.tba_event_key).toBe("2026new");
   });
 });
 

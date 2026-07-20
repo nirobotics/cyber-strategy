@@ -5,12 +5,12 @@ import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, cn } from "./ui";
 import {
   buildTeamEventMap,
+  enrichScheduledMatches,
   fmt,
   levelLabel,
   matchIdentity,
   matchLabel,
   matchTeams,
-  mergeMatches,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -36,20 +36,28 @@ type MatchVideoLink = {
 
 export function MatchAnalysis({
   eventKey,
+  schedule,
   teamData,
-  initialMatches,
+  enrich = true,
 }: {
   eventKey: string;
+  schedule: CombinedMatch[];
   teamData: TeamData;
-  initialMatches?: CombinedMatch[];
+  enrich?: boolean;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
-  const [state, setState] = useState<LoadState>(() => initialMatches
-    ? { status: "ready", matches: initialMatches, teamEvents: [] }
-    : { status: "idle" });
+  const [state, setState] = useState<LoadState>(() => enrich
+    ? { status: "idle" }
+    : { status: "ready", matches: schedule, teamEvents: [] });
 
   useEffect(() => {
-    if (initialMatches) return;
+    if (!enrich) {
+      queueMicrotask(() => {
+        setSelectedMatchKey(null);
+        setState({ status: "ready", matches: schedule, teamEvents: [] });
+      });
+      return;
+    }
     let alive = true;
     queueMicrotask(() => {
       if (!alive) return;
@@ -76,9 +84,9 @@ export function MatchAnalysis({
         const teamEvents = teamEventsResult.status === "fulfilled" && teamEventsResult.value.ok
           ? ((await teamEventsResult.value.json()) as TeamEvent[])
           : [];
-        const combinedMatches = mergeMatches(matches, tbaMatches).map((match) => ({
+        const combinedMatches = enrichScheduledMatches(schedule, matches, tbaMatches).map((match) => ({
           ...match,
-          videos: videos[matchIdentity(match)] ?? [],
+          videos: videos[match.tba?.key ?? matchIdentity(match)] ?? [],
         }));
         if (!combinedMatches.length && !teamEvents.length) {
           setState({ status: "error", message: "暂无可用赛程数据。" });
@@ -92,7 +100,7 @@ export function MatchAnalysis({
     return () => {
       alive = false;
     };
-  }, [eventKey, initialMatches]);
+  }, [enrich, eventKey, schedule]);
 
   const selectedMatch = state.status === "ready" && selectedMatchKey
     ? state.matches.find((match) => matchIdentity(match) === selectedMatchKey) ?? null

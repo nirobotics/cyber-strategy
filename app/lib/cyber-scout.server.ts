@@ -11,6 +11,8 @@ import { getActiveDataset } from "./datasets.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
 import { getDataRange } from "./settings.server";
+import { toCyberScoutMatches, type CombinedMatch } from "./match-analysis";
+import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
 type CyberScoutLoadResult = {
@@ -209,11 +211,12 @@ export async function loadCyberScoutDataset(
       tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
     }
     const dataset = buildCyberScoutDataset({ event, records, tbaMatches, includedMatchTypes });
-    const scoringError = tbaError
-      ? `${tbaError}；已忽略需要 TBA 分项的比赛记录。`
-      : dataset.scoringIgnoredMatches > 0
-        ? `已忽略 ${dataset.scoringIgnoredMatches} 条缺少 TBA 分项或无法按比例分配的比赛记录。`
-        : undefined;
+    const scoringMessages = [
+      tbaError,
+      dataset.scoringFallbackMatches > 0 ? `${dataset.scoringFallbackMatches} 条队伍比赛记录使用 Super Scout Auto/Teleop 分项。` : null,
+      dataset.scoringIgnoredMatches > 0 ? `已忽略 ${dataset.scoringIgnoredMatches} 条缺少可用分项或无法按比例分配的队伍比赛记录。` : null,
+    ].filter(Boolean);
+    const scoringError = scoringMessages.length ? scoringMessages.join("；") : undefined;
     return {
       dataset,
       events,
@@ -222,7 +225,7 @@ export async function loadCyberScoutDataset(
       status: {
         source: "cyber-scout",
         label: "Scout 实时数据",
-        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录${scoringError ? " · 部分比赛已忽略" : ""}`,
+        message: `${event.name || event.tba_event_key} · ${records.length} 条原始记录${scoringError ? " · 评分存在降级或忽略" : ""}`,
         updatedAt: dataset.updatedAt,
         error: scoringError,
       },
@@ -242,6 +245,22 @@ export async function loadCyberScoutDataset(
       },
     };
   }
+}
+
+export async function loadCyberScoutProposalMatches(eventKey: string, includedMatchTypes?: DataRange[]): Promise<ProposalMatch[]> {
+  const db = getCyberScoutClient();
+  if (!db) return [];
+  const config = await fetchScoutEventConfig(db);
+  if (config.tbaEventKey !== eventKey) return [];
+  return toCyberScoutProposalMatches(config.matches, includedMatchTypes);
+}
+
+export async function loadCyberScoutMatches(eventKey: string, includedMatchTypes?: DataRange[]): Promise<CombinedMatch[]> {
+  const db = getCyberScoutClient();
+  if (!db) return [];
+  const config = await fetchScoutEventConfig(db);
+  if (config.tbaEventKey !== eventKey) return [];
+  return toCyberScoutMatches(config.matches, includedMatchTypes);
 }
 
 export async function loadScoutConfidenceForRequest(request: Request): Promise<ScoutConfidenceResult> {
@@ -707,9 +726,9 @@ function normalizeAssignment(value: unknown): ScoutLeadAssignment | null {
   };
 }
 
-function resolveEvent(events: CyberScoutEventRow[], eventKey: string | null): CyberScoutEventRow | null {
+export function resolveEvent(events: CyberScoutEventRow[], eventKey: string | null): CyberScoutEventRow | null {
   if (eventKey) return events.find((event) => event.tba_event_key === eventKey) ?? null;
-  return events.find((event) => event.is_active) ?? null;
+  return events.find((event) => event.is_active) ?? events[0] ?? null;
 }
 
 function toEventOption(event: CyberScoutEventRow): ScoutingEventOption {

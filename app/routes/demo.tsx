@@ -4,10 +4,9 @@ import type { Route } from "./+types/demo";
 import { AnalyticsDashboard } from "../components/analytics-dashboard";
 import { AppShell } from "../components/app-shell";
 import { Card } from "../components/ui";
-import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
+import { loadCyberScoutDataset, loadCyberScoutMatches, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
 import { startFeishuLogin } from "../lib/feishu";
-import { mergeMatches } from "../lib/match-analysis";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import { DEFAULT_TIER_PERCENTAGES } from "../lib/tier-settings";
 
@@ -19,8 +18,9 @@ const DEMO_USER = {
 };
 
 export async function loader() {
-  const [source, scoutingLead] = await Promise.all([
+  const [source, matches, scoutingLead] = await Promise.all([
     loadCyberScoutDataset(DEMO_EVENT_KEY),
+    loadCyberScoutMatches(DEMO_EVENT_KEY),
     loadScoutConfidenceReport(DEMO_EVENT_KEY),
   ]);
 
@@ -28,7 +28,7 @@ export async function loader() {
 
   try {
     return {
-      demo: buildDemoData(source.dataset, mergeMatches([], source.matches), scoutingLead),
+      demo: buildDemoData(source.dataset, matches, scoutingLead),
       error: null,
     };
   } catch (error) {
@@ -43,7 +43,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.17"
+      version="1.0.18"
       user={null}
       authLoading={false}
       allowGuest
@@ -60,6 +60,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           isAdmin={false}
           tierPercentages={DEFAULT_TIER_PERCENTAGES}
           user={DEMO_USER}
+          matchSchedule={loaderData.demo.matches}
           strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS), loaded: true }}
           scoutingLead={loaderData.demo.scoutingLead}
           demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"] }}
