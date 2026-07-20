@@ -469,6 +469,6 @@
 - 回归测试覆盖 Super Scout 预测使用相同加减分公式。
 - 使用 `2026otsan` Practice 当前数据复验：208 条预测参与，189 条已计分、19 条等待完整比赛结果，21 人均有已计分记录，总净分 176，准确率约 60.85%。
 - 13 个测试文件、82 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
-- 待完成：生产部署确认。
+- Vercel Production 部署 `dpl_DQoTB9d29ED8P9WW8UKZvLHHmM5A` Ready，alias 已绑定 `https://strategy.team8214.com`。
 
 **风险 / 待办**：同一名 Super Scout 分别提交红蓝联盟时，两条预测各自计分，与普通 Scout 按队伍分别计分的规则一致。
