@@ -409,3 +409,26 @@
 - 真实浏览器确认登录入口、`v1.0.17`、390px 布局正常，无横向溢出或控制台错误。
 
 **风险 / 待办**：本机无法代替真实飞书账号完成生产 OAuth 授权，最终账号登录仍需部署环境复核。
+
+---
+
+## 2026-07-20 · FRC Events 比赛结果与 Super Scout 回退
+
+**当前状态**：赛程分析的实际比赛结果优先读取官方 FRC Events API；官方无结果、请求失败或未配置凭据时，回退到 Cyber Scout 的 Super Scout `Auto + Teleop` 联盟总分，版本升级为 `1.0.19`。
+
+**本轮完成**：
+- 新增服务端 FRC Events API 客户端，使用 `FRC_EVENTS_USERNAME` / `FRC_EVENTS_API_KEY` Basic Auth 读取 Practice、Qualification 和 Playoff 比分。
+- 新增统一比赛结果接口 `/api/match-results`；同一场比赛存在两种数据时，官方 FRC Events 结果覆盖 Super Scout 结果。
+- Super Scout 回退按联盟读取最新记录并计算 `Auto + Teleop`；仅单边有数据时保留部分结果，不虚构胜负。
+- 赛程继续来自 Cyber Scout `event_config`，Statbotics 只用于预测；TBA 不再作为比赛最终比分来源。
+- 保留视频关联的 TBA key 兼容映射，并更新 README 与环境变量示例。
+- 功能提交 `e7d4c36` 已推送到 `origin/main`，生产页脚已确认显示 `v1.0.19`。
+
+**验证**：
+- `pnpm test`：13 个测试文件、81 项测试通过。
+- `pnpm typecheck`、`pnpm lint`、`pnpm build` 和 `git diff --check` 全部通过。
+- 使用当前 Cyber Scout 真实数据验证 `2026otsan`：读取到 28 场 Practice、0 场 Qualification；5 场已有 Super Scout 红蓝联盟比分，均成功按 `Auto + Teleop` 生成实际结果和胜方。
+
+**风险 / 待办**：
+- Cyber Strategy 的 Vercel 项目尚未配置 `FRC_EVENTS_USERNAME` 和 `FRC_EVENTS_API_KEY`，因此线上目前会进入 Super Scout 回退。Cyber Scout 项目中的同名值是 Vercel sensitive env，无法读取或复制；需在 Cyber Strategy 的 Production 和 Preview 环境手动填入真实凭据后再做官方接口线上验证。
+- 当前 Cyber Scout `2026otsan` 赛程全部是 Practice，而 Strategy 默认数据范围仅含 Qualification，所以赛程分析会显示没有可分析记录。需要在设置的数据范围中启用 Practice，或在 Cyber Scout 导入 Qualification 赛程。
