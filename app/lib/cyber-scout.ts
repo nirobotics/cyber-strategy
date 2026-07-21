@@ -60,6 +60,7 @@ type NormalRecord = {
 type SuperRecord = {
   team: string;
   teams: string[];
+  alliance: "red" | "blue" | null;
   match: number;
   matchType: DataRange;
   tbaMatchKey: string | null;
@@ -89,10 +90,11 @@ type PitRecord = {
 type TeamScore = {
   autoPts: number;
   teleGamePiecePts: number;
-  source: "tba" | "super-scout" | "zero";
+  source: "frc-events" | "tba" | "super-scout" | "zero";
 };
 
 type ScoredDataset = ScoutingDataset & {
+  scoringOfficialMatches: number;
   scoringFallbackMatches: number;
   scoringZeroMatches: number;
 };
@@ -100,11 +102,13 @@ type ScoredDataset = ScoutingDataset & {
 export function buildCyberScoutDataset({
   event,
   records,
+  officialResults = [],
   tbaMatches = [],
   includedMatchTypes = DEFAULT_DATA_RANGE,
 }: {
   event: CyberScoutEventRow;
   records: CyberScoutRecordRow[];
+  officialResults?: MatchResult[];
   tbaMatches?: TbaMatch[];
   includedMatchTypes?: DataRange[];
 }): ScoredDataset {
@@ -119,7 +123,8 @@ export function buildCyberScoutDataset({
     if (row.record_type === "pit") addPitRecord(pitByTeam, row);
   }
 
-  const teamScores = buildTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch, includedMatchTypes: includedTypes });
+  const teamScores = buildTeamScores({ officialResults, tbaMatches, normalByTeamMatch, superByTeamMatch, includedMatchTypes: includedTypes });
+  let scoringOfficialMatches = 0;
   let scoringFallbackMatches = 0;
   let scoringZeroMatches = 0;
   const matchesByTeam = new Map<string, ScoutingMatch[]>();
@@ -133,6 +138,7 @@ export function buildCyberScoutDataset({
     const teamScore = teamScores.get(key);
     if (!teamScore) scoringZeroMatches += 1;
 
+    if (teamScore?.source === "frc-events") scoringOfficialMatches += 1;
     if (teamScore?.source === "super-scout") scoringFallbackMatches += 1;
     const scoutingMatch = toScoutingMatch({
       normal,
@@ -160,6 +166,7 @@ export function buildCyberScoutDataset({
     isActive: event.is_active,
     createdAt: null,
     updatedAt: latestTimestamp(records) ?? event.updated_at,
+    scoringOfficialMatches,
     scoringFallbackMatches,
     scoringZeroMatches,
   };
@@ -249,6 +256,7 @@ function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow,
   if (!includedMatchTypes.has(matchType)) return;
   const tbaMatchKey = recordTbaMatchKey(payload);
   const teamNumbers = teams.map(positiveId).filter((team): team is string => Boolean(team));
+  const alliance = allianceValue(row.alliance ?? payload.alliance ?? payload.al);
   const autoScore = finiteOrNull(payload.autoScore ?? payload.asc);
   const teleopScore = finiteOrNull(payload.teleopScore ?? payload.tsc);
 
@@ -258,6 +266,7 @@ function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow,
     const record: SuperRecord = {
       team,
       teams: teamNumbers,
+      alliance,
       match,
       matchType,
       tbaMatchKey,
@@ -353,11 +362,13 @@ function toScoutingMatch({
 }
 
 function buildTeamScores({
+  officialResults,
   tbaMatches,
   normalByTeamMatch,
   superByTeamMatch,
   includedMatchTypes,
 }: {
+  officialResults: MatchResult[];
   tbaMatches: TbaMatch[];
   normalByTeamMatch: Map<string, NormalRecord>;
   superByTeamMatch: Map<string, SuperRecord>;
@@ -399,6 +410,44 @@ function buildTeamScores({
         if (autoPts != null && teleGamePiecePts != null) {
           scores.set(row.key, { autoPts, teleGamePiecePts, source: "tba" });
         }
+      });
+    }
+  }
+
+  const recordKeys = new Set([...normalByTeamMatch.keys(), ...superByTeamMatch.keys()]);
+  for (const result of officialResults) {
+    const matchType = matchTypeFromTbaCompLevel(result.comp_level);
+    if (!matchType || !includedMatchTypes.has(matchType)) continue;
+    const matchNumber = positiveNumber(matchType === "playoff" ? result.set_number ?? result.match_number : result.match_number);
+    if (!matchNumber) continue;
+
+    for (const alliance of ["red", "blue"] as const) {
+      const autoTotal = finiteOrNull(result.alliances[alliance]?.autoPoints);
+      const teleTotal = finiteOrNull(result.alliances[alliance]?.teleopPoints);
+      if (autoTotal == null || teleTotal == null) continue;
+      const rows = [...recordKeys].flatMap((key) => {
+        const normal = normalByTeamMatch.get(key);
+        const superRecord = superByTeamMatch.get(key);
+        const record = normal ?? superRecord;
+        const recordAlliance = allianceValue(superRecord?.alliance ?? normal?.alliance);
+        if (!record || record.matchType !== matchType || record.match !== matchNumber || recordAlliance !== alliance) return [];
+        const noShow = normal?.noShow ?? false;
+        return [{
+          key,
+          noShow,
+          autoWeight: noShow ? 0 : clamp(superRecord?.auto ?? 0, 0, 100),
+          teleWeight: noShow ? 0 : predictedGamePieces(normal, superRecord),
+        }];
+      });
+      const activeWeights = rows.map((row) => row.noShow ? 0 : 1);
+      const autoWeights = rows.map((row) => row.autoWeight);
+      const teleWeights = rows.map((row) => row.teleWeight);
+      const autoAllocations = allocateByWeight(autoTotal, autoWeights.some((weight) => weight > 0) ? autoWeights : activeWeights);
+      const teleAllocations = allocateByWeight(teleTotal, teleWeights.some((weight) => weight > 0) ? teleWeights : activeWeights);
+      rows.forEach((row, index) => {
+        const autoPts = autoAllocations[index];
+        const teleGamePiecePts = teleAllocations[index];
+        if (autoPts != null && teleGamePiecePts != null) scores.set(row.key, { autoPts, teleGamePiecePts, source: "frc-events" });
       });
     }
   }

@@ -4,6 +4,8 @@ const frcEventsBaseUrl = "https://frc-api.firstinspires.org/v3.0";
 
 type FrcAllianceScore = {
   alliance?: string;
+  autoPoints?: number;
+  teleopPoints?: number;
   totalPoints?: number;
 };
 
@@ -64,15 +66,12 @@ export function normalizeFrcScores(
     if (!identity) return [];
     const red = allianceScore(score.alliances, "red");
     const blue = allianceScore(score.alliances, "blue");
-    if (red == null || blue == null) return [];
+    if (!red || !blue) return [];
     return [{
       source: "frc-events" as const,
       ...identity,
-      winning_alliance: red > blue ? "red" as const : blue > red ? "blue" as const : "tie" as const,
-      alliances: {
-        red: { score: red },
-        blue: { score: blue },
-      },
+      winning_alliance: red.score > blue.score ? "red" as const : blue.score > red.score ? "blue" as const : "tie" as const,
+      alliances: { red, blue },
     }];
   });
 }
@@ -117,8 +116,17 @@ function frcMatchIdentity(score: FrcMatchScore, requestedLevel: string, playoffD
 }
 
 function allianceScore(alliances: FrcAllianceScore[] | undefined, alliance: "red" | "blue") {
-  const value = alliances?.find((item) => item.alliance?.toLowerCase() === alliance)?.totalPoints;
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+  const value = alliances?.find((item) => item.alliance?.toLowerCase() === alliance);
+  if (!value || !validScore(value.totalPoints)) return null;
+  return {
+    score: value.totalPoints,
+    ...(validScore(value.autoPoints) ? { autoPoints: value.autoPoints } : {}),
+    ...(validScore(value.teleopPoints) ? { teleopPoints: value.teleopPoints } : {}),
+  };
+}
+
+function validScore(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
 function positiveInteger(value: unknown): number | null {

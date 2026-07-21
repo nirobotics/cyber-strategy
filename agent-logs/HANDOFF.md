@@ -575,3 +575,21 @@
 - 15 个测试文件、88 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
 
 **风险 / 待办**：0 分记录会暂时拉低队伍均分；官方分项或 Super Scout Auto/Teleop 补齐后，页面会自动按实际分配结果重算。
+
+---
+
+## 2026-07-21 · 队伍得分接入 FRC Events 分项
+
+**当前状态**：队伍详情和综合分计算采用 FRC Events Auto/Teleop 分项优先、Super Scout 分项回退、仍缺失则按 0 分保留的三级逻辑，版本升级为 `1.0.28`。
+
+**本轮完成**：
+- FRC Events 比分解析新增联盟 `autoPoints` 和 `teleopPoints`，继续保留 `totalPoints` 供赛程结果展示。
+- Cyber Scout 队伍聚合接入官方分项，并按 Normal/Super Scout 的联盟、队伍和贡献权重分配到单队；官方分项在最后覆盖 TBA 和 Super Scout。
+- 官方仅有总分、没有 Auto/Teleop 时继续使用 Super Scout；两者都没有时保持上一版本的 0 分记录。
+- 数据源状态新增 FRC Events 分项实际覆盖的队伍比赛记录数量。
+
+**验证**：
+- 回归测试覆盖 FRC Events 分项解析、官方覆盖 Super Scout、官方无分项时回退 Super Scout以及完全缺失时按 0 分。
+- 15 个测试文件、89 项测试、类型检查和 Lint 通过。
+
+**风险 / 待办**：FRC Events 只有 `autoPoints` 与 `teleopPoints` 都存在时才参与单队分配；接口仅发布联盟总分时不会误用总分代替阶段分项。

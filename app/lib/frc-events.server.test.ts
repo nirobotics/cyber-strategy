@@ -19,8 +19,8 @@ describe("FRC Events match results", () => {
             matchLevel: "Qualification",
             matchNumber: 3,
             alliances: [
-              { alliance: "Red", totalPoints: 123 },
-              { alliance: "Blue", totalPoints: 98 },
+              { alliance: "Red", autoPoints: 35, teleopPoints: 88, totalPoints: 123 },
+              { alliance: "Blue", autoPoints: 28, teleopPoints: 70, totalPoints: 98 },
             ],
           }],
         }));
@@ -35,7 +35,10 @@ describe("FRC Events match results", () => {
       comp_level: "qm",
       match_number: 3,
       winning_alliance: "red",
-      alliances: { red: { score: 123 }, blue: { score: 98 } },
+      alliances: {
+        red: { score: 123, autoPoints: 35, teleopPoints: 88 },
+        blue: { score: 98, autoPoints: 28, teleopPoints: 70 },
+      },
     }]);
     expect(requests).toHaveLength(4);
     expect(requests.every((request) => request.authorization === `Basic ${Buffer.from("strategy@example.com:test-token").toString("base64")}`)).toBe(true);

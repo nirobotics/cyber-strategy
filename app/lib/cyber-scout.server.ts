@@ -207,6 +207,7 @@ export async function loadCyberScoutDataset(
     }
 
     const records = await fetchRecords(db, event.id);
+    const officialResults = await fetchFrcMatchResults(event.tba_event_key).catch(() => []);
     let tbaMatches: TbaMatch[] = [];
     let tbaError: string | null = null;
     try {
@@ -214,9 +215,10 @@ export async function loadCyberScoutDataset(
     } catch (error) {
       tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
     }
-    const dataset = buildCyberScoutDataset({ event, records, tbaMatches, includedMatchTypes });
+    const dataset = buildCyberScoutDataset({ event, records, officialResults, tbaMatches, includedMatchTypes });
     const scoringMessages = [
       tbaError,
+      dataset.scoringOfficialMatches > 0 ? `${dataset.scoringOfficialMatches} 条队伍比赛记录使用 FRC Events Auto/Teleop 分项。` : null,
       dataset.scoringFallbackMatches > 0 ? `${dataset.scoringFallbackMatches} 条队伍比赛记录使用 Super Scout Auto/Teleop 分项。` : null,
       dataset.scoringZeroMatches > 0 ? `${dataset.scoringZeroMatches} 条队伍比赛记录缺少可用分项，已按 0 分显示。` : null,
     ].filter(Boolean);

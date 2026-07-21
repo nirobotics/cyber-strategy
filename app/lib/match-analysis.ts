@@ -46,8 +46,8 @@ export type MatchResult = {
   set_number?: number;
   winning_alliance?: "red" | "blue" | "tie";
   alliances: {
-    red?: { score?: number };
-    blue?: { score?: number };
+    red?: { score?: number; autoPoints?: number; teleopPoints?: number };
+    blue?: { score?: number; autoPoints?: number; teleopPoints?: number };
   };
 };
 

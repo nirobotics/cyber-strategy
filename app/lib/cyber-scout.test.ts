@@ -227,6 +227,12 @@ describe("cyber-scout dataset conversion", () => {
   it("uses Super Scout Auto and Teleop scores when TBA scoring is unavailable", () => {
     const dataset = buildCyberScoutDataset({
       event,
+      officialResults: [{
+        source: "frc-events",
+        comp_level: "qm",
+        match_number: 1,
+        alliances: { red: { score: 110 }, blue: { score: 90 } },
+      }],
       records: [
         normal(8214, 1, {
           climbPosition: "A",
@@ -259,6 +265,45 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({ autoPts: 9, telePts: 40, totalPts: 49 });
     expect(dataset.teamData["157"].matches[0]).toMatchObject({ autoPts: 6, telePts: 0, totalPts: 6 });
     expect(dataset.scoringFallbackMatches).toBe(3);
+    expect(dataset.scoringZeroMatches).toBe(0);
+  });
+
+  it("prefers FRC Events Auto and Teleop scores over Super Scout", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      officialResults: [{
+        source: "frc-events",
+        comp_level: "qm",
+        match_number: 1,
+        winning_alliance: "red",
+        alliances: {
+          red: { score: 100, autoPoints: 40, teleopPoints: 60 },
+          blue: { score: 50, autoPoints: 20, teleopPoints: 30 },
+        },
+      }],
+      records: [
+        normal(8214, 1, {
+          alliance: "red",
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214],
+          auto: [100],
+          drive: [0],
+          defense: [0],
+          bps: [10],
+          accuracy: [100],
+          comments: [""],
+          autoScore: 10,
+          teleopScore: 20,
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 40, telePts: 60, totalPts: 100 });
+    expect(dataset.scoringOfficialMatches).toBe(1);
+    expect(dataset.scoringFallbackMatches).toBe(0);
     expect(dataset.scoringZeroMatches).toBe(0);
   });
 
