@@ -46,6 +46,7 @@ export async function listStrategyProposals(eventKey: string): Promise<StrategyP
     .from("strategy_proposals")
     .select("*")
     .eq("event_key", eventKey)
+    .eq("proposal_type", "auto")
     .order("updated_at", { ascending: false });
   if (error) throw new Response("加载 Strategy Proposal 失败，请确认数据库迁移已执行。", { status: 500 });
 
@@ -244,7 +245,7 @@ function rowToProposal(row: StrategyProposalRow): StrategyProposal {
     ownTeam: normalizeOwnTeam(row.own_team),
     proposalType,
     status: isProposalStatus(row.status) ? row.status : "draft",
-    title: row.title,
+    title: proposalType === "auto" ? strategyProposalTitle(proposalType, row.match_label) : row.title,
     payload: normalizeProposalPayload(proposalType, row.payload),
     createdBy: row.created_by,
     createdByName: row.created_by ?? "未知",

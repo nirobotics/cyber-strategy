@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   Download,
-  Eye,
   Plus,
   Save,
   Send,
@@ -9,9 +8,10 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { PhotoLightbox, TeamDetailModal } from "./analytics-dashboard";
+import { StrategyBoard } from "./strategy-board";
 import { StrategyNavigation } from "./strategy-navigation";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
@@ -25,26 +25,24 @@ import {
   type ProposalMatch,
 } from "../lib/strategy-proposal-matches";
 import {
-  autoWinners,
   canDeleteProposalAs,
   canEditProposalAs,
   canRestoreApprovedSnapshot,
   canReviewProposal,
-  compactRoutePoints,
+  ensureStrategyBoardTeams,
   proposalMatchesSnapshot,
   proposalMatchesOwnTeamQuery,
   normalizeProposalPayload,
   ownStrategyTeams,
   proposalStatuses,
-  proposalTypes,
-  shouldFinishRouteStroke,
   strategyShifts,
   type AutoProposalPayload,
   type AutoWinner,
   type PartnerStrategyPayload,
   type RoutePoint,
   type RouteMap,
-  type SelfStrategyPayload,
+  type StrategyBoardPhase,
+  type StrategyBoardPhaseId,
   type StrategyProposal,
   type StrategyProposalPayload,
   type StrategyProposalStatus,
@@ -64,7 +62,6 @@ export type StrategyProposalPanelData = {
   matches: ProposalMatch[];
 };
 
-type TeamGroup = { label: string; tone: "red" | "blue" | "neutral"; teams: string[] };
 type EditorState = {
   id: string | null;
   proposalType: StrategyProposalType;
@@ -100,14 +97,17 @@ export function StrategyProposalPanel({
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [printProposals, setPrintProposals] = useState<StrategyProposal[] | null>(null);
-  const selected = data.proposals.find((proposal) => proposal.id === selectedId) ?? null;
-  const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, data.dataset, ownTeams));
+  const matchProposals = data.proposals.filter((proposal) => proposal.proposalType === "auto");
+  const selected = matchProposals.find((proposal) => proposal.id === selectedId) ?? null;
+  const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, ownTeams));
   const busy = navigation.state !== "idle" || proposalFetcher.state !== "idle";
   const editorMatches = proposalMatchesForTeam(data.matches, editor.ownTeam);
   const selectedMatch = proposalMatchForKeyOrFirst(editorMatches, editor.matchKey);
   const matchKeyValue = selectedMatch?.key ?? editor.matchKey;
   const matchLabelValue = selectedMatch?.label ?? editor.matchKey;
-  const allMatchTeams = selectedMatch ? [...selectedMatch.redTeams, ...selectedMatch.blueTeams] : [];
+  const approvedSnapshot = selected?.lastApprovedSnapshot
+    ? { ...selected.lastApprovedSnapshot, payload: ensureMatchPayload(selected.lastApprovedSnapshot.payload, selectedMatch) }
+    : null;
   const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
   const deletable = canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
   const reviewer = canReviewProposal(selected, data.isAdmin);
@@ -117,13 +117,14 @@ export function StrategyProposalPanel({
   const matchFilterOptions = data.matches.filter((match) => proposalMatchMatchesTeamQuery(match, teamFilter));
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
     ...selected,
+    lastApprovedSnapshot: approvedSnapshot,
     matchKey: matchKeyValue,
     matchLabel: matchLabelValue,
     ownTeam: editor.ownTeam,
     proposalType: editor.proposalType,
     payload: editor.payload,
   }));
-  const filteredProposals = data.proposals.filter((proposal) =>
+  const filteredProposals = matchProposals.filter((proposal) =>
     (statusFilter === "all" || proposal.status === statusFilter) &&
     (matchFilter === "all" || proposal.matchKey === matchFilter) &&
     proposalMatchesOwnTeamQuery(proposal, teamFilterDigits)
@@ -136,7 +137,7 @@ export function StrategyProposalPanel({
     if (proposalFetcher.data.deleted) {
       const timeout = window.setTimeout(() => {
         setSelectedId(null);
-        setEditor(initialEditorState(null, data.matches, data.dataset, ownTeams));
+        setEditor(initialEditorState(null, data.matches, ownTeams));
         replaceProposalUrl(searchParams, null, embedded, routeBase);
       }, 0);
       return () => window.clearTimeout(timeout);
@@ -172,23 +173,15 @@ export function StrategyProposalPanel({
 
   function newProposal() {
     setSelectedId(null);
-    setEditor(initialEditorState(null, data.matches, data.dataset, ownTeams));
+    setEditor(initialEditorState(null, data.matches, ownTeams));
     replaceProposalUrl(searchParams, null, embedded, routeBase);
   }
 
   function openProposal(id: string) {
-    const proposal = data.proposals.find((item) => item.id === id) ?? null;
+    const proposal = matchProposals.find((item) => item.id === id) ?? null;
     setSelectedId(id);
-    setEditor(initialEditorState(proposal, data.matches, data.dataset, ownTeams));
+    setEditor(initialEditorState(proposal, data.matches, ownTeams));
     replaceProposalUrl(searchParams, id, embedded, routeBase);
-  }
-
-  function updateType(type: StrategyProposalType) {
-    setEditor((current) => ({
-      ...current,
-      proposalType: type,
-      payload: emptyPayload(type, current.ownTeam, allMatchTeams, partnerTeams(selectedMatch, current.ownTeam)),
-    }));
   }
 
   function updateOwnTeam(ownTeam: string) {
@@ -197,35 +190,21 @@ export function StrategyProposalPanel({
       const nextMatch = currentMatch && proposalMatchIncludesTeam(currentMatch, ownTeam)
         ? currentMatch
         : firstProposalMatchForTeam(data.matches, ownTeam);
-      const teams = nextMatch ? [...nextMatch.redTeams, ...nextMatch.blueTeams] : [];
       return {
         ...current,
         ownTeam,
         matchKey: nextMatch?.key ?? "",
-        payload: current.payload.kind === "partner_strategy"
-          ? ensurePartnerPayload(current.payload, partnerTeams(nextMatch, ownTeam), opponentTeams(nextMatch, ownTeam))
-          : current.payload.kind === "auto"
-            ? ensureAutoPayload(current.payload, teams)
-            : current.payload.kind === "self_strategy"
-              ? ensureSelfPayload(current.payload, opponentTeams(nextMatch, ownTeam))
-              : current.payload,
+        payload: ensureMatchPayload(current.payload, nextMatch),
       };
     });
   }
 
   function updateMatch(matchKey: string) {
     const match = data.matches.find((item) => item.key === matchKey) ?? null;
-    const teams = match ? [...match.redTeams, ...match.blueTeams] : [];
     setEditor((current) => ({
       ...current,
       matchKey,
-      payload: current.payload.kind === "partner_strategy"
-        ? ensurePartnerPayload(current.payload, partnerTeams(match, current.ownTeam), opponentTeams(match, current.ownTeam))
-        : current.payload.kind === "auto"
-          ? ensureAutoPayload(current.payload, teams)
-          : current.payload.kind === "self_strategy"
-            ? ensureSelfPayload(current.payload, opponentTeams(match, current.ownTeam))
-            : current.payload,
+      payload: ensureMatchPayload(current.payload, match),
     }));
   }
 
@@ -245,7 +224,7 @@ export function StrategyProposalPanel({
         <div className="min-w-0">
           <p className="section-label">Strategy Proposal</p>
           <p className="mt-1 text-sm text-ink-dim">
-            {data.selectedEventKey} · {data.proposals.length} 个 proposal · {data.matches.length} 场比赛
+            {data.selectedEventKey} · {matchProposals.length} 个比赛策略 · {data.matches.length} 场比赛
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -276,7 +255,7 @@ export function StrategyProposalPanel({
         <Card className="overflow-hidden p-0">
           <div className="flex items-center justify-between gap-2 border-b border-line p-3">
             <div>
-              <p className="section-label">Proposal</p>
+              <p className="section-label">比赛策略</p>
               <h2 className="text-lg font-semibold text-ink">列表</h2>
             </div>
             <div className="flex gap-2">
@@ -314,7 +293,7 @@ export function StrategyProposalPanel({
           </div>
           <div className="max-h-[72dvh] overflow-y-auto">
             {!filteredProposals.length ? (
-              <div className="p-6 text-center text-sm text-ink-dim">暂无 proposal。</div>
+              <div className="p-6 text-center text-sm text-ink-dim">暂无比赛策略。</div>
             ) : (
               filteredProposals.map((proposal) => (
                 <button
@@ -341,7 +320,7 @@ export function StrategyProposalPanel({
         <Card className="overflow-hidden p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
             <div>
-              <h2 className="text-lg font-semibold text-ink">{selected ? "编辑 Proposal" : "新建 Proposal"}</h2>
+              <h2 className="text-lg font-semibold text-ink">{selected ? "编辑比赛策略" : "新建比赛策略"}</h2>
             </div>
             {selected ? <StatusBadge status={selected.status} /> : <StatusBadge status="draft" />}
           </div>
@@ -366,18 +345,7 @@ export function StrategyProposalPanel({
             <input type="hidden" name="proposalType" value={editor.proposalType} />
             <input type="hidden" name="payload" value={editorPayloadJson} />
 
-            <div className="grid gap-3 lg:grid-cols-[160px_160px_minmax(0,1fr)]">
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-ink-dim">类型</span>
-                <select
-                  value={editor.proposalType}
-                  disabled={!editable || Boolean(editor.id)}
-                  onChange={(event) => updateType(event.target.value as StrategyProposalType)}
-                  className="input h-10 font-sans"
-                >
-                  {proposalTypes.map((type) => <option key={type} value={type}>{proposalTypeLabel(type)}</option>)}
-                </select>
-              </label>
+            <div className="grid gap-3 lg:grid-cols-[160px_minmax(0,1fr)]">
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-ink-dim">己方队伍</span>
                 <select
@@ -409,19 +377,16 @@ export function StrategyProposalPanel({
 
             {!selectedMatch ? (
               <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
-                当前赛事没有 Team {editor.ownTeam} 的 TBA 赛程，暂不能创建 proposal。
+                当前赛事没有 Team {editor.ownTeam} 的 Cyber Scout 赛程，暂不能创建比赛策略。
               </div>
             ) : (
               <MatchTeamsBar match={selectedMatch} activeTeam={editor.ownTeam} onOpenTeam={setDetailTeam} />
             )}
 
             <PayloadEditor
-              proposalType={editor.proposalType}
-              ownTeam={editor.ownTeam}
               match={selectedMatch}
               payload={editor.payload}
               disabled={!editable}
-              onOpenTeam={setDetailTeam}
               onChange={(payload) => setEditor((current) => ({ ...current, payload }))}
             />
 
@@ -536,480 +501,19 @@ export function StrategyProposalPanel({
 }
 
 function PayloadEditor({
-  proposalType,
-  ownTeam,
   match,
   payload,
   disabled,
-  onOpenTeam,
   onChange,
 }: {
-  proposalType: StrategyProposalType;
-  ownTeam: string;
   match: ProposalMatch | null;
   payload: StrategyProposalPayload;
   disabled: boolean;
-  onOpenTeam: (team: string) => void;
   onChange: (payload: StrategyProposalPayload) => void;
 }) {
-  const matchTeamList = match ? [...match.redTeams, ...match.blueTeams] : [];
-  if (proposalType === "self_strategy") {
-    const opponents = opponentTeams(match, ownTeam);
-    return (
-      <SelfStrategyEditor
-        payload={payload.kind === "self_strategy" ? ensureSelfPayload(payload, opponents) : emptySelfPayload()}
-        ownTeam={ownTeam}
-        match={match}
-        disabled={disabled}
-        onOpenTeam={onOpenTeam}
-        onChange={onChange}
-      />
-    );
-  }
-
-  if (proposalType === "partner_strategy") {
-    const partners = partnerTeams(match, ownTeam);
-    const opponents = opponentTeams(match, ownTeam);
-    return (
-      <PartnerStrategyEditor
-        payload={payload.kind === "partner_strategy" ? ensurePartnerPayload(payload, partners, opponents) : emptyPartnerPayload(partners, opponents)}
-        partners={partners}
-        opponents={opponents}
-        opponentTone={opponentTone(match, ownTeam)}
-        disabled={disabled}
-        onOpenTeam={onOpenTeam}
-        onChange={onChange}
-      />
-    );
-  }
-
-  return (
-    <AutoProposalEditor
-      payload={payload.kind === "auto" ? ensureAutoPayload(payload, matchTeamList) : emptyAutoPayload(matchTeamList)}
-      match={match}
-      disabled={disabled}
-      onOpenTeam={onOpenTeam}
-      onChange={onChange}
-    />
-  );
-}
-
-function AutoProposalEditor({
-  payload,
-  match,
-  disabled,
-  onOpenTeam,
-  onChange,
-}: {
-  payload: AutoProposalPayload;
-  match: ProposalMatch | null;
-  disabled: boolean;
-  onOpenTeam: (team: string) => void;
-  onChange: (payload: AutoProposalPayload) => void;
-}) {
-  const teams = match ? [...match.redTeams, ...match.blueTeams] : [];
-  const teamGroups = match ? allianceGroups(match) : undefined;
-  const [activeAutoTeam, setActiveAutoTeam] = useState(teams[0] ?? "");
-  const [activeTransitionTeam, setActiveTransitionTeam] = useState(teams[0] ?? "");
-  const resolvedAutoTeam = teams.includes(activeAutoTeam) ? activeAutoTeam : teams[0] ?? "";
-  const resolvedTransitionTeam = teams.includes(activeTransitionTeam) ? activeTransitionTeam : teams[0] ?? "";
-
-  return (
-    <div className="grid gap-4">
-      <label className="grid max-w-xs gap-1">
-        <span className="text-sm font-medium text-ink-dim">预测 Auto 结果</span>
-        <select
-          value={payload.autoWinner}
-          disabled={disabled}
-          onChange={(event) => onChange({ ...payload, autoWinner: event.target.value as AutoWinner })}
-          className="input h-10 font-sans"
-        >
-          {autoWinners.map((winner) => <option key={winner} value={winner}>{autoWinnerLabel(winner)}</option>)}
-        </select>
-      </label>
-      <RoutePlanner
-        title="Auto 路线"
-        teams={teams}
-        teamGroups={teamGroups}
-        activeTeam={resolvedAutoTeam}
-        routes={payload.autoRoutes}
-        disabled={disabled}
-        onActiveTeam={setActiveAutoTeam}
-        onOpenTeam={onOpenTeam}
-        onRoutesChange={(autoRoutes) => onChange({ ...payload, autoRoutes })}
-      />
-      <RoutePlanner
-        title="Transition 路线"
-        teams={teams}
-        teamGroups={teamGroups}
-        activeTeam={resolvedTransitionTeam}
-        routes={payload.transitionRoutes}
-        disabled={disabled}
-        onActiveTeam={setActiveTransitionTeam}
-        onOpenTeam={onOpenTeam}
-        onRoutesChange={(transitionRoutes) => onChange({ ...payload, transitionRoutes })}
-      />
-      <TeamNoteRows
-        title="队伍备注"
-        teams={teams}
-        notes={payload.teamNotes}
-        disabled={disabled}
-        onChange={(teamNotes) => onChange({ ...payload, teamNotes })}
-      />
-      <NoteBox value={payload.note} disabled={disabled} onChange={(note) => onChange({ ...payload, note })} />
-    </div>
-  );
-}
-
-function SelfStrategyEditor({
-  payload,
-  ownTeam,
-  match,
-  disabled,
-  onOpenTeam,
-  onChange,
-}: {
-  payload: SelfStrategyPayload;
-  ownTeam: string;
-  match: ProposalMatch | null;
-  disabled: boolean;
-  onOpenTeam: (team: string) => void;
-  onChange: (payload: SelfStrategyPayload) => void;
-}) {
-  const [shift, setShift] = useState<StrategyShift>("active");
-  const [activeTeam, setActiveTeam] = useState(ownTeam);
-  const current = payload.shifts[shift];
-  const opponents = opponentTeams(match, ownTeam);
-  const teams = [ownTeam, ...opponents];
-  const resolvedActiveTeam = teams.includes(activeTeam) ? activeTeam : ownTeam;
-  const routes = { ...current.opponentRoutes, [ownTeam]: current.points };
-  return (
-    <ShiftSection activeShift={shift} onShift={setShift}>
-      <RoutePlanner
-        title={`${shiftLabel(shift)} 路线`}
-        teams={teams}
-        teamGroups={[
-          { label: "己方", tone: "neutral", teams: [ownTeam] },
-          { label: "对方", tone: opponentTone(match, ownTeam), teams: opponents },
-        ]}
-        activeTeam={resolvedActiveTeam}
-        routes={routes}
-        disabled={disabled}
-        onActiveTeam={setActiveTeam}
-        onOpenTeam={onOpenTeam}
-        onRoutesChange={(routes) => onChange({
-          ...payload,
-          shifts: {
-            ...payload.shifts,
-            [shift]: {
-              ...current,
-              points: routes[ownTeam] ?? [],
-              opponentRoutes: keepRouteTeams(routes, opponents),
-            },
-          },
-        })}
-      />
-      <NoteBox value={current.note} disabled={disabled} onChange={(note) => onChange({ ...payload, shifts: { ...payload.shifts, [shift]: { ...current, note } } })} />
-    </ShiftSection>
-  );
-}
-
-function PartnerStrategyEditor({
-  payload,
-  partners,
-  opponents,
-  opponentTone,
-  disabled,
-  onOpenTeam,
-  onChange,
-}: {
-  payload: PartnerStrategyPayload;
-  partners: string[];
-  opponents: string[];
-  opponentTone: TeamGroup["tone"];
-  disabled: boolean;
-  onOpenTeam: (team: string) => void;
-  onChange: (payload: PartnerStrategyPayload) => void;
-}) {
-  const [shift, setShift] = useState<StrategyShift>("active");
-  const [activeTeam, setActiveTeam] = useState(partners[0] ?? "");
-  const current = payload.shifts[shift];
-  const teams = [...partners, ...opponents];
-  const resolvedActiveTeam = teams.includes(activeTeam) ? activeTeam : partners[0] ?? opponents[0] ?? "";
-
-  return (
-    <ShiftSection activeShift={shift} onShift={setShift}>
-      {!partners.length ? (
-        <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
-          所选己方队伍不在当前比赛中，无法自动识别队友。
-        </div>
-      ) : null}
-      <RoutePlanner
-        title={`${shiftLabel(shift)} 队友共享地图`}
-        teams={teams}
-        teamGroups={[
-          { label: "队友", tone: "neutral", teams: partners },
-          { label: "对方", tone: opponentTone, teams: opponents },
-        ]}
-        activeTeam={resolvedActiveTeam}
-        routes={current.routes}
-        disabled={disabled}
-        onActiveTeam={setActiveTeam}
-        onOpenTeam={onOpenTeam}
-        onRoutesChange={(routes) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, routes: keepRouteTeams(routes, teams) } } })}
-      />
-      <TeamNoteRows
-        title="队友备注"
-        teams={partners}
-        notes={payload.partnerNotes}
-        disabled={disabled}
-        onChange={(partnerNotes) => onChange({ ...payload, partners, partnerNotes })}
-      />
-      <NoteBox value={current.note} disabled={disabled} onChange={(note) => onChange({ ...payload, partners, shifts: { ...payload.shifts, [shift]: { ...current, note } } })} />
-    </ShiftSection>
-  );
-}
-
-function TeamNoteRows({
-  title,
-  teams,
-  notes,
-  disabled,
-  onChange,
-}: {
-  title: string;
-  teams: string[];
-  notes: Record<string, string>;
-  disabled: boolean;
-  onChange: (notes: Record<string, string>) => void;
-}) {
-  if (!teams.length) return null;
-  return (
-    <div className="grid gap-2 rounded-md border border-line bg-surface-2 p-3">
-      <p className="section-label">{title}</p>
-      <div className="grid gap-2 md:grid-cols-2">
-        {teams.map((team) => (
-          <label key={team} className="grid gap-1">
-            <span className="text-sm font-medium text-ink-dim">Team {team}</span>
-            <input
-              value={notes[team] ?? ""}
-              disabled={disabled}
-              onChange={(event) => onChange({ ...notes, [team]: event.target.value })}
-              className="input h-10 font-sans"
-              placeholder="备注"
-            />
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ShiftSection({ activeShift, onShift, children }: { activeShift: StrategyShift; onShift: (shift: StrategyShift) => void; children: ReactNode }) {
-  return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap gap-2">
-        {strategyShifts.map((shift) => (
-          <Button key={shift} type="button" variant={activeShift === shift ? "active" : "default"} onClick={() => onShift(shift)}>
-            {shiftLabel(shift)}
-          </Button>
-        ))}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function RoutePlanner({
-  title,
-  teams,
-  teamGroups,
-  activeTeam,
-  routes,
-  disabled,
-  onActiveTeam,
-  onOpenTeam,
-  onRoutesChange,
-}: {
-  title: string;
-  teams: string[];
-  teamGroups?: TeamGroup[];
-  activeTeam: string;
-  routes: RouteMap;
-  disabled: boolean;
-  onActiveTeam: (team: string) => void;
-  onOpenTeam: (team: string) => void;
-  onRoutesChange: (routes: RouteMap) => void;
-}) {
-  const displayGroups = (teamGroups?.length ? teamGroups : [{ label: "队伍", tone: "neutral" as const, teams }]).filter((group) => group.teams.length);
-  const orderedTeams = displayGroups.flatMap((group) => group.teams);
-  const [draftRoutes, setDraftRoutes] = useState(routes);
-  const activePoints = useMemo(() => draftRoutes[activeTeam] ?? [], [activeTeam, draftRoutes]);
-  const drawingRef = useRef(false);
-  const draftPointsRef = useRef<RoutePoint[]>(activePoints);
-  const routesRef = useRef(routes);
-
-  useEffect(() => {
-    if (drawingRef.current) return;
-    routesRef.current = routes;
-    setDraftRoutes(routes);
-    draftPointsRef.current = routes[activeTeam] ?? [];
-  }, [activeTeam, routes]);
-
-  function pointFromPointer(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (disabled || !activeTeam) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const point = {
-      x: Math.round(((event.clientX - rect.left) / rect.width) * 1000) / 10,
-      y: Math.round(((event.clientY - rect.top) / rect.height) * 1000) / 10,
-    };
-    if (point.x < 0 || point.x > 100 || point.y < 0 || point.y > 100) return;
-    return point;
-  }
-
-  function setActiveRoute(points: RoutePoint[], commit = false) {
-    const nextRoutes = { ...routesRef.current, [activeTeam]: points };
-    routesRef.current = nextRoutes;
-    draftPointsRef.current = points;
-    setDraftRoutes(nextRoutes);
-    if (commit) onRoutesChange(nextRoutes);
-  }
-
-  function startStroke(event: ReactPointerEvent<HTMLButtonElement>) {
-    const point = pointFromPointer(event);
-    if (!point) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    drawingRef.current = true;
-    setActiveRoute([...activePoints, { ...point, start: true }]);
-  }
-
-  function drawStroke(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!drawingRef.current) return;
-    const point = pointFromPointer(event);
-    if (!point) return;
-    event.preventDefault();
-    const previous = draftPointsRef.current.at(-1);
-    if (previous && Math.hypot(point.x - previous.x, point.y - previous.y) < 0.7) return;
-    setActiveRoute([...draftPointsRef.current, point]);
-  }
-
-  function stopStroke(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (!shouldFinishRouteStroke(event.type, event.pointerType)) return;
-    if (!drawingRef.current) return;
-    drawingRef.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setActiveRoute(compactRoutePoints(draftPointsRef.current), true);
-  }
-
-  function undo() {
-    let lastStrokeStart = -1;
-    for (let index = activePoints.length - 1; index >= 0; index -= 1) {
-      if (activePoints[index].start) {
-        lastStrokeStart = index;
-        break;
-      }
-    }
-    setActiveRoute(activePoints.slice(0, Math.max(0, lastStrokeStart)), true);
-  }
-
-  function clear() {
-    setActiveRoute([], true);
-  }
-
-  return (
-    <Card className="overflow-hidden p-0">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
-        <div>
-          <p className="section-label">{title}</p>
-          <h3 className="text-base font-semibold text-ink">{activeTeam ? `编辑 Team ${activeTeam}` : "请选择队伍"}</h3>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" onClick={undo} disabled={disabled || !activePoints.length}>
-            <Undo2 className="size-4" />
-            撤销
-          </Button>
-          <Button type="button" onClick={clear} disabled={disabled || !activePoints.length}>
-            <Trash2 className="size-4" />
-            清空
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-3 p-3">
-        <div className="grid gap-2">
-          {displayGroups.map((group) => (
-            <div key={group.label} className="flex flex-wrap items-center gap-2">
-              <Badge
-                className={cn(
-                  group.tone === "red" && "border-danger/40 bg-danger/10 text-danger",
-                  group.tone === "blue" && "border-info/40 bg-info/10 text-info",
-                  group.tone === "neutral" && "border-line bg-surface-2 text-ink-dim",
-                )}
-              >
-                {group.label}
-              </Badge>
-              {group.teams.map((team) => {
-                const index = orderedTeams.indexOf(team);
-                const active = activeTeam === team;
-                return (
-                  <div
-                    key={team}
-                    className={cn(
-                      "flex items-center overflow-hidden rounded-md border border-line bg-surface-2 transition",
-                      active && "border-brand bg-brand/10 text-brand ring-2 ring-brand/30",
-                    )}
-                  >
-                    <button
-                      type="button"
-                      className={cn("px-2 py-1 text-sm font-semibold text-ink", active && "text-brand")}
-                      onClick={() => onActiveTeam(team)}
-                    >
-                      <span className="mr-1 inline-block size-2 rounded-full" style={{ backgroundColor: routeColor(index) }} />
-                      Team {team}
-                    </button>
-                    <button type="button" className="border-l border-line px-2 py-1 text-ink-faint hover:text-ink" title="查看队伍详情" onClick={() => onOpenTeam(team)}>
-                      <Eye className="size-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          className={cn("relative aspect-[2/1] touch-none overflow-hidden rounded-md border border-line bg-surface-2", !disabled && activeTeam && "cursor-crosshair")}
-          onPointerDown={startStroke}
-          onPointerMove={drawStroke}
-          onPointerUp={stopStroke}
-          onPointerCancel={stopStroke}
-          onPointerLeave={stopStroke}
-          disabled={disabled || !activeTeam}
-          aria-label={title}
-        >
-          <img src="/pit-field-map.webp" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
-            {orderedTeams.map((team, index) => {
-              const points = draftRoutes[team] ?? [];
-              if (points.length < 2) return null;
-              return routeSegments(points).map((segment, segmentIndex) => (
-                <polyline
-                  key={`${team}-${segmentIndex}`}
-                  points={segment.map((point) => `${point.x},${point.y}`).join(" ")}
-                  fill="none"
-                  stroke={routeColor(index)}
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-              ));
-            })}
-          </svg>
-        </button>
-      </div>
-    </Card>
-  );
+  if (!match) return null;
+  const matchPayload = ensureMatchPayload(payload, match);
+  return <StrategyBoard payload={matchPayload} match={match} disabled={disabled} onChange={onChange} />;
 }
 
 function MatchTeamsBar({ match, activeTeam, onOpenTeam }: { match: ProposalMatch; activeTeam: string; onOpenTeam: (team: string) => void }) {
@@ -1311,23 +815,61 @@ function PrintableProposalMaps({ proposal, match }: { proposal: StrategyProposal
   }
 
   const teams = printMatchTeams(match, proposal);
+  const matchPayload = match ? ensureStrategyBoardTeams(payload, match.redTeams, match.blueTeams) : payload;
   return (
     <div className="proposal-print-map-grid">
-      <PrintRouteMap
-        title="Auto 路线"
-        teams={teams}
-        routes={payload.autoRoutes}
-        notes={[
-          { label: "预测 Auto 结果", value: autoWinnerLabel(payload.autoWinner) },
-          ...teamNoteRows(payload.teamNotes),
-        ]}
-      />
-      <PrintRouteMap
-        title="Transition 路线"
-        teams={teams}
-        routes={payload.transitionRoutes}
-        notes={payload.note ? [{ label: "备注", value: payload.note }] : []}
-      />
+      {(Object.keys(matchPayload.phases) as StrategyBoardPhaseId[]).map((phase) => (
+        <PrintStrategyBoardPhase key={phase} title={strategyBoardPhaseLabel(phase)} phase={matchPayload.phases[phase]} match={match} teams={teams} />
+      ))}
+    </div>
+  );
+}
+
+function PrintStrategyBoardPhase({
+  title,
+  phase,
+  match,
+  teams,
+}: {
+  title: string;
+  phase: StrategyBoardPhase;
+  match: ProposalMatch | null;
+  teams: string[];
+}) {
+  return (
+    <div className="proposal-print-map-card">
+      <div className="proposal-print-map-head">
+        <h3>{title}</h3>
+        <div className="proposal-print-map-legend">
+          {teams.map((team) => <span key={team}>Team {team}</span>)}
+        </div>
+      </div>
+      <div className="proposal-print-field">
+        <img src="/pit-field-map.webp" alt="" />
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
+          {phase.strokes.map((stroke) => (
+            <polyline
+              key={stroke.id}
+              points={stroke.points.map((point) => `${point.x},${point.y}`).join(" ")}
+              fill="none"
+              stroke={stroke.color}
+              strokeWidth="2.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+          {phase.robots.map((robot) => {
+            const red = match?.redTeams.includes(robot.team) ?? false;
+            return (
+              <g key={robot.team} transform={`translate(${robot.x} ${robot.y}) rotate(${robot.rotation})`}>
+                <rect x="-4.5" y="-3.2" width="9" height="6.4" rx="1" fill="#111827" stroke={red ? "#ef4444" : "#3b82f6"} strokeWidth="0.8" />
+                <text x="0" y="0.9" textAnchor="middle" fill="#fff" fontSize="2.6" fontWeight="700">{robot.team}</text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </div>
   );
 }
@@ -1409,10 +951,10 @@ function PrintRouteMap({
 function PrintProposalNotes({ proposal }: { proposal: StrategyProposal }) {
   const payload = proposal.payload;
   const notes: Array<{ label: string; value: string }> = [];
-  if (payload.kind === "auto") {
-    notes.push({ label: "预测 Auto 结果", value: autoWinnerLabel(payload.autoWinner) });
+  if (payload.kind === "match_strategy") {
+    notes.push({ label: "预测自动阶段结果", value: autoWinnerLabel(payload.autoWinner) });
     notes.push(...teamNoteRows(payload.teamNotes));
-    if (payload.note) notes.push({ label: "全局备注", value: payload.note });
+    if (payload.note) notes.push({ label: "整场备注", value: payload.note });
   } else if (payload.kind === "self_strategy") {
     for (const shift of strategyShifts) {
       const note = payload.shifts[shift].note;
@@ -1436,15 +978,6 @@ function PrintProposalNotes({ proposal }: { proposal: StrategyProposal }) {
   );
 }
 
-function NoteBox({ value, disabled, onChange }: { value: string; disabled: boolean; onChange: (value: string) => void }) {
-  return (
-    <label className="grid gap-1">
-      <span className="text-sm font-medium text-ink-dim">备注</span>
-      <textarea value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="input min-h-24 font-sans" />
-    </label>
-  );
-}
-
 function StatusBadge({ status }: { status: StrategyProposalStatus }) {
   return (
     <Badge
@@ -1463,96 +996,29 @@ function StatusBadge({ status }: { status: StrategyProposalStatus }) {
 function initialEditorState(
   proposal: StrategyProposal | null,
   matches: ProposalMatch[],
-  dataset: ScoutingDataset,
   ownTeams: readonly string[],
 ): EditorState {
-  const proposalType = proposal?.proposalType ?? "auto";
+  const proposalType: StrategyProposalType = "auto";
   const ownTeam = proposal?.ownTeam ?? ownTeams[0] ?? ownStrategyTeams[0];
   const ownMatches = proposalMatchesForTeam(matches, ownTeam);
   const match = proposal ? proposalMatchForKeyOrFirst(ownMatches, proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
-  const teams = match ? [...match.redTeams, ...match.blueTeams] : Object.keys(dataset.teamData).slice(0, 6);
+  const payload = proposal?.proposalType === "auto" ? proposal.payload : normalizeProposalPayload("auto", {});
   return {
     id: proposal?.id ?? null,
     proposalType,
     ownTeam,
     matchKey: match?.key ?? proposal?.matchKey ?? "",
-    payload: proposal?.payload ?? emptyPayload(proposalType, ownTeam, teams, partnerTeams(match ?? null, ownTeam)),
+    payload: ensureMatchPayload(payload, match),
   };
 }
 
-function emptyPayload(type: StrategyProposalType, ownTeam: string, teams: string[], partners: string[]): StrategyProposalPayload {
-  if (type === "self_strategy") {
-    return emptySelfPayload();
-  }
-  if (type === "partner_strategy") {
-    return emptyPartnerPayload(partners, teams.filter((team) => team !== ownTeam && !partners.includes(team)));
-  }
-  return emptyAutoPayload(teams.includes(ownTeam) ? teams : teams);
-}
-
-function emptyAutoPayload(teams: string[]): AutoProposalPayload {
-  return ensureAutoPayload(normalizeProposalPayload("auto", {}) as AutoProposalPayload, teams);
-}
-
-function emptySelfPayload(): SelfStrategyPayload {
-  return normalizeProposalPayload("self_strategy", {
-    shifts: Object.fromEntries(strategyShifts.map((shift) => [shift, { points: [], opponentRoutes: {}, note: "" }])),
-  }) as SelfStrategyPayload;
-}
-
-function emptyPartnerPayload(partners: string[], opponents: string[]): PartnerStrategyPayload {
-  return ensurePartnerPayload(normalizeProposalPayload("partner_strategy", { partners }) as PartnerStrategyPayload, partners, opponents);
-}
-
-function ensureAutoPayload(payload: AutoProposalPayload, teams: string[]): AutoProposalPayload {
-  return {
-    ...payload,
-    autoRoutes: keepRouteTeams(payload.autoRoutes, teams),
-    transitionRoutes: keepRouteTeams(payload.transitionRoutes, teams),
-    teamNotes: keepNotesForTeams(payload.teamNotes, teams),
-  };
-}
-
-function ensureSelfPayload(payload: SelfStrategyPayload, opponents: string[]): SelfStrategyPayload {
-  return {
-    ...payload,
-    shifts: Object.fromEntries(strategyShifts.map((shift) => [
-      shift,
-      {
-        note: payload.shifts[shift]?.note ?? "",
-        points: payload.shifts[shift]?.points ?? [],
-        opponentRoutes: keepRouteTeams(payload.shifts[shift]?.opponentRoutes ?? {}, opponents),
-      },
-    ])) as SelfStrategyPayload["shifts"],
-  };
-}
-
-function ensurePartnerPayload(payload: PartnerStrategyPayload, partners: string[], opponents: string[]): PartnerStrategyPayload {
-  const routeTeams = [...partners, ...opponents];
-  return {
-    ...payload,
-    partners,
-    partnerNotes: keepNotesForTeams(payload.partnerNotes, partners),
-    shifts: Object.fromEntries(strategyShifts.map((shift) => [
-      shift,
-      {
-        note: payload.shifts[shift]?.note ?? "",
-        routes: keepRouteTeams(payload.shifts[shift]?.routes ?? {}, routeTeams),
-      },
-    ])) as PartnerStrategyPayload["shifts"],
-  };
-}
-
-function keepRouteTeams(routes: RouteMap, teams: string[]) {
-  const next: RouteMap = {};
-  for (const team of teams) next[team] = routes[team] ?? [];
-  return next;
-}
-
-function keepNotesForTeams(notes: Record<string, string>, teams: string[]) {
-  const next: Record<string, string> = {};
-  for (const team of teams) next[team] = notes[team] ?? "";
-  return next;
+function ensureMatchPayload(payload: StrategyProposalPayload, match: ProposalMatch | null): AutoProposalPayload {
+  const matchPayload = payload.kind === "match_strategy"
+    ? payload
+    : normalizeProposalPayload("auto", {}) as AutoProposalPayload;
+  return match
+    ? ensureStrategyBoardTeams(matchPayload, match.redTeams, match.blueTeams)
+    : matchPayload;
 }
 
 function partnerTeams(match: ProposalMatch | null, ownTeam: string) {
@@ -1569,20 +1035,6 @@ function opponentTeams(match: ProposalMatch | null, ownTeam: string) {
   return [];
 }
 
-function opponentTone(match: ProposalMatch | null, ownTeam: string): TeamGroup["tone"] {
-  if (!match) return "neutral";
-  if (match.redTeams.includes(ownTeam)) return "blue";
-  if (match.blueTeams.includes(ownTeam)) return "red";
-  return "neutral";
-}
-
-function allianceGroups(match: ProposalMatch): TeamGroup[] {
-  return [
-    { label: "Red", tone: "red", teams: match.redTeams },
-    { label: "Blue", tone: "blue", teams: match.blueTeams },
-  ];
-}
-
 function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, embedded: boolean, routeBase: string) {
   const params = new URLSearchParams(searchParams);
   if (id) params.set("proposal", id);
@@ -1594,7 +1046,7 @@ function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, em
 }
 
 function proposalTypeLabel(type: StrategyProposalType) {
-  if (type === "auto") return "Auto";
+  if (type === "auto") return "比赛策略";
   if (type === "self_strategy") return "我们自己";
   return "队友策略";
 }
@@ -1610,6 +1062,13 @@ function shiftLabel(shift: StrategyShift) {
   if (shift === "inactive") return "Inactive";
   if (shift === "endgame") return "Endgame";
   return "Active";
+}
+
+function strategyBoardPhaseLabel(phase: StrategyBoardPhaseId) {
+  if (phase === "auto") return "AUTO";
+  if (phase === "transition") return "TRANSITION";
+  if (phase === "active") return "ACTIVE";
+  return "INACTIVE";
 }
 
 function autoWinnerLabel(value: AutoWinner) {
@@ -1630,9 +1089,8 @@ function routeTeamsForPayload(payload: StrategyProposalPayload) {
     teams.push(...Object.keys(routes));
   }
 
-  if (payload.kind === "auto") {
-    addRoutes(payload.autoRoutes);
-    addRoutes(payload.transitionRoutes);
+  if (payload.kind === "match_strategy") {
+    for (const phase of Object.values(payload.phases)) teams.push(...phase.robots.map((robot) => robot.team));
     teams.push(...Object.keys(payload.teamNotes));
   } else if (payload.kind === "self_strategy") {
     for (const shift of strategyShifts) addRoutes(payload.shifts[shift].opponentRoutes);

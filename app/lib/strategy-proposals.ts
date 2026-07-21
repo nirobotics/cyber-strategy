@@ -3,6 +3,8 @@ export const proposalTypes = ["auto", "self_strategy", "partner_strategy"] as co
 export const proposalStatuses = ["draft", "submitted", "approved", "rejected"] as const;
 export const strategyShifts = ["active", "inactive", "endgame"] as const;
 export const autoWinners = ["unknown", "red", "blue", "tie"] as const;
+export const strategyBoardPhases = ["auto", "transition", "active", "inactive"] as const;
+export const strategyBoardColors = ["#f8fafc", "#ef4444", "#3b82f6", "#22c55e", "#facc15"] as const;
 const routePointMinDistance = 1.2;
 const routeMaxPointsPerStroke = 100;
 
@@ -11,15 +13,18 @@ export type StrategyProposalType = (typeof proposalTypes)[number];
 export type StrategyProposalStatus = (typeof proposalStatuses)[number];
 export type StrategyShift = (typeof strategyShifts)[number];
 export type AutoWinner = (typeof autoWinners)[number];
+export type StrategyBoardPhaseId = (typeof strategyBoardPhases)[number];
 
 export type RoutePoint = { x: number; y: number; start?: boolean };
 export type RouteMap = Record<string, RoutePoint[]>;
+export type StrategyBoardStroke = { id: string; color: string; points: RoutePoint[] };
+export type StrategyBoardRobot = { team: string; x: number; y: number; rotation: number };
+export type StrategyBoardPhase = { strokes: StrategyBoardStroke[]; robots: StrategyBoardRobot[] };
 
 export type AutoProposalPayload = {
-  kind: "auto";
+  kind: "match_strategy";
   autoWinner: AutoWinner;
-  autoRoutes: RouteMap;
-  transitionRoutes: RouteMap;
+  phases: Record<StrategyBoardPhaseId, StrategyBoardPhase>;
   teamNotes: Record<string, string>;
   note: string;
 };
@@ -89,7 +94,7 @@ export function isProposalStatus(value: unknown): value is StrategyProposalStatu
 }
 
 export function strategyProposalTitle(type: StrategyProposalType, matchLabel: string) {
-  const label = type === "auto" ? "Auto" : type === "self_strategy" ? "我们自己" : "队友策略";
+  const label = type === "auto" ? "比赛策略" : type === "self_strategy" ? "我们自己" : "队友策略";
   return `${String(matchLabel || "Match").trim() || "Match"} · ${label}`;
 }
 
@@ -127,14 +132,61 @@ export function normalizeProposalPayload(type: StrategyProposalType, value: unkn
     };
   }
 
+  const phaseSource = objectValue(record.phases);
   return {
-    kind: "auto",
+    kind: "match_strategy",
     autoWinner: autoWinners.includes(record.autoWinner as AutoWinner) ? (record.autoWinner as AutoWinner) : "unknown",
-    autoRoutes: normalizeRouteMap(record.autoRoutes),
-    transitionRoutes: normalizeRouteMap(record.transitionRoutes),
+    phases: Object.fromEntries(strategyBoardPhases.map((phase) => [
+      phase,
+      phaseSource[phase]
+        ? normalizeStrategyBoardPhase(phaseSource[phase], phase)
+        : {
+            strokes: phase === "auto"
+              ? legacyRoutesToStrokes(record.autoRoutes, phase)
+              : phase === "transition"
+                ? legacyRoutesToStrokes(record.transitionRoutes, phase)
+                : [],
+            robots: [],
+          },
+    ])) as AutoProposalPayload["phases"],
     teamNotes: normalizeNoteMap(record.teamNotes),
     note: stringValue(record.note),
   };
+}
+
+export function ensureStrategyBoardTeams(
+  payload: AutoProposalPayload,
+  redTeams: string[],
+  blueTeams: string[],
+): AutoProposalPayload {
+  const defaults = defaultStrategyRobots(redTeams, blueTeams);
+  return {
+    ...payload,
+    phases: Object.fromEntries(strategyBoardPhases.map((phase) => {
+      const current = payload.phases[phase] ?? { strokes: [], robots: [] };
+      const robots = new Map(current.robots.map((robot) => [robot.team, robot]));
+      return [phase, {
+        strokes: current.strokes,
+        robots: defaults.map((robot) => robots.get(robot.team) ?? robot),
+      }];
+    })) as AutoProposalPayload["phases"],
+    teamNotes: Object.fromEntries([...redTeams, ...blueTeams].map((team) => [team, payload.teamNotes[team] ?? ""])),
+  };
+}
+
+export function defaultStrategyRobots(redTeams: string[], blueTeams: string[]): StrategyBoardRobot[] {
+  return [
+    ...redTeams.map((team, index) => ({ team, x: 20, y: 20 + index * 30, rotation: 0 })),
+    ...blueTeams.map((team, index) => ({ team, x: 80, y: 20 + index * 30, rotation: 180 })),
+  ];
+}
+
+export function eraseStrategyStrokes(
+  strokes: StrategyBoardStroke[],
+  point: RoutePoint,
+  radius = 3,
+) {
+  return strokes.filter((stroke) => !strokeTouchesPoint(stroke, point, radius));
 }
 
 export function normalizeProposalSnapshot(value: unknown): StrategyProposalSnapshot | null {
@@ -258,6 +310,71 @@ function normalizePoints(value: unknown): RoutePoint[] {
     })
     .filter((point): point is RoutePoint => Boolean(point));
   return compactRoutePoints(points);
+}
+
+function normalizeStrategyBoardPhase(value: unknown, phase: StrategyBoardPhaseId): StrategyBoardPhase {
+  const record = objectValue(value);
+  return {
+    strokes: Array.isArray(record.strokes)
+      ? record.strokes.map((stroke, index) => normalizeStrategyBoardStroke(stroke, `${phase}-${index}`)).filter(Boolean) as StrategyBoardStroke[]
+      : [],
+    robots: Array.isArray(record.robots)
+      ? record.robots.map(normalizeStrategyBoardRobot).filter(Boolean) as StrategyBoardRobot[]
+      : [],
+  };
+}
+
+function normalizeStrategyBoardStroke(value: unknown, fallbackId: string): StrategyBoardStroke | null {
+  const record = objectValue(value);
+  const points = normalizePoints(record.points).map(({ x, y }) => ({ x, y }));
+  if (points.length < 2) return null;
+  const color = typeof record.color === "string" && /^#[0-9a-f]{6}$/i.test(record.color)
+    ? record.color.toLowerCase()
+    : strategyBoardColors[0];
+  const id = typeof record.id === "string" && record.id.trim() ? record.id.trim().slice(0, 80) : fallbackId;
+  return { id, color, points };
+}
+
+function normalizeStrategyBoardRobot(value: unknown): StrategyBoardRobot | null {
+  const record = objectValue(value);
+  const team = teamNumber(record.team);
+  const x = boundedPercent(record.x);
+  const y = boundedPercent(record.y);
+  if (!team || x == null || y == null) return null;
+  const rotation = Number(record.rotation);
+  return { team, x, y, rotation: Number.isFinite(rotation) ? Math.round((((rotation % 360) + 360) % 360) * 10) / 10 : 0 };
+}
+
+function legacyRoutesToStrokes(value: unknown, phase: StrategyBoardPhaseId) {
+  return Object.entries(normalizeRouteMap(value)).flatMap(([team, points], teamIndex) => {
+    const strokes: RoutePoint[][] = [];
+    for (const point of points) {
+      if (point.start || !strokes.length) strokes.push([{ x: point.x, y: point.y }]);
+      else strokes[strokes.length - 1].push({ x: point.x, y: point.y });
+    }
+    return strokes
+      .filter((stroke) => stroke.length > 1)
+      .map((stroke, strokeIndex) => ({
+        id: `legacy-${phase}-${team}-${strokeIndex}`,
+        color: strategyBoardColors[teamIndex % strategyBoardColors.length],
+        points: stroke,
+      }));
+  });
+}
+
+function strokeTouchesPoint(stroke: StrategyBoardStroke, point: RoutePoint, radius: number) {
+  for (let index = 1; index < stroke.points.length; index += 1) {
+    if (distanceToSegment(point, stroke.points[index - 1], stroke.points[index]) <= radius) return true;
+  }
+  return false;
+}
+
+function distanceToSegment(point: RoutePoint, start: RoutePoint, end: RoutePoint) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (!dx && !dy) return Math.hypot(point.x - start.x, point.y - start.y);
+  const position = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(point.x - (start.x + position * dx), point.y - (start.y + position * dy));
 }
 
 function compactStroke(points: RoutePoint[]) {

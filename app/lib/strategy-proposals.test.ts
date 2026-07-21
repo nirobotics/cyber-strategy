@@ -6,6 +6,8 @@ import {
   canRestoreApprovedSnapshot,
   canReviewProposal,
   compactRoutePoints,
+  ensureStrategyBoardTeams,
+  eraseStrategyStrokes,
   normalizeOwnTeam,
   normalizeProposalPayload,
   proposalMatchesOwnTeamQuery,
@@ -17,26 +19,59 @@ import {
 
 describe("strategy proposal helpers", () => {
   it("generates proposal titles from match and type", () => {
-    expect(strategyProposalTitle("auto", "Q9")).toBe("Q9 · Auto");
+    expect(strategyProposalTitle("auto", "Q9")).toBe("Q9 · 比赛策略");
     expect(strategyProposalTitle("self_strategy", "Q12")).toBe("Q12 · 我们自己");
     expect(strategyProposalTitle("partner_strategy", "Q15")).toBe("Q15 · 队友策略");
   });
 
-  it("normalizes auto proposal payload and manual winner", () => {
+  it("migrates legacy Auto routes into the unified match board", () => {
     expect(normalizeProposalPayload("auto", {
       autoWinner: "red",
-      autoRoutes: { frc8214: [{ x: 10.04, y: 99.96, start: true }, { x: 20, y: 80, s: true }, { x: -1, y: 2 }] },
+      autoRoutes: { frc8214: [{ x: 10.04, y: 99.96, start: true }, { x: 20, y: 80 }, { x: -1, y: 2 }] },
       transitionRoutes: { 9635: [{ x: 50, y: 40 }] },
       teamNotes: { frc8214: "  start left  " },
       note: "  hold center  ",
     })).toEqual({
-      kind: "auto",
+      kind: "match_strategy",
       autoWinner: "red",
-      autoRoutes: { "8214": [{ x: 10, y: 100, start: true }, { x: 20, y: 80, start: true }] },
-      transitionRoutes: { "9635": [{ x: 50, y: 40 }] },
+      phases: {
+        auto: {
+          robots: [],
+          strokes: [{
+            id: "legacy-auto-8214-0",
+            color: "#f8fafc",
+            points: [{ x: 10, y: 100 }, { x: 20, y: 80 }],
+          }],
+        },
+        transition: { robots: [], strokes: [] },
+        active: { robots: [], strokes: [] },
+        inactive: { robots: [], strokes: [] },
+      },
       teamNotes: { "8214": "start left" },
       note: "hold center",
     });
+  });
+
+  it("adds six independent robot models to every match phase", () => {
+    const payload = ensureStrategyBoardTeams(
+      normalizeProposalPayload("auto", {}) as Extract<ReturnType<typeof normalizeProposalPayload>, { kind: "match_strategy" }>,
+      ["8214", "9992", "6399"],
+      ["11019", "9995", "10016"],
+    );
+
+    expect(payload.phases.auto.robots).toHaveLength(6);
+    expect(payload.phases.transition.robots).toHaveLength(6);
+    expect(payload.phases.auto.robots[0]).toEqual({ team: "8214", x: 20, y: 20, rotation: 0 });
+    expect(payload.phases.auto.robots[3]).toEqual({ team: "11019", x: 80, y: 20, rotation: 180 });
+    expect(payload.phases.auto.robots).not.toBe(payload.phases.transition.robots);
+  });
+
+  it("eraser removes the whole stroke it touches", () => {
+    const strokes = [
+      { id: "a", color: "#ffffff", points: [{ x: 10, y: 10 }, { x: 50, y: 50 }] },
+      { id: "b", color: "#ef4444", points: [{ x: 10, y: 80 }, { x: 50, y: 80 }] },
+    ];
+    expect(eraseStrategyStrokes(strokes, { x: 30, y: 31 }, 2).map((stroke) => stroke.id)).toEqual(["b"]);
   });
 
   it("keeps self strategy as one map per shift", () => {
