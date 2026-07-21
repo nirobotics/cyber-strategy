@@ -61,20 +61,36 @@ describe("match analysis calculations", () => {
     expect(strategyScoreSd([], teamData)).toBeCloseTo(Math.sqrt(3) * 8.165, 2);
   });
 
-  it("falls back to Statbotics win probability when Strategy composite is missing", () => {
-    const match = schedule(["1", "2", "3"], ["4", "5", "6"], {
+  it("falls back to Statbotics win probability when an alliance lineup is incomplete", () => {
+    const match = schedule(["1", "2", "3"], ["4", "5"], {
       pred: { red_win_prob: 0.72 },
     });
 
     const probability = resolveWinProbability({
       match,
       redTeams: ["1", "2", "3"],
-      blueTeams: ["4", "5", "6"],
+      blueTeams: ["4", "5"],
       teamData: teams({ 1: 10, 2: 20, 3: 30 }),
       matches: [match],
     });
 
     expect(probability).toMatchObject({ source: "statbotics", red: 0.72, blue: 0.28 });
+  });
+
+  it("counts a team without Strategy data as zero in match predictions", () => {
+    const match = schedule(["1", "2", "3"], ["4", "5", "6"]);
+
+    expect(resolveMatchScores({
+      match,
+      redTeams: ["1", "2", "3"],
+      blueTeams: ["4", "5", "6"],
+      teamData: teams({ 1: 10, 2: 20, 4: 40, 5: 50, 6: 60 }),
+    })).toMatchObject({
+      predictedRed: 30,
+      predictedBlue: 150,
+      source: "strategy",
+      label: "综合分预测",
+    });
   });
 
   it("uses FRC Events for actual match score", () => {

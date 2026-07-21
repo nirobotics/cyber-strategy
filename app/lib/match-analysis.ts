@@ -314,9 +314,9 @@ export function strategyScoreSd(matches: CombinedMatch[], teamData: TeamData): n
 
 export function allianceCompositeScore(teamNumbers: string[], teamData: TeamData): number | null {
   if (teamNumbers.length !== 3) return null;
-  const values = teamNumbers.map((team) => teamData[team]?.avgTotal);
-  if (values.some((value) => value == null || !Number.isFinite(value))) return null;
-  return round1(values.reduce((sum, value) => sum + (value ?? 0), 0));
+  const values = teamNumbers.map((team) => teamData[team]?.avgTotal ?? 0);
+  if (values.some((value) => !Number.isFinite(value))) return null;
+  return round1(values.reduce((sum, value) => sum + value, 0));
 }
 
 export function buildTeamEventMap(teamEvents: TeamEvent[]): Map<string, TeamEvent> {
