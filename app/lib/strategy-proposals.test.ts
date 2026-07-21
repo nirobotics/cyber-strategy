@@ -10,6 +10,7 @@ import {
   normalizeProposalPayload,
   proposalMatchesOwnTeamQuery,
   proposalMatchesSnapshot,
+  shouldFinishRouteStroke,
   strategyProposalTitle,
   type StrategyProposal,
 } from "./strategy-proposals";
@@ -108,6 +109,14 @@ describe("strategy proposal helpers", () => {
     }));
 
     expect(compactRoutePoints(longStroke).length).toBeLessThanOrEqual(100);
+  });
+
+  it("keeps iPad touch and Apple Pencil strokes active through pointerleave", () => {
+    expect(shouldFinishRouteStroke("pointerleave", "touch")).toBe(false);
+    expect(shouldFinishRouteStroke("pointerleave", "pen")).toBe(false);
+    expect(shouldFinishRouteStroke("pointerleave", "mouse")).toBe(true);
+    expect(shouldFinishRouteStroke("pointerup", "touch")).toBe(true);
+    expect(shouldFinishRouteStroke("pointercancel", "pen")).toBe(true);
   });
 
   it("locks own team choices and permissions", () => {

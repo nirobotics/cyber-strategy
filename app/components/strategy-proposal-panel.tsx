@@ -37,6 +37,7 @@ import {
   ownStrategyTeams,
   proposalStatuses,
   proposalTypes,
+  shouldFinishRouteStroke,
   strategyShifts,
   type AutoProposalPayload,
   type AutoWinner,
@@ -894,6 +895,7 @@ function RoutePlanner({
   }
 
   function stopStroke(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!shouldFinishRouteStroke(event.type, event.pointerType)) return;
     if (!drawingRef.current) return;
     drawingRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -985,8 +987,8 @@ function RoutePlanner({
           disabled={disabled || !activeTeam}
           aria-label={title}
         >
-          <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+          <img src="/pit-field-map.webp" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
             {orderedTeams.map((team, index) => {
               const points = draftRoutes[team] ?? [];
               if (points.length < 2) return null;

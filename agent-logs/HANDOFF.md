@@ -489,3 +489,20 @@
 - 回归用例确认红方已知队伍 10 + 20、第三队无数据时，红方预测为 30。
 
 **风险 / 待办**：缺失数据会使联盟预测偏低，这是本轮明确采用的降级规则；页面暂不额外标记哪些队伍按 0 分计算。
+
+---
+
+## 2026-07-21 · 修复 iPad 路线连续绘制
+
+**当前状态**：Strategy Proposal 路线画布在 iPad 触控和 Apple Pencil 绘制时，不再被 `pointerleave` 边界事件提前截断为单点，版本升级为 `1.0.23`。
+
+**本轮完成**：
+- 鼠标离开画布仍结束当前笔画；触控和笔输入忽略 `pointerleave`，由 `pointerup` 或 `pointercancel` 正常结束并保存笔画。
+- 地图图片和 SVG 路线层不再参与指针命中，地图图片同时禁用原生拖拽，保持画布为稳定捕获目标。
+- 新增回归测试覆盖 touch、pen、mouse、pointerup 和 pointercancel 的结束规则。
+
+**验证**：
+- 13 个测试文件、84 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+- 本地真实浏览器在 Demo Strategy Proposal 画布拖动后生成包含 7 个坐标点的连续折线；1024×768 iPad 横屏尺寸无横向溢出，控制台无错误。
+
+**风险 / 待办**：本机没有实体 iPad，iPad 分支通过 Pointer Events 规则测试覆盖；部署后仍建议在实际 iPad Safari 或主屏幕 Web App 中复验一次。

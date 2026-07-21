@@ -173,6 +173,10 @@ export function compactRoutePoints(points: RoutePoint[]): RoutePoint[] {
   return strokes.flatMap(compactStroke);
 }
 
+export function shouldFinishRouteStroke(eventType: string, pointerType: string) {
+  return eventType !== "pointerleave" || pointerType === "mouse";
+}
+
 function normalizeNoteMap(value: unknown) {
   const record = objectValue(value);
   const notes: Record<string, string> = {};
