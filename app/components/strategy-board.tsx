@@ -1,6 +1,6 @@
 import { Eraser, Pencil, RotateCw, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Badge, Button, Card, cn } from "./ui";
+import { Button, Card, cn } from "./ui";
 import type { ProposalMatch } from "../lib/strategy-proposal-matches";
 import {
   autoWinners,
@@ -232,22 +232,16 @@ export function StrategyBoard({
     <div className="grid gap-3">
       <Card className="overflow-hidden p-0">
         <div className="grid gap-3 border-b border-line p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="section-label">整场比赛策略板</p>
-              <h3 className="text-base font-semibold text-ink">{phaseLabel(phase)}</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={undo} disabled={disabled || !undoCounts[phase]}>
-                <Undo2 className="size-4" />撤销
-              </Button>
-              <Button type="button" onClick={clearStrokes} disabled={disabled || !phaseDraft.strokes.length}>
-                <Trash2 className="size-4" />清空笔迹
-              </Button>
-              <Button type="button" onClick={resetRobots} disabled={disabled}>
-                <RotateCw className="size-4" />重置机器人
-              </Button>
-            </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" onClick={undo} disabled={disabled || !undoCounts[phase]}>
+              <Undo2 className="size-4" />撤销
+            </Button>
+            <Button type="button" onClick={clearStrokes} disabled={disabled || !phaseDraft.strokes.length}>
+              <Trash2 className="size-4" />清空笔迹
+            </Button>
+            <Button type="button" onClick={resetRobots} disabled={disabled}>
+              <RotateCw className="size-4" />重置机器人
+            </Button>
           </div>
           <div className="flex flex-wrap gap-2" aria-label="比赛阶段">
             {strategyBoardPhases.map((item) => (
@@ -361,11 +355,6 @@ export function StrategyBoard({
               </button>
             );
           })}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-line p-3 text-xs text-ink-dim">
-          <Badge className="border-danger/40 bg-danger/10 text-danger">红方机器人</Badge>
-          <Badge className="border-info/40 bg-info/10 text-info">蓝方机器人</Badge>
-          <span>拖动机器人改变位置；选中后拖动白色手柄旋转。</span>
         </div>
       </Card>
 
