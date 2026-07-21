@@ -865,7 +865,7 @@ function PrintStrategyBoardPhase({
               <g key={robot.team} transform={`translate(${robot.x} ${robot.y}) rotate(${robot.rotation})`}>
                 <rect x="-2.171" y="-4.733" width="4.342" height="9.466" rx="0.7" fill={red ? "#ef4444" : "#3b82f6"} />
                 <rect x="-1.687" y="-3.678" width="3.374" height="7.356" rx="0.45" fill="#242429" />
-                <text x="0" y="0.8" textAnchor="middle" fill="#fff" fontSize="2.2" fontWeight="700">{robot.team}</text>
+                <text x="0" y="0.65" textAnchor="middle" fill="#fff" fontSize="1.8" fontWeight="700">{robot.team}</text>
               </g>
             );
           })}

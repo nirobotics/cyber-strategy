@@ -321,7 +321,7 @@ export function StrategyBoard({
                 key={robot.team}
                 type="button"
                 className={cn(
-                  "absolute z-10 grid touch-none select-none place-items-center rounded-md p-[3px] text-[clamp(0.5rem,1.05vw,0.875rem)] font-bold text-white shadow-lg",
+                  "absolute z-10 grid touch-none select-none place-items-center rounded-md p-[3px] text-[clamp(0.45rem,0.9vw,0.75rem)] font-bold text-white shadow-lg",
                   red ? "bg-danger" : "bg-info",
                   selected && "ring-2 ring-white/90 ring-offset-2 ring-offset-black/40",
                 )}
@@ -339,7 +339,7 @@ export function StrategyBoard({
                 disabled={disabled}
                 aria-label={`Team ${robot.team} 机器人`}
               >
-                <span className="grid size-full place-items-center rounded-[3px] bg-[#242429] leading-none">{robot.team}</span>
+                <span className="grid size-full overflow-hidden place-items-center rounded-[3px] bg-[#242429] px-px leading-none tracking-tight tabular-nums">{robot.team}</span>
                 {selected ? (
                   <span
                     role="button"
