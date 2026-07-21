@@ -218,7 +218,7 @@ export async function loadCyberScoutDataset(
     const scoringMessages = [
       tbaError,
       dataset.scoringFallbackMatches > 0 ? `${dataset.scoringFallbackMatches} 条队伍比赛记录使用 Super Scout Auto/Teleop 分项。` : null,
-      dataset.scoringIgnoredMatches > 0 ? `已忽略 ${dataset.scoringIgnoredMatches} 条缺少可用分项或无法按比例分配的队伍比赛记录。` : null,
+      dataset.scoringZeroMatches > 0 ? `${dataset.scoringZeroMatches} 条队伍比赛记录缺少可用分项，已按 0 分显示。` : null,
     ].filter(Boolean);
     const scoringError = scoringMessages.length ? scoringMessages.join("；") : undefined;
     return {

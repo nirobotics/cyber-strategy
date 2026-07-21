@@ -89,12 +89,12 @@ type PitRecord = {
 type TeamScore = {
   autoPts: number;
   teleGamePiecePts: number;
-  source: "tba" | "super-scout";
+  source: "tba" | "super-scout" | "zero";
 };
 
 type ScoredDataset = ScoutingDataset & {
   scoringFallbackMatches: number;
-  scoringIgnoredMatches: number;
+  scoringZeroMatches: number;
 };
 
 export function buildCyberScoutDataset({
@@ -121,7 +121,7 @@ export function buildCyberScoutDataset({
 
   const teamScores = buildTeamScores({ tbaMatches, normalByTeamMatch, superByTeamMatch, includedMatchTypes: includedTypes });
   let scoringFallbackMatches = 0;
-  let scoringIgnoredMatches = 0;
+  let scoringZeroMatches = 0;
   const matchesByTeam = new Map<string, ScoutingMatch[]>();
   const keys = new Set([...normalByTeamMatch.keys(), ...superByTeamMatch.keys()]);
   for (const key of keys) {
@@ -131,13 +131,15 @@ export function buildCyberScoutDataset({
     const match = normal?.match ?? superRecord?.match;
     if (!team || !match) continue;
     const teamScore = teamScores.get(key);
-    if (!teamScore) {
-      scoringIgnoredMatches += 1;
-      continue;
-    }
+    if (!teamScore) scoringZeroMatches += 1;
 
-    if (teamScore.source === "super-scout") scoringFallbackMatches += 1;
-    const scoutingMatch = toScoutingMatch({ normal, superRecord, match, teamScore });
+    if (teamScore?.source === "super-scout") scoringFallbackMatches += 1;
+    const scoutingMatch = toScoutingMatch({
+      normal,
+      superRecord,
+      match,
+      teamScore: teamScore ?? { autoPts: 0, teleGamePiecePts: 0, source: "zero" },
+    });
     matchesByTeam.set(team, [...(matchesByTeam.get(team) ?? []), scoutingMatch]);
   }
 
@@ -159,7 +161,7 @@ export function buildCyberScoutDataset({
     createdAt: null,
     updatedAt: latestTimestamp(records) ?? event.updated_at,
     scoringFallbackMatches,
-    scoringIgnoredMatches,
+    scoringZeroMatches,
   };
 }
 

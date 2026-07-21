@@ -203,7 +203,7 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
-  it("ignores scout matches that cannot be scored from TBA", () => {
+  it("keeps unscored scout matches with zero points", () => {
     const dataset = buildCyberScoutDataset({
       event,
       records: [
@@ -220,8 +220,8 @@ describe("cyber-scout dataset conversion", () => {
       ],
     });
 
-    expect(dataset.teamData["8214"]).toBeUndefined();
-    expect(dataset.scoringIgnoredMatches).toBe(1);
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 0, telePts: 0, totalPts: 0 });
+    expect(dataset.scoringZeroMatches).toBe(1);
   });
 
   it("uses Super Scout Auto and Teleop scores when TBA scoring is unavailable", () => {
@@ -259,7 +259,7 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({ autoPts: 9, telePts: 40, totalPts: 49 });
     expect(dataset.teamData["157"].matches[0]).toMatchObject({ autoPts: 6, telePts: 0, totalPts: 6 });
     expect(dataset.scoringFallbackMatches).toBe(3);
-    expect(dataset.scoringIgnoredMatches).toBe(0);
+    expect(dataset.scoringZeroMatches).toBe(0);
   });
 
   it("reads compact Super Scout phase score fields", () => {
@@ -342,7 +342,7 @@ describe("cyber-scout dataset conversion", () => {
     expect(matches.reduce((sum, match) => sum + match.autoPts, 0)).toBe(17);
     expect(matches.reduce((sum, match) => sum + match.telePts, 0)).toBe(395);
     expect(dataset.scoringFallbackMatches).toBe(3);
-    expect(dataset.scoringIgnoredMatches).toBe(0);
+    expect(dataset.scoringZeroMatches).toBe(0);
   });
 
   it("does not score TBA matches from legacy top-level breakdown fields", () => {
@@ -378,8 +378,8 @@ describe("cyber-scout dataset conversion", () => {
       ],
     });
 
-    expect(dataset.teamData["8214"]).toBeUndefined();
-    expect(dataset.scoringIgnoredMatches).toBe(1);
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 0, telePts: 0, totalPts: 0 });
+    expect(dataset.scoringZeroMatches).toBe(1);
   });
 
   it("uses TBA hubScore auto and teleop totals with scout contribution ratios", () => {
@@ -588,7 +588,7 @@ describe("cyber-scout dataset conversion", () => {
       match: 1,
       totalPts: 30,
     });
-    expect(dataset.scoringIgnoredMatches).toBe(0);
+    expect(dataset.scoringZeroMatches).toBe(0);
   });
 
   it("scores playoff records only when they carry an exact TBA match key and playoffs are selected", () => {
