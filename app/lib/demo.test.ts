@@ -70,6 +70,7 @@ function scoutingLead(): ScoutConfidenceResult {
   const record = {
     id: "real-record-id",
     recordType: "normal_match" as const,
+    matchType: "qualification" as const,
     matchNumber: 1,
     alliance: "red" as const,
     position: "R1",
@@ -87,6 +88,7 @@ function scoutingLead(): ScoutConfidenceResult {
     leadData: {
       recordSchedule: {
         matches: [{
+          matchType: "qualification",
           matchNumber: 1,
           red: [{ team: "2000", position: "R1", alliance: "red", normalRecords: [record], superRecords: [] }],
           blue: [],

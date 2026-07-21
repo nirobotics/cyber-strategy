@@ -15,6 +15,7 @@ import type {
   ScoutConfidenceResult,
   ScoutLeadAssignment,
   ScoutScheduleCell,
+  ScoutScheduleMatch,
 } from "../lib/cyber-scout.server";
 import type {
   ScoutConfidenceCalibration,
@@ -177,7 +178,7 @@ function RecordsView({
   busy: boolean;
   readOnly: boolean;
 }) {
-  const [selected, setSelected] = useState<{ matchNumber: number; cell: ScoutScheduleCell } | null>(null);
+  const [selected, setSelected] = useState<{ matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; cell: ScoutScheduleCell } | null>(null);
 
   return (
     <>
@@ -203,13 +204,13 @@ function RecordsView({
               </thead>
               <tbody className="divide-y divide-line">
                 {schedule.matches.map((match) => (
-                  <tr key={match.matchNumber} className="align-top">
-                    <td className="px-3 py-3 font-semibold text-ink">Q{match.matchNumber}</td>
+                  <tr key={`${match.matchType}-${match.matchNumber}`} className="align-top">
+                    <td className="px-3 py-3 font-semibold text-ink">{scoutMatchLabel(match)}</td>
                     <td className="px-3 py-2">
-                      <AllianceCells matchNumber={match.matchNumber} cells={match.red} onSelect={(cell) => setSelected({ matchNumber: match.matchNumber, cell })} />
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.red} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, cell })} />
                     </td>
                     <td className="px-3 py-2">
-                      <AllianceCells matchNumber={match.matchNumber} cells={match.blue} onSelect={(cell) => setSelected({ matchNumber: match.matchNumber, cell })} />
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.blue} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, cell })} />
                     </td>
                   </tr>
                 ))}
@@ -265,7 +266,7 @@ function RecordModal({
   onClose,
 }: {
   eventKey: string | null;
-  selected: { matchNumber: number; cell: ScoutScheduleCell };
+  selected: { matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; cell: ScoutScheduleCell };
   busy: boolean;
   readOnly: boolean;
   onClose: () => void;
@@ -283,7 +284,7 @@ function RecordModal({
       <Card className="max-h-[86vh] w-full max-w-2xl overflow-hidden p-0" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-2 border-b border-line p-3">
           <div className="min-w-0">
-            <p className="section-label">Q{selected.matchNumber} · {selected.cell.position}</p>
+            <p className="section-label">{scoutMatchLabel(selected)} · {selected.cell.position}</p>
             <h2 className="truncate text-lg font-semibold text-ink">Team {selected.cell.team} 提交记录</h2>
           </div>
           <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
@@ -589,7 +590,7 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
         <tbody className="divide-y divide-line">
           {matches.map((match) => (
             <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
-              <td className="px-3 py-2 font-semibold text-ink">{confidenceMatchLabel(match)}</td>
+              <td className="px-3 py-2 font-semibold text-ink">{scoutMatchLabel(match)}</td>
               <td className="px-3 py-2 text-right tabular-nums text-danger">{match.redPredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-info">{match.bluePredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
@@ -687,7 +688,7 @@ function winnerLabel(value: ScoutConfidenceMatch["actualWinner"]) {
   return "暂无";
 }
 
-function confidenceMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber">) {
+function scoutMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber">) {
   if (match.matchType === "practice") return `P${match.matchNumber}`;
   if (match.matchType === "qualification") return `Q${match.matchNumber}`;
   return `E${match.matchNumber}`;

@@ -49,6 +49,7 @@ type ScoutMatchType = "Q";
 export type ScoutLeadRecord = {
   id: string;
   recordType: ScoutRecordType;
+  matchType: DataRange;
   matchNumber: number | null;
   alliance: ScoutAlliance | null;
   position: string | null;
@@ -68,6 +69,7 @@ export type ScoutScheduleCell = {
 };
 
 export type ScoutScheduleMatch = {
+  matchType: DataRange;
   matchNumber: number;
   red: ScoutScheduleCell[];
   blue: ScoutScheduleCell[];
@@ -100,7 +102,7 @@ export type ScoutLeadData = {
   configSavedAt: string | null;
 };
 
-type ScoutLeadRecordRow = CyberScoutRecordRow & {
+export type ScoutLeadRecordRow = CyberScoutRecordRow & {
   record_type: ScoutRecordType;
   match_type: string | null;
   alliance: string | null;
@@ -321,17 +323,22 @@ export async function loadScoutConfidenceReport(
       fetchScoutEventConfig(db),
       fetchFrcMatchResults(event.tba_event_key).catch(() => []),
     ]);
-    let tbaMatches = opts.tbaMatches ?? [];
+    const includedMatchTypes = opts.includedMatchTypes ?? DEFAULT_DATA_RANGE;
+    const includedTypes = new Set(includedMatchTypes);
+    let scheduleMatches = toCyberScoutMatches(eventConfig.matches, includedMatchTypes);
     let tbaError: string | null = null;
-    if (!opts.tbaMatches) {
-      try {
-        tbaMatches = await fetchTbaMatches(event.tba_event_key);
-      } catch (error) {
-        tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
+    if (!scheduleMatches.length) {
+      scheduleMatches = opts.tbaMatches ?? [];
+      if (!opts.tbaMatches) {
+        try {
+          scheduleMatches = await fetchTbaMatches(event.tba_event_key);
+        } catch (error) {
+          tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
+        }
       }
     }
-    const includedTypes = new Set(opts.includedMatchTypes ?? DEFAULT_DATA_RANGE);
     const confidenceRecords = records.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
+    const visibleLeadRecords = leadRecords.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
     const confidenceResults = mergeMatchResults(officialResults, buildSuperScoutMatchResults(confidenceRecords)).filter((match) => {
       const type = matchTypeFromTbaCompLevel(match.comp_level);
       return type ? includedTypes.has(type) : false;
@@ -349,7 +356,7 @@ export async function loadScoutConfidenceReport(
         error: tbaError ?? undefined,
       },
       leadData: {
-        recordSchedule: buildScoutRecordSchedule(tbaMatches, leadRecords),
+        recordSchedule: buildScoutRecordSchedule(scheduleMatches, visibleLeadRecords),
         assignments: eventConfig.assignments,
         users,
         configEventKey: eventConfig.tbaEventKey || null,
@@ -585,43 +592,48 @@ async function saveScoutEventConfig(db: SupabaseClient, config: ScoutEventConfig
   if (error) throw error;
 }
 
-function buildScoutRecordSchedule(tbaMatches: TbaMatch[], rows: ScoutLeadRecordRow[]): ScoutLeadData["recordSchedule"] {
+export function buildScoutRecordSchedule(scheduleMatches: CombinedMatch[], rows: ScoutLeadRecordRow[]): ScoutLeadData["recordSchedule"] {
   const records = rows.map(toLeadRecord);
   const normalByMatchTeam = groupRecords(records.filter((record) => record.recordType === "normal_match" && record.teamNumber), (record) =>
-    `${record.matchNumber}:${record.teamNumber}`,
+    `${record.matchType}:${record.matchNumber}:${record.teamNumber}`,
   );
   const superByMatchAlliance = groupRecords(records.filter((record) => record.recordType === "super_match" && record.alliance), (record) =>
-    `${record.matchNumber}:${record.alliance}`,
+    `${record.matchType}:${record.matchNumber}:${record.alliance}`,
   );
-  const matches = buildTbaSchedule(tbaMatches, normalByMatchTeam, superByMatchAlliance);
+  const scheduled = buildConfiguredSchedule(scheduleMatches, normalByMatchTeam, superByMatchAlliance);
+  const scheduledKeys = new Set(scheduled.map(scheduleMatchKey));
+  const recordOnly = buildRecordOnlySchedule(records, normalByMatchTeam, superByMatchAlliance)
+    .filter((match) => !scheduledKeys.has(scheduleMatchKey(match)));
   return {
-    matches: matches.length ? matches : buildRecordOnlySchedule(records, normalByMatchTeam, superByMatchAlliance),
+    matches: [...scheduled, ...recordOnly].sort(compareScheduleMatches),
     totalRecords: records.length,
     normalRecords: records.filter((record) => record.recordType === "normal_match").length,
     superRecords: records.filter((record) => record.recordType === "super_match").length,
   };
 }
 
-function buildTbaSchedule(
-  tbaMatches: TbaMatch[],
+function buildConfiguredSchedule(
+  scheduleMatches: CombinedMatch[],
   normalByMatchTeam: Map<string, ScoutLeadRecord[]>,
   superByMatchAlliance: Map<string, ScoutLeadRecord[]>,
 ): ScoutScheduleMatch[] {
-  return [...tbaMatches]
-    .filter((match) => match.comp_level === "qm" && positiveInteger(match.match_number))
-    .sort((left, right) => (left.match_number ?? 0) - (right.match_number ?? 0))
+  return [...scheduleMatches]
+    .filter((match) => matchTypeFromTbaCompLevel(match.comp_level) && positiveInteger(match.match_number))
     .map((match) => {
+      const matchType = matchTypeFromTbaCompLevel(match.comp_level) ?? "qualification";
       const matchNumber = match.match_number ?? 0;
       return {
+        matchType,
         matchNumber,
-        red: buildAllianceCells(matchNumber, "red", match.alliances?.red?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
-        blue: buildAllianceCells(matchNumber, "blue", match.alliances?.blue?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
+        red: buildAllianceCells(matchType, matchNumber, "red", match.alliances?.red?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
+        blue: buildAllianceCells(matchType, matchNumber, "blue", match.alliances?.blue?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
       };
     })
     .filter((match) => match.red.length || match.blue.length);
 }
 
 function buildAllianceCells(
+  matchType: DataRange,
   matchNumber: number,
   alliance: ScoutAlliance,
   teamKeys: Array<string | number>,
@@ -635,8 +647,8 @@ function buildAllianceCells(
       team,
       position,
       alliance,
-      normalRecords: normalByMatchTeam.get(`${matchNumber}:${team}`) ?? [],
-      superRecords: superByMatchAlliance.get(`${matchNumber}:${alliance}`) ?? [],
+      normalRecords: normalByMatchTeam.get(`${matchType}:${matchNumber}:${team}`) ?? [],
+      superRecords: superByMatchAlliance.get(`${matchType}:${matchNumber}:${alliance}`) ?? [],
     };
   }).filter((cell) => cell.team);
 }
@@ -646,21 +658,22 @@ function buildRecordOnlySchedule(
   normalByMatchTeam: Map<string, ScoutLeadRecord[]>,
   superByMatchAlliance: Map<string, ScoutLeadRecord[]>,
 ): ScoutScheduleMatch[] {
-  const byMatch = new Map<number, ScoutScheduleMatch>();
+  const byMatch = new Map<string, ScoutScheduleMatch>();
   for (const record of records) {
     if (!record.matchNumber || !record.teamNumber || !isScoutPosition(record.position)) continue;
     const alliance = record.position.startsWith("R") ? "red" : "blue";
-    const match = byMatch.get(record.matchNumber) ?? { matchNumber: record.matchNumber, red: [], blue: [] };
+    const key = `${record.matchType}:${record.matchNumber}`;
+    const match = byMatch.get(key) ?? { matchType: record.matchType, matchNumber: record.matchNumber, red: [], blue: [] };
     const cell: ScoutScheduleCell = {
       team: record.teamNumber,
       position: record.position,
       alliance,
-      normalRecords: normalByMatchTeam.get(`${record.matchNumber}:${record.teamNumber}`) ?? [],
-      superRecords: superByMatchAlliance.get(`${record.matchNumber}:${alliance}`) ?? [],
+      normalRecords: normalByMatchTeam.get(`${record.matchType}:${record.matchNumber}:${record.teamNumber}`) ?? [],
+      superRecords: superByMatchAlliance.get(`${record.matchType}:${record.matchNumber}:${alliance}`) ?? [],
     };
     const list = alliance === "red" ? match.red : match.blue;
     if (!list.some((item) => item.team === cell.team && item.position === cell.position)) list.push(cell);
-    byMatch.set(record.matchNumber, match);
+    byMatch.set(key, match);
   }
   return [...byMatch.values()]
     .map((match) => ({
@@ -668,7 +681,7 @@ function buildRecordOnlySchedule(
       red: match.red.sort(compareCells),
       blue: match.blue.sort(compareCells),
     }))
-    .sort((left, right) => left.matchNumber - right.matchNumber);
+    .sort(compareScheduleMatches);
 }
 
 function toLeadRecord(row: ScoutLeadRecordRow): ScoutLeadRecord {
@@ -683,6 +696,7 @@ function toLeadRecord(row: ScoutLeadRecordRow): ScoutLeadRecord {
   return {
     id: row.id,
     recordType,
+    matchType: confidenceRecordMatchType(row),
     matchNumber,
     alliance,
     position: position || null,
@@ -782,6 +796,15 @@ function groupRecords(records: ScoutLeadRecord[], keyFor: (record: ScoutLeadReco
     groups.set(key, [...(groups.get(key) ?? []), record]);
   }
   return groups;
+}
+
+function scheduleMatchKey(match: Pick<ScoutScheduleMatch, "matchType" | "matchNumber">) {
+  return `${match.matchType}:${match.matchNumber}`;
+}
+
+function compareScheduleMatches(left: ScoutScheduleMatch, right: ScoutScheduleMatch) {
+  const order: Record<DataRange, number> = { practice: 0, qualification: 1, playoff: 2 };
+  return order[left.matchType] - order[right.matchType] || left.matchNumber - right.matchNumber;
 }
 
 function compareCells(left: ScoutScheduleCell, right: ScoutScheduleCell) {
