@@ -7,6 +7,10 @@ export const strategyBoardPhases = ["auto", "transition", "active", "inactive"] 
 export const strategyBoardColors = ["#f8fafc", "#ef4444", "#3b82f6", "#22c55e", "#facc15"] as const;
 const routePointMinDistance = 1.2;
 const routeMaxPointsPerStroke = 100;
+const strategyBoardFieldWidth = 3510;
+const strategyBoardFieldHeight = 1610;
+const strategyBoardAllianceX = { red: 2680, blue: 830 } as const;
+const strategyBoardRobotY = [205, 805, 1405] as const;
 
 export type OwnStrategyTeam = (typeof ownStrategyTeams)[number];
 export type StrategyProposalType = (typeof proposalTypes)[number];
@@ -160,14 +164,20 @@ export function ensureStrategyBoardTeams(
   blueTeams: string[],
 ): AutoProposalPayload {
   const defaults = defaultStrategyRobots(redTeams, blueTeams);
+  const legacyDefaults = legacyDefaultStrategyRobots(redTeams, blueTeams);
   return {
     ...payload,
     phases: Object.fromEntries(strategyBoardPhases.map((phase) => {
       const current = payload.phases[phase] ?? { strokes: [], robots: [] };
       const robots = new Map(current.robots.map((robot) => [robot.team, robot]));
+      const legacyRobots = new Map(legacyDefaults.map((robot) => [robot.team, robot]));
       return [phase, {
         strokes: current.strokes,
-        robots: defaults.map((robot) => robots.get(robot.team) ?? robot),
+        robots: defaults.map((robot) => {
+          const saved = robots.get(robot.team);
+          const legacy = legacyRobots.get(robot.team);
+          return saved && (!legacy || !sameRobotPlacement(saved, legacy)) ? saved : robot;
+        }),
       }];
     })) as AutoProposalPayload["phases"],
     teamNotes: Object.fromEntries([...redTeams, ...blueTeams].map((team) => [team, payload.teamNotes[team] ?? ""])),
@@ -176,9 +186,30 @@ export function ensureStrategyBoardTeams(
 
 export function defaultStrategyRobots(redTeams: string[], blueTeams: string[]): StrategyBoardRobot[] {
   return [
+    ...redTeams.map((team, index) => sourceStrategyRobot(team, "red", index)),
+    ...blueTeams.map((team, index) => sourceStrategyRobot(team, "blue", index)),
+  ];
+}
+
+function sourceStrategyRobot(team: string, alliance: keyof typeof strategyBoardAllianceX, index: number): StrategyBoardRobot {
+  const y = strategyBoardRobotY[Math.min(index, strategyBoardRobotY.length - 1)];
+  return {
+    team,
+    x: strategyBoardAllianceX[alliance] / strategyBoardFieldWidth * 100,
+    y: y / strategyBoardFieldHeight * 100,
+    rotation: 0,
+  };
+}
+
+function legacyDefaultStrategyRobots(redTeams: string[], blueTeams: string[]): StrategyBoardRobot[] {
+  return [
     ...redTeams.map((team, index) => ({ team, x: 20, y: 20 + index * 30, rotation: 0 })),
     ...blueTeams.map((team, index) => ({ team, x: 80, y: 20 + index * 30, rotation: 180 })),
   ];
+}
+
+function sameRobotPlacement(left: StrategyBoardRobot, right: StrategyBoardRobot) {
+  return left.x === right.x && left.y === right.y && left.rotation === right.rotation;
 }
 
 export function eraseStrategyStrokes(

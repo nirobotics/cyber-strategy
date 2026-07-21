@@ -185,7 +185,11 @@ export function StrategyBoard({
     } else {
       const centerX = field.left + (gesture.robot.x / 100) * field.width;
       const centerY = field.top + (gesture.robot.y / 100) * field.height;
-      robot = { ...gesture.robot, rotation: Math.round(Math.atan2(event.clientY - centerY, event.clientX - centerX) * 1800 / Math.PI) / 10 };
+      const allianceOffset = match.blueTeams.includes(gesture.team) ? 180 : 0;
+      robot = {
+        ...gesture.robot,
+        rotation: Math.round((Math.atan2(event.clientY - centerY, event.clientX - centerX) * 180 / Math.PI + allianceOffset) * 10) / 10,
+      };
     }
     updatePhase({
       ...phaseRef.current,
@@ -280,7 +284,7 @@ export function StrategyBoard({
 
         <div
           data-strategy-field
-          className={cn("relative aspect-[2/1] touch-none overflow-hidden bg-black", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
+          className={cn("relative aspect-[3510/1610] touch-none overflow-hidden bg-black", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
           onPointerDown={startBoardPointer}
           onPointerMove={moveBoardPointer}
           onPointerUp={stopBoardPointer}
@@ -289,7 +293,7 @@ export function StrategyBoard({
           role="application"
           aria-label={`${phaseLabel(phase)}策略绘制板`}
         >
-          <img src="/pit-field-map.webp" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
+          <img src="/strategy-board-2026.png" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
             {phaseDraft.strokes.map((stroke) => (
               <polyline
@@ -323,11 +327,17 @@ export function StrategyBoard({
                 key={robot.team}
                 type="button"
                 className={cn(
-                  "absolute z-10 grid h-9 min-w-14 touch-none select-none place-items-center rounded-md border-2 bg-surface/95 px-2 text-xs font-bold shadow-lg",
-                  red ? "border-danger text-danger" : "border-info text-info",
+                  "absolute z-10 grid touch-none select-none place-items-center rounded-md p-[3px] text-[clamp(0.5rem,1.05vw,0.875rem)] font-bold text-white shadow-lg",
+                  red ? "bg-danger" : "bg-info",
                   selected && "ring-2 ring-white/90 ring-offset-2 ring-offset-black/40",
                 )}
-                style={{ left: `${robot.x}%`, top: `${robot.y}%`, transform: `translate(-50%, -50%) rotate(${robot.rotation}deg)` }}
+                style={{
+                  left: `${robot.x}%`,
+                  top: `${robot.y}%`,
+                  width: "max(4.342%, 2.25rem)",
+                  aspectRatio: "1",
+                  transform: `translate(-50%, -50%) rotate(${robot.rotation}deg)`,
+                }}
                 onPointerDown={(event) => startRobotGesture(event, robot, "move")}
                 onPointerMove={moveRobotGesture}
                 onPointerUp={stopRobotGesture}
@@ -335,12 +345,15 @@ export function StrategyBoard({
                 disabled={disabled}
                 aria-label={`Team ${robot.team} 机器人`}
               >
-                {robot.team}
+                <span className="grid size-full place-items-center rounded-[3px] bg-[#242429] leading-none">{robot.team}</span>
                 {selected ? (
                   <span
                     role="button"
                     tabIndex={-1}
-                    className="absolute -right-5 top-1/2 size-4 -translate-y-1/2 rounded-full border-2 border-surface bg-white shadow"
+                    className={cn(
+                      "absolute top-1/2 size-4 -translate-y-1/2 rounded-full border-2 border-[#242429] bg-white shadow",
+                      red ? "-right-2" : "-left-2",
+                    )}
                     onPointerDown={(event) => startRobotGesture(event, robot, "rotate")}
                     aria-label={`旋转 Team ${robot.team}`}
                   />

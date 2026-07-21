@@ -845,7 +845,7 @@ function PrintStrategyBoardPhase({
         </div>
       </div>
       <div className="proposal-print-field">
-        <img src="/pit-field-map.webp" alt="" />
+        <img src="/strategy-board-2026.png" alt="" />
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {phase.strokes.map((stroke) => (
             <polyline
@@ -863,8 +863,9 @@ function PrintStrategyBoardPhase({
             const red = match?.redTeams.includes(robot.team) ?? false;
             return (
               <g key={robot.team} transform={`translate(${robot.x} ${robot.y}) rotate(${robot.rotation})`}>
-                <rect x="-4.5" y="-3.2" width="9" height="6.4" rx="1" fill="#111827" stroke={red ? "#ef4444" : "#3b82f6"} strokeWidth="0.8" />
-                <text x="0" y="0.9" textAnchor="middle" fill="#fff" fontSize="2.6" fontWeight="700">{robot.team}</text>
+                <rect x="-2.171" y="-4.733" width="4.342" height="9.466" rx="0.7" fill={red ? "#ef4444" : "#3b82f6"} />
+                <rect x="-1.687" y="-3.678" width="3.374" height="7.356" rx="0.45" fill="#242429" />
+                <text x="0" y="0.8" textAnchor="middle" fill="#fff" fontSize="2.2" fontWeight="700">{robot.team}</text>
               </g>
             );
           })}
@@ -1483,8 +1484,8 @@ const PROPOSAL_PRINT_CSS = `
 
   .proposal-print-field {
     position: relative;
-    aspect-ratio: 2 / 1;
-    background: #f3f4f6;
+    aspect-ratio: 3510 / 1610;
+    background: #000;
   }
 
   .proposal-print-field img,

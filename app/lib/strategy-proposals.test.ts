@@ -61,9 +61,29 @@ describe("strategy proposal helpers", () => {
 
     expect(payload.phases.auto.robots).toHaveLength(6);
     expect(payload.phases.transition.robots).toHaveLength(6);
-    expect(payload.phases.auto.robots[0]).toEqual({ team: "8214", x: 20, y: 20, rotation: 0 });
-    expect(payload.phases.auto.robots[3]).toEqual({ team: "11019", x: 80, y: 20, rotation: 180 });
+    expect(payload.phases.auto.robots[0]).toEqual({ team: "8214", x: 2680 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
+    expect(payload.phases.auto.robots[3]).toEqual({ team: "11019", x: 830 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
     expect(payload.phases.auto.robots).not.toBe(payload.phases.transition.robots);
+  });
+
+  it("migrates only untouched legacy robot positions", () => {
+    const payload = normalizeProposalPayload("auto", {
+      phases: {
+        auto: {
+          robots: [
+            { team: "8214", x: 20, y: 20, rotation: 0 },
+            { team: "9992", x: 42, y: 44, rotation: 25 },
+            { team: "11019", x: 80, y: 20, rotation: 180 },
+          ],
+        },
+      },
+    }) as Extract<ReturnType<typeof normalizeProposalPayload>, { kind: "match_strategy" }>;
+
+    const migrated = ensureStrategyBoardTeams(payload, ["8214", "9992"], ["11019"]);
+
+    expect(migrated.phases.auto.robots[0]).toEqual({ team: "8214", x: 2680 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
+    expect(migrated.phases.auto.robots[1]).toEqual({ team: "9992", x: 42, y: 44, rotation: 25 });
+    expect(migrated.phases.auto.robots[2]).toEqual({ team: "11019", x: 830 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
   });
 
   it("eraser removes the whole stroke it touches", () => {
