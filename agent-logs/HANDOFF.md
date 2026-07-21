@@ -506,3 +506,20 @@
 - 本地真实浏览器在 Demo Strategy Proposal 画布拖动后生成包含 7 个坐标点的连续折线；1024×768 iPad 横屏尺寸无横向溢出，控制台无错误。
 
 **风险 / 待办**：本机没有实体 iPad，iPad 分支通过 Pointer Events 规则测试覆盖；部署后仍建议在实际 iPad Safari 或主屏幕 Web App 中复验一次。
+
+---
+
+## 2026-07-21 · 严格按 FRC Events 优先请求比赛结果
+
+**当前状态**：比赛结果服务端请求顺序改为先请求 FRC Events，再请求 Super Scout 并按比赛合并，官方同场结果仍覆盖 Super Scout，版本升级为 `1.0.24`。
+
+**本轮完成**：
+- 移除 FRC Events 与 Super Scout 的并行请求，避免 Super Scout 在官方请求完成前先返回。
+- 新增请求顺序和官方覆盖回归测试。
+- 核对并补齐线上 Vercel Production/Preview 环境的 `FRC_EVENTS_USERNAME` / `FRC_EVENTS_API_KEY`，凭据仅保存在 Vercel sensitive env。
+
+**验证**：
+- 回归测试确认 FRC Events 先请求、官方结果覆盖同场 Super Scout；FRC Events `2026/OTSAN/Qualification` 实际返回 200 和官方比分记录。
+- 14 个测试文件、86 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+
+**风险 / 待办**：生产现已具备官方凭据；若 FRC Events 临时失败或某场尚未发布完整比分，仍按比赛逐场回退 Super Scout。
