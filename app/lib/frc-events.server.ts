@@ -6,7 +6,13 @@ type FrcAllianceScore = {
   alliance?: string;
   autoPoints?: number;
   teleopPoints?: number;
+  totalAutoPoints?: number;
+  totalTeleopPoints?: number;
   totalPoints?: number;
+  hubScore?: {
+    autoPoints?: number;
+    teleopPoints?: number;
+  };
 };
 
 type FrcMatchScore = {
@@ -118,11 +124,17 @@ function frcMatchIdentity(score: FrcMatchScore, requestedLevel: string, playoffD
 function allianceScore(alliances: FrcAllianceScore[] | undefined, alliance: "red" | "blue") {
   const value = alliances?.find((item) => item.alliance?.toLowerCase() === alliance);
   if (!value || !validScore(value.totalPoints)) return null;
+  const autoPoints = firstValidScore(value.hubScore?.autoPoints, value.autoPoints, value.totalAutoPoints);
+  const teleopPoints = firstValidScore(value.hubScore?.teleopPoints, value.teleopPoints, value.totalTeleopPoints);
   return {
     score: value.totalPoints,
-    ...(validScore(value.autoPoints) ? { autoPoints: value.autoPoints } : {}),
-    ...(validScore(value.teleopPoints) ? { teleopPoints: value.teleopPoints } : {}),
+    ...(autoPoints == null ? {} : { autoPoints }),
+    ...(teleopPoints == null ? {} : { teleopPoints }),
   };
+}
+
+function firstValidScore(...values: unknown[]) {
+  return values.find(validScore) as number | undefined;
 }
 
 function validScore(value: unknown): value is number {

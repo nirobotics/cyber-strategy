@@ -19,8 +19,8 @@ describe("FRC Events match results", () => {
             matchLevel: "Qualification",
             matchNumber: 3,
             alliances: [
-              { alliance: "Red", autoPoints: 35, teleopPoints: 88, totalPoints: 123 },
-              { alliance: "Blue", autoPoints: 28, teleopPoints: 70, totalPoints: 98 },
+              { alliance: "Red", totalAutoPoints: 40, totalTeleopPoints: 93, hubScore: { autoPoints: 35, teleopPoints: 88 }, totalPoints: 123 },
+              { alliance: "Blue", totalAutoPoints: 30, totalTeleopPoints: 72, hubScore: { autoPoints: 28, teleopPoints: 70 }, totalPoints: 98 },
             ],
           }],
         }));

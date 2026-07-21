@@ -593,3 +593,23 @@
 - 15 个测试文件、89 项测试、类型检查和 Lint 通过。
 
 **风险 / 待办**：FRC Events 只有 `autoPoints` 与 `teleopPoints` 都存在时才参与单队分配；接口仅发布联盟总分时不会误用总分代替阶段分项。
+
+---
+
+## 2026-07-21 · 修正 FRC Events 分项字段路径
+
+**当前状态**：FRC Events 实际返回的 `hubScore.autoPoints` / `hubScore.teleopPoints` 已正确进入队伍得分分配，版本升级为 `1.0.29`。
+
+**本轮完成**：
+- 修正 `v1.0.28` 对联盟顶层 `autoPoints` / `teleopPoints` 的错误假设，优先读取官方实际的 `hubScore` 嵌套字段。
+- 兼容顶层阶段字段和 `totalAutoPoints` / `totalTeleopPoints`，但以 Hub 分项优先，避免把塔分重复计入队伍射击贡献。
+- 回归测试使用与 FRC Events 生产响应一致的嵌套结构，并验证 Hub 分项优先于联盟阶段总分。
+
+**验证**：
+- FRC Events `2026/OTSAN/Qualification` Q33 实际响应确认蓝方 Hub Auto 25、Teleop 150，红方 Hub Auto 42、Teleop 193。
+- 使用 `2026otsan` 当前 611 条 Scout 记录与 36 场官方资格赛结果复验：216 条资格赛队伍记录全部由 FRC Events 分项计算，Super Scout 回退 0 条、零分回退 0 条。
+- 11019 的 Q33 已生成 Auto 25、Teleop 50、总分 75 的队伍记录。
+- 练习赛没有官方结果，其中 153 条队伍记录使用 Super Scout、13 条无 Super Scout 的记录继续按 0 分保留。
+- 15 个测试文件、89 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+
+**风险 / 待办**：不同赛季若没有 `hubScore`，会回退兼容字段；仍缺阶段分项时继续使用 Super Scout，最后按 0 分保留。
