@@ -35,6 +35,7 @@ import {
   normalizeProposalPayload,
   ownStrategyTeams,
   proposalStatuses,
+  strategyBoardStations,
   strategyShifts,
   type AutoProposalPayload,
   type AutoWinner,
@@ -846,6 +847,15 @@ function PrintStrategyBoardPhase({
       </div>
       <div className="proposal-print-field">
         <img src="/strategy-board-2026.png" alt="" />
+        {match ? strategyBoardStations(match.redTeams, match.blueTeams).map((station) => (
+          <span
+            key={`${station.alliance}-${station.team}`}
+            className="proposal-print-station"
+            style={{ left: `${station.x}%`, top: `${station.y}%` }}
+          >
+            {station.team}
+          </span>
+        )) : null}
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {phase.strokes.map((stroke) => (
             <polyline
@@ -1486,6 +1496,7 @@ const PROPOSAL_PRINT_CSS = `
     position: relative;
     aspect-ratio: 3510 / 1610;
     background: #000;
+    container-type: inline-size;
   }
 
   .proposal-print-field img,
@@ -1498,6 +1509,17 @@ const PROPOSAL_PRINT_CSS = `
 
   .proposal-print-field img {
     object-fit: fill;
+  }
+
+  .proposal-print-station {
+    position: absolute;
+    z-index: 2;
+    color: #fff;
+    font-size: clamp(6px, 1.82cqw, 8px);
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    transform: translate(-50%, -50%) rotate(90deg);
   }
 
   .proposal-print-empty-map {

@@ -11,6 +11,7 @@ import {
   shouldFinishRouteStroke,
   strategyBoardColors,
   strategyBoardPhases,
+  strategyBoardStations,
   type AutoProposalPayload,
   type AutoWinner,
   type RoutePoint,
@@ -278,7 +279,7 @@ export function StrategyBoard({
 
         <div
           data-strategy-field
-          className={cn("relative aspect-[3510/1610] touch-none overflow-hidden bg-black", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
+          className={cn("relative aspect-[3510/1610] touch-none overflow-hidden bg-black [container-type:inline-size]", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
           onPointerDown={startBoardPointer}
           onPointerMove={moveBoardPointer}
           onPointerUp={stopBoardPointer}
@@ -288,6 +289,17 @@ export function StrategyBoard({
           aria-label={`${phaseLabel(phase)}策略绘制板`}
         >
           <img src="/strategy-board-2026.png" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
+          {strategyBoardStations(match.redTeams, match.blueTeams).map((station) => (
+            <span
+              key={`${station.alliance}-${station.team}`}
+              className="pointer-events-none absolute z-[5] -translate-x-1/2 -translate-y-1/2 rotate-90 whitespace-nowrap text-[clamp(0.375rem,1.82cqw,1rem)] font-bold leading-none text-white tabular-nums"
+              style={{ left: `${station.x}%`, top: `${station.y}%` }}
+              data-strategy-station={`${station.alliance}-${station.team}`}
+              aria-hidden
+            >
+              {station.team}
+            </span>
+          ))}
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
             {phaseDraft.strokes.map((stroke) => (
               <polyline

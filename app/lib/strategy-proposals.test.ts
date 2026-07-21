@@ -13,6 +13,7 @@ import {
   proposalMatchesOwnTeamQuery,
   proposalMatchesSnapshot,
   shouldFinishRouteStroke,
+  strategyBoardStations,
   strategyProposalTitle,
   type StrategyProposal,
 } from "./strategy-proposals";
@@ -84,6 +85,18 @@ describe("strategy proposal helpers", () => {
     expect(migrated.phases.auto.robots[0]).toEqual({ team: "8214", x: 2680 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
     expect(migrated.phases.auto.robots[1]).toEqual({ team: "9992", x: 42, y: 44, rotation: 25 });
     expect(migrated.phases.auto.robots[2]).toEqual({ team: "11019", x: 830 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
+  });
+
+  it("places alliance station numbers on the field edges in schedule order", () => {
+    const stations = strategyBoardStations(["8214", "9992", "6399"], ["11256", "9995", "10016"]);
+
+    expect(stations.map(({ team, alliance }) => [team, alliance])).toEqual([
+      ["11256", "blue"], ["9995", "blue"], ["10016", "blue"],
+      ["8214", "red"], ["9992", "red"], ["6399", "red"],
+    ]);
+    expect(stations[0]).toMatchObject({ x: 37 / 3510 * 100, y: 455 / 1610 * 100 });
+    expect(stations[2]).toMatchObject({ x: 37 / 3510 * 100, y: 1155 / 1610 * 100 });
+    expect(stations[3]).toMatchObject({ x: 3473 / 3510 * 100, y: 455 / 1610 * 100 });
   });
 
   it("eraser removes the whole stroke it touches", () => {

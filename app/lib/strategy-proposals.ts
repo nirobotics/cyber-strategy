@@ -11,6 +11,8 @@ const strategyBoardFieldWidth = 3510;
 const strategyBoardFieldHeight = 1610;
 const strategyBoardAllianceX = { red: 2680, blue: 830 } as const;
 const strategyBoardRobotY = [205, 805, 1405] as const;
+const strategyBoardStationX = { red: 3473, blue: 37 } as const;
+const strategyBoardStationY = [455, 805, 1155] as const;
 
 export type OwnStrategyTeam = (typeof ownStrategyTeams)[number];
 export type StrategyProposalType = (typeof proposalTypes)[number];
@@ -23,6 +25,7 @@ export type RoutePoint = { x: number; y: number; start?: boolean };
 export type RouteMap = Record<string, RoutePoint[]>;
 export type StrategyBoardStroke = { id: string; color: string; points: RoutePoint[] };
 export type StrategyBoardRobot = { team: string; x: number; y: number; rotation: number };
+export type StrategyBoardStation = { team: string; alliance: "red" | "blue"; x: number; y: number };
 export type StrategyBoardPhase = { strokes: StrategyBoardStroke[]; robots: StrategyBoardRobot[] };
 
 export type AutoProposalPayload = {
@@ -189,6 +192,16 @@ export function defaultStrategyRobots(redTeams: string[], blueTeams: string[]): 
     ...redTeams.map((team, index) => sourceStrategyRobot(team, "red", index)),
     ...blueTeams.map((team, index) => sourceStrategyRobot(team, "blue", index)),
   ];
+}
+
+export function strategyBoardStations(redTeams: string[], blueTeams: string[]): StrategyBoardStation[] {
+  const stations = (teams: string[], alliance: StrategyBoardStation["alliance"]) => teams.map((team, index) => ({
+    team,
+    alliance,
+    x: strategyBoardStationX[alliance] / strategyBoardFieldWidth * 100,
+    y: strategyBoardStationY[Math.min(index, strategyBoardStationY.length - 1)] / strategyBoardFieldHeight * 100,
+  }));
+  return [...stations(blueTeams, "blue"), ...stations(redTeams, "red")];
 }
 
 function sourceStrategyRobot(team: string, alliance: keyof typeof strategyBoardAllianceX, index: number): StrategyBoardRobot {
