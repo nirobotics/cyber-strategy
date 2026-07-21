@@ -161,6 +161,48 @@ describe("cyber-scout dataset conversion", () => {
     });
   });
 
+  it("averages duplicate normal scout shooting times but keeps the latest record fields", () => {
+    const dataset = buildCyberScoutDataset({
+      event,
+      records: [
+        normal(8214, 1, {
+          scout: "Early Scout",
+          startPosition: "early",
+          manualShotDirect: [{ startMs: 0, endMs: 4_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(8214, 1, {
+          scout: "Late Scout",
+          startPosition: "late",
+          manualShotDirect: [{ startMs: 0, endMs: 8_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        normal(6328, 1, {
+          manualShotDirect: [{ startMs: 0, endMs: 10_000 }],
+          manualZoneEvents: [{ zone: "联盟", atMs: 0 }],
+        }),
+        superRecord(1, {
+          teams: [8214, 6328],
+          auto: [0, 0],
+          drive: [0, 0],
+          defense: [0, 0],
+          bps: [10, 10],
+          accuracy: [100, 100],
+          comments: ["", ""],
+          autoScore: 0,
+          teleopScore: 100,
+        }),
+      ],
+    });
+
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({
+      telePts: 37.5,
+      transferPieces: 0,
+      startPos: "late",
+      autoScoutName: "Late Scout",
+    });
+  });
+
   it("ignores scout matches that cannot be scored from TBA", () => {
     const dataset = buildCyberScoutDataset({
       event,

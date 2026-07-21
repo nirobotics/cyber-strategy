@@ -51,6 +51,9 @@ type NormalRecord = {
   incapMs: number;
   shootingMs: number;
   transferShootingMs: number;
+  normalRecordCount: number;
+  shootingMsTotal: number;
+  transferShootingMsTotal: number;
   sourceAt: number;
 };
 
@@ -227,9 +230,12 @@ function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRo
     incapMs: timedPeriodsMs(payload.incapPeriods ?? payload.ip),
     shootingMs: shotTimes.scoringMs,
     transferShootingMs: shotTimes.transferMs,
+    normalRecordCount: 1,
+    shootingMsTotal: shotTimes.scoringMs,
+    transferShootingMsTotal: shotTimes.transferMs,
     sourceAt: rowTimestamp(row),
   };
-  upsertLatest(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
+  upsertNormalRecord(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
 }
 
 function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
@@ -574,6 +580,27 @@ function latestTimestamp(rows: CyberScoutRecordRow[]) {
 function upsertLatest<T extends { sourceAt: number }>(map: Map<string, T>, key: string, record: T) {
   const current = map.get(key);
   if (!current || record.sourceAt >= current.sourceAt) map.set(key, record);
+}
+
+function upsertNormalRecord(map: Map<string, NormalRecord>, key: string, record: NormalRecord) {
+  const current = map.get(key);
+  if (!current) {
+    map.set(key, record);
+    return;
+  }
+
+  const count = current.normalRecordCount + 1;
+  const shootingMsTotal = current.shootingMsTotal + record.shootingMs;
+  const transferShootingMsTotal = current.transferShootingMsTotal + record.transferShootingMs;
+  const latest = record.sourceAt >= current.sourceAt ? record : current;
+  map.set(key, {
+    ...latest,
+    normalRecordCount: count,
+    shootingMsTotal,
+    transferShootingMsTotal,
+    shootingMs: round1(shootingMsTotal / count),
+    transferShootingMs: round1(transferShootingMsTotal / count),
+  });
 }
 
 function teamMatchKey(team: string, matchType: DataRange, match: number, tbaMatchKey: string | null) {
