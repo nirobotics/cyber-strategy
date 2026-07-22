@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type DragEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
 import {
   BarChart3,
   Bot,
   ChevronLeft,
   ChevronRight,
+  Download,
   Eye,
   EyeOff,
   FileText,
@@ -42,6 +43,7 @@ import {
   addPickListTeam,
   insertPickListTeam,
   orderPickPool,
+  pickListAutoScrollDelta,
   removePickListTeam,
   sanitizePickList,
   type PickListId,
@@ -320,6 +322,7 @@ export function AnalyticsDashboard({
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}
+          eventKey={dataset.eventKey}
           teams={teams}
           tierByTeam={tierByTeam}
           rankByTeam={rankByTeam}
@@ -700,12 +703,14 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
 
 function PicklistBoard({
   datasetId,
+  eventKey,
   teams,
   tierByTeam,
   rankByTeam,
   onOpenTeam,
 }: {
   datasetId: string;
+  eventKey: string;
   teams: TeamSummary[];
   tierByTeam: Map<string, TierInfo>;
   rankByTeam: Map<string, number>;
@@ -716,14 +721,84 @@ function PicklistBoard({
   const [firstPick, setFirstPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:first`);
   const [secondPick, setSecondPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:second`);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const dragging = useRef(false);
+  const autoScrollFrame = useRef<number | null>(null);
+  const autoScrollTarget = useRef<HTMLElement | Window | null>(null);
+  const autoScrollSpeed = useRef(0);
   const validTeamIds = useMemo(() => teams.map((team) => team.team), [teams]);
   const crossedSet = useMemo(() => new Set(sanitizePickList(crossedTeams, validTeamIds)), [crossedTeams, validTeamIds]);
+  const firstPickTeams = useMemo(() => sanitizePickList(firstPick, validTeamIds), [firstPick, validTeamIds]);
+  const secondPickTeams = useMemo(() => sanitizePickList(secondPick, validTeamIds), [secondPick, validTeamIds]);
   const pickTeams = useMemo(
-    () => sanitizePickList(activePick === "first" ? firstPick : secondPick, validTeamIds),
-    [activePick, firstPick, secondPick, validTeamIds],
+    () => activePick === "first" ? firstPickTeams : secondPickTeams,
+    [activePick, firstPickTeams, secondPickTeams],
   );
   const poolTeams = useMemo(() => orderPickPool(teams, crossedTeams, pickTeams), [teams, crossedTeams, pickTeams]);
   const pickTitle = activePick === "first" ? "1st Pick List" : "2nd Pick List";
+
+  useEffect(() => {
+    function stopAutoScroll() {
+      dragging.current = false;
+      autoScrollSpeed.current = 0;
+      autoScrollTarget.current = null;
+      if (autoScrollFrame.current !== null) window.cancelAnimationFrame(autoScrollFrame.current);
+      autoScrollFrame.current = null;
+    }
+
+    function scrollFrame() {
+      const target = autoScrollTarget.current;
+      const speed = autoScrollSpeed.current;
+      if (!target || !speed) {
+        autoScrollFrame.current = null;
+        return;
+      }
+      target.scrollBy({ top: speed, behavior: "auto" });
+      autoScrollFrame.current = window.requestAnimationFrame(scrollFrame);
+    }
+
+    function startAutoScroll(target: HTMLElement | Window, speed: number) {
+      autoScrollTarget.current = speed ? target : null;
+      autoScrollSpeed.current = speed;
+      if (speed && autoScrollFrame.current === null) autoScrollFrame.current = window.requestAnimationFrame(scrollFrame);
+    }
+
+    function handleDragOver(event: globalThis.DragEvent) {
+      if (!dragging.current) return;
+      const element = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-picklist-scroll]") : null;
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        const speed = pickListAutoScrollDelta(event.clientY, rect.top, rect.bottom);
+        const canScroll = speed < 0 ? element.scrollTop > 0 : speed > 0 && element.scrollTop + element.clientHeight < element.scrollHeight;
+        if (speed && canScroll) {
+          startAutoScroll(element, speed);
+          return;
+        }
+      }
+      startAutoScroll(window, pickListAutoScrollDelta(event.clientY, 0, window.innerHeight));
+    }
+
+    window.addEventListener("dragover", handleDragOver);
+    window.addEventListener("dragend", stopAutoScroll);
+    window.addEventListener("drop", stopAutoScroll);
+    return () => {
+      window.removeEventListener("dragover", handleDragOver);
+      window.removeEventListener("dragend", stopAutoScroll);
+      window.removeEventListener("drop", stopAutoScroll);
+      stopAutoScroll();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!printing) return;
+    const timeout = window.setTimeout(() => window.print(), 250);
+    const clear = () => setPrinting(false);
+    window.addEventListener("afterprint", clear, { once: true });
+    return () => {
+      window.clearTimeout(timeout);
+      window.removeEventListener("afterprint", clear);
+    };
+  }, [printing]);
 
   function updateCurrentPick(updater: (current: string[]) => string[]) {
     const apply = (current: string[]) => sanitizePickList(updater(current), validTeamIds);
@@ -736,6 +811,7 @@ function PicklistBoard({
   }
 
   function startDrag(event: DragEvent<HTMLElement>, team: string, source: "pool" | "pick") {
+    dragging.current = true;
     event.dataTransfer.setData(PICK_DRAG_TEAM_TYPE, team);
     event.dataTransfer.setData(PICK_DRAG_SOURCE_TYPE, source);
     event.dataTransfer.setData("text/plain", team);
@@ -768,11 +844,10 @@ function PicklistBoard({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>
             <p className="section-label">{pickTitle}</p>
-            <h2 className="text-base font-semibold text-ink">候选队伍池</h2>
           </div>
           <span className="text-sm text-ink-dim">{poolTeams.length} 支队伍</span>
         </div>
-        <div className="max-h-[68dvh] overflow-y-auto p-2">
+        <div data-picklist-scroll className="max-h-[68dvh] overflow-y-auto p-2">
           {poolTeams.map((team) => {
             const crossed = crossedSet.has(team.team);
             return (
@@ -845,7 +920,18 @@ function PicklistBoard({
               <p className="section-label">Picklist</p>
               <h2 className="text-base font-semibold text-ink">{pickTitle}</h2>
             </div>
-            <span className="text-sm text-ink-dim">{pickTeams.length} 支</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-dim">{pickTeams.length} 支</span>
+              <Button
+                type="button"
+                onClick={() => setPrinting(true)}
+                disabled={!firstPickTeams.length && !secondPickTeams.length}
+                title="导出 Picklist PDF"
+              >
+                <Download className="size-4" />
+                导出 PDF
+              </Button>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button type="button" variant={activePick === "first" ? "active" : "default"} onClick={() => setActivePick("first")}>
@@ -857,6 +943,7 @@ function PicklistBoard({
           </div>
         </div>
         <div
+          data-picklist-scroll
           className="min-h-80 max-h-[68dvh] overflow-y-auto p-2"
           onDragOver={(event) => {
             event.preventDefault();
@@ -926,9 +1013,108 @@ function PicklistBoard({
           {pickTeams.length ? <DropLine active={dropTarget === "end"} /> : null}
         </div>
       </Card>
+      {printing ? (
+        <PicklistPrintDocument
+          eventKey={eventKey}
+          teams={teams}
+          tierByTeam={tierByTeam}
+          rankByTeam={rankByTeam}
+          firstPick={firstPickTeams}
+          secondPick={secondPickTeams}
+        />
+      ) : null}
     </div>
   );
 }
+
+function PicklistPrintDocument({
+  eventKey,
+  teams,
+  tierByTeam,
+  rankByTeam,
+  firstPick,
+  secondPick,
+}: {
+  eventKey: string;
+  teams: TeamSummary[];
+  tierByTeam: Map<string, TierInfo>;
+  rankByTeam: Map<string, number>;
+  firstPick: string[];
+  secondPick: string[];
+}) {
+  const byTeam = new Map(teams.map((team) => [team.team, team]));
+  const exportedAt = new Date().toLocaleString("zh-CN", { hour12: false });
+  return (
+    <div className="picklist-print-root" aria-hidden="true">
+      <style>{PICKLIST_PRINT_CSS}</style>
+      <article className="picklist-print-page">
+        <header className="picklist-print-header">
+          <div>
+            <p>NI Robotics · Cyber Strategy</p>
+            <h1>Picklist</h1>
+          </div>
+          <div><span>{eventKey}</span><span>{exportedAt}</span></div>
+        </header>
+        <div className="picklist-print-lists">
+          {([["1st Pick List", firstPick], ["2nd Pick List", secondPick]] as const).map(([title, list]) => (
+            <section key={title}>
+              <h2>{title}</h2>
+              {!list.length ? <p className="picklist-print-empty">暂无队伍</p> : null}
+              {list.map((teamNumber, index) => {
+                const team = byTeam.get(teamNumber);
+                if (!team) return null;
+                const tier = tierByTeam.get(teamNumber);
+                return (
+                  <div className="picklist-print-row" key={teamNumber}>
+                    <strong>{index + 1}</strong>
+                    <div><h3>Team {teamNumber}</h3><p>数据排名 #{rankByTeam.get(teamNumber) ?? "-"} · {team.matchCount} 场 · 可靠性 {reliability(team)}%</p></div>
+                    <div className="picklist-print-stats">
+                      <span>综合 <b>{team.avgTotal}</b></span>
+                      <span>Drive <b>{team.avgDriver.toFixed(1)}</b></span>
+                      <span>Defence <b>{defenceScore(team).toFixed(1)}</b></span>
+                      {tier ? <span>分层 <b>{tierDisplayLabel(tier.label)}</b></span> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          ))}
+        </div>
+        <footer>NI Robotics · Cyber Strategy · Picklist</footer>
+      </article>
+    </div>
+  );
+}
+
+const PICKLIST_PRINT_CSS = `
+.picklist-print-root { position: fixed; left: -10000px; top: 0; width: 210mm; height: 1px; overflow: hidden; background: #fff; color: #111827; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.picklist-print-root * { box-sizing: border-box; }
+@page { size: A4 landscape; margin: 12mm; }
+@media print {
+  html, body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .picklist-print-root, .picklist-print-root * { visibility: visible !important; }
+  .picklist-print-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; height: auto !important; overflow: visible !important; }
+  .picklist-print-page { min-height: 180mm; color: #111827; background: #fff; }
+  .picklist-print-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db; }
+  .picklist-print-header p, .picklist-print-header h1 { margin: 0; }
+  .picklist-print-header p { color: #6b7280; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+  .picklist-print-header h1 { margin-top: 2px; font-size: 22px; }
+  .picklist-print-header > div:last-child { display: grid; gap: 2px; color: #6b7280; font-size: 9px; text-align: right; }
+  .picklist-print-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10mm; margin-top: 7mm; }
+  .picklist-print-lists section { min-width: 0; }
+  .picklist-print-lists h2 { margin: 0 0 3mm; font-size: 15px; }
+  .picklist-print-row { display: grid; grid-template-columns: 7mm minmax(0, 1fr); gap: 3mm; break-inside: avoid; margin-bottom: 2mm; border: 1px solid #e5e7eb; border-radius: 5px; padding: 2.5mm; }
+  .picklist-print-row > strong { display: grid; place-items: center; border-radius: 4px; background: #f3f4f6; font-size: 12px; }
+  .picklist-print-row h3, .picklist-print-row p { margin: 0; }
+  .picklist-print-row h3 { font-size: 11px; }
+  .picklist-print-row p { margin-top: 1px; color: #6b7280; font-size: 8px; }
+  .picklist-print-stats { grid-column: 2; display: flex; flex-wrap: wrap; gap: 2mm 4mm; color: #6b7280; font-size: 8px; }
+  .picklist-print-stats b { color: #111827; }
+  .picklist-print-empty { color: #6b7280; font-size: 10px; }
+  .picklist-print-page footer { position: fixed; right: 12mm; bottom: 5mm; left: 12mm; color: #6b7280; font-size: 8px; text-align: center; }
+}
+`;
 
 function DropLine({ active }: { active: boolean }) {
   return (

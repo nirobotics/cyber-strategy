@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addPickListTeam, insertPickListTeam, orderPickPool, sanitizePickList } from "./picklist";
+import { addPickListTeam, insertPickListTeam, orderPickPool, pickListAutoScrollDelta, sanitizePickList } from "./picklist";
 
 describe("picklist helpers", () => {
   const teams = [
@@ -37,5 +37,11 @@ describe("picklist helpers", () => {
 
   it("filters stale and duplicate teams", () => {
     expect(sanitizePickList(["1", "9", "2", "1"], ["1", "2"])).toEqual(["1", "2"]);
+  });
+
+  it("scrolls toward the nearest drag edge and stays still in the middle", () => {
+    expect(pickListAutoScrollDelta(10, 0, 600)).toBeLessThan(0);
+    expect(pickListAutoScrollDelta(300, 0, 600)).toBe(0);
+    expect(pickListAutoScrollDelta(590, 0, 600)).toBeGreaterThan(0);
   });
 });

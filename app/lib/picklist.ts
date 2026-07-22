@@ -43,6 +43,14 @@ export function sanitizePickList(list: string[], validTeams: string[]) {
   });
 }
 
+export function pickListAutoScrollDelta(pointerY: number, start: number, end: number) {
+  const edge = Math.min(96, Math.max(0, (end - start) / 3));
+  if (!edge) return 0;
+  if (pointerY < start + edge) return -Math.min(18, Math.max(4, Math.ceil((start + edge - pointerY) / 5)));
+  if (pointerY > end - edge) return Math.min(18, Math.max(4, Math.ceil((pointerY - (end - edge)) / 5)));
+  return 0;
+}
+
 function teamNumber(team: string) {
   const parsed = Number(team);
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
