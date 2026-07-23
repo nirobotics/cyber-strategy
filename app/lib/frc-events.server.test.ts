@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchFrcMatchResults, normalizeFrcScores } from "./frc-events.server";
+import { fetchFrcMatchResults, fetchFrcMatchSchedule, normalizeFrcSchedule, normalizeFrcScores } from "./frc-events.server";
 
 describe("FRC Events match results", () => {
   afterEach(() => {
@@ -52,5 +52,64 @@ describe("FRC Events match results", () => {
         alliances: [{ alliance: "Red", totalPoints: 100 }],
       }],
     }, "Qualification")).toEqual([]);
+  });
+
+  it("loads the selected official schedule levels", async () => {
+    vi.stubEnv("FRC_EVENTS_USERNAME", "strategy@example.com");
+    vi.stubEnv("FRC_EVENTS_API_KEY", "test-token");
+    const requests: string[] = [];
+    vi.stubGlobal("fetch", vi.fn((url: string) => {
+      requests.push(url);
+      return Promise.resolve(Response.json({ Schedule: [] }));
+    }));
+
+    await expect(fetchFrcMatchSchedule("2026otsan", ["qualification", "playoff"])).resolves.toEqual([]);
+    expect(requests).toEqual([
+      "https://frc-api.firstinspires.org/v3.0/2026/schedule/OTSAN?tournamentLevel=Qualification",
+      "https://frc-api.firstinspires.org/v3.0/2026/schedule/OTSAN?tournamentLevel=Playoff",
+    ]);
+  });
+
+  it("keeps official red and blue stations for a double-elimination match", () => {
+    expect(normalizeFrcSchedule({
+      Schedule: [{
+        tournamentLevel: "Playoff",
+        description: "Match 5",
+        matchNumber: 5,
+        teams: [
+          { teamNumber: 6487, station: "Red2" },
+          { teamNumber: 9995, station: "Red1" },
+          { teamNumber: 9597, station: "Red3" },
+          { teamNumber: 9992, station: "Blue2" },
+          { teamNumber: 9635, station: "Blue3" },
+          { teamNumber: 6766, station: "Blue1" },
+        ],
+      }],
+    }, "Playoff")).toEqual([{
+      comp_level: "sf",
+      set_number: 5,
+      match_number: 1,
+      alliances: {
+        red: { team_keys: ["9995", "6487", "9597"] },
+        blue: { team_keys: ["6766", "9992", "9635"] },
+      },
+    }]);
+  });
+
+  it("maps final games to one set with increasing match numbers", () => {
+    expect(normalizeFrcScores({
+      MatchScores: [{
+        matchLevel: "Playoff",
+        matchNumber: 14,
+        alliances: [
+          { alliance: "Red", totalPoints: 400 },
+          { alliance: "Blue", totalPoints: 350 },
+        ],
+      }],
+    }, "Playoff", new Map([[14, "Final 2"]]))[0]).toMatchObject({
+      comp_level: "f",
+      set_number: 1,
+      match_number: 2,
+    });
   });
 });

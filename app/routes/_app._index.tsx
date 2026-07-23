@@ -2,6 +2,7 @@ import type { Route } from "./+types/_app._index";
 import { AnalyticsDashboard } from "../components/analytics-dashboard";
 import { requireUser } from "../lib/auth.server";
 import { getStrategyDatasetForRequest, loadCyberScoutMatches, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
+import { fetchFrcMatchSchedule } from "../lib/frc-events.server";
 import { isAdmin } from "../lib/profiles.server";
 import { getDataRange, getTierPercentages } from "../lib/settings.server";
 import { listStrategyProposals } from "../lib/strategy-proposals.server";
@@ -19,12 +20,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   const activeTab = new URL(request.url).searchParams.get("tab");
   let proposalError: string | null = null;
-  const [proposals, matchSchedule, scoutingLead] = await Promise.all([
+  const [proposals, matchSchedule, proposalSchedule, scoutingLead] = await Promise.all([
     activeTab === "proposal" ? listStrategyProposals(selectedEventKey).catch((error) => {
       proposalError = error instanceof Error ? error.message : "Strategy Proposal 数据表不可用。";
       return [];
     }) : Promise.resolve([]),
-    loadCyberScoutMatches(selectedEventKey, dataRange).catch(() => []),
+    activeTab === "match" ? fetchFrcMatchSchedule(selectedEventKey, dataRange).catch(() => []) : Promise.resolve([]),
+    activeTab === "proposal" ? loadCyberScoutMatches(selectedEventKey, dataRange).catch(() => []) : Promise.resolve([]),
     admin && activeTab === "lead" ? loadScoutConfidenceReport(selectedEventKey, { includedMatchTypes: dataRange, tbaMatches: matches }).catch(() => null) : Promise.resolve(null),
   ]);
 
@@ -39,7 +41,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     strategyProposal: {
       proposals,
       proposalError,
-      matches: activeTab === "proposal" ? toProposalMatches(matchSchedule) : [],
+      matches: activeTab === "proposal" ? toProposalMatches(proposalSchedule) : [],
       loaded: activeTab === "proposal",
     },
     scoutingLead,
