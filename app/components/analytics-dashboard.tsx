@@ -69,6 +69,7 @@ export function AnalyticsDashboard({
   selectedEventKey,
   isAdmin,
   tierPercentages,
+  dataRange,
   user,
   matchSchedule,
   strategyProposal,
@@ -80,6 +81,7 @@ export function AnalyticsDashboard({
   selectedEventKey: string | null;
   isAdmin: boolean;
   tierPercentages: TierPercentages;
+  dataRange: DataRange[];
   user: SessionUser;
   matchSchedule: CombinedMatch[];
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
@@ -114,6 +116,7 @@ export function AnalyticsDashboard({
   const routeBase = demo?.routeBase ?? "/";
   const canViewLead = isAdmin || demoMode;
   const activeTab = (tab === "lead" || tab === "settings") && !canViewLead ? "browser" : tab;
+  const showMatchTypes = dataRange.length > 1;
 
   useEffect(() => {
     if (demoMode) return;
@@ -311,6 +314,7 @@ export function AnalyticsDashboard({
             onToggleIgnoreMatch={toggleIgnoredMatch}
             onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
             hideComments={demoMode}
+            showMatchTypes={showMatchTypes}
           />
         </div>
       ) : null}
@@ -363,6 +367,7 @@ export function AnalyticsDashboard({
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
           hideComments={demoMode}
+          showMatchTypes={showMatchTypes}
         />
       ) : null}
 
@@ -384,6 +389,11 @@ function readDashboardTab(value: string | null): Tab {
   return value === "compare" || value === "match" || value === "picklist" || value === "proposal" || value === "lead" || value === "settings" ? value : "browser";
 }
 
+export function matchDisplayLabel(match: Pick<ScoutingMatch, "match" | "matchType">, showMatchType = false) {
+  const prefix = !showMatchType ? "M" : match.matchType === "practice" ? "P" : match.matchType === "qualification" ? "Q" : "M";
+  return `${prefix}${match.match}`;
+}
+
 function TeamDetail({
   team,
   tier,
@@ -394,6 +404,7 @@ function TeamDetail({
   onToggleIgnoreMatch,
   onOpenPhoto,
   hideComments = false,
+  showMatchTypes = false,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
@@ -404,6 +415,7 @@ function TeamDetail({
   onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
   hideComments?: boolean;
+  showMatchTypes?: boolean;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
@@ -502,11 +514,11 @@ function TeamDetail({
                   <span className="mr-1">使用场次</span>
                   {route.matches.map((match) => (
                     <span
-                      key={`${route.id}:${match.match}:${match.scoutName}`}
+                      key={`${route.id}:${match.matchType}:${match.match}:${match.scoutName}`}
                       className="rounded-full bg-surface-2 px-2 py-0.5"
                       title={[match.alliance, match.startPosition, match.flipped ? "镜像" : "", match.scoutName].filter(Boolean).join(" · ")}
                     >
-                      M{match.match}
+                      {matchDisplayLabel(match, showMatchTypes)}
                     </span>
                   ))}
                 </div>
@@ -525,7 +537,7 @@ function TeamDetail({
           <ChartCanvas
             label={`Team ${team.team} 逐场综合分`}
             configKey={`team-line:${team.team}:${team.matches.map((match) => match.totalPts).join(",")}`}
-            buildConfig={(palette) => teamLineConfig(team, palette)}
+            buildConfig={(palette) => teamLineConfig(team, palette, showMatchTypes)}
           />
         </Card>
         <Card className="p-4">
@@ -536,7 +548,7 @@ function TeamDetail({
           <ChartCanvas
             label={`Team ${team.team} 自动和手动贡献拆分`}
             configKey={`team-bars:${team.team}:${team.matches.map((match) => `${match.autoPts}/${match.telePts}`).join(",")}`}
-            buildConfig={(palette) => teamBarConfig(team, palette)}
+            buildConfig={(palette) => teamBarConfig(team, palette, showMatchTypes)}
           />
         </Card>
       </div>
@@ -570,7 +582,7 @@ function TeamDetail({
                           <button
                             type="button"
                             title={ignored ? "恢复此场" : "忽略此场"}
-                            aria-label={ignored ? `恢复 Team ${team.team} M${match.match}` : `忽略 Team ${team.team} M${match.match}`}
+                            aria-label={ignored ? `恢复 Team ${team.team} ${matchDisplayLabel(match, showMatchTypes)}` : `忽略 Team ${team.team} ${matchDisplayLabel(match, showMatchTypes)}`}
                             className={cn(
                               "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-line text-ink-faint transition hover:border-brand hover:text-brand",
                               ignored && "border-danger/40 bg-danger/10 text-danger hover:text-danger",
@@ -580,7 +592,7 @@ function TeamDetail({
                             {ignored ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                           </button>
                         ) : null}
-                        <span>M{match.match}</span>
+                        <span>{matchDisplayLabel(match, showMatchTypes)}</span>
                         {ignored ? <span className="rounded-full border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[10px] text-danger">已忽略</span> : null}
                       </div>
                     </td>
@@ -1128,6 +1140,7 @@ export function TeamDetailModal({
   onOpenPhoto,
   onClose,
   hideComments = false,
+  showMatchTypes = false,
 }: {
   team: TeamSummary;
   tier?: TierInfo;
@@ -1139,6 +1152,7 @@ export function TeamDetailModal({
   onOpenPhoto: (index: number) => void;
   onClose: () => void;
   hideComments?: boolean;
+  showMatchTypes?: boolean;
 }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -1174,6 +1188,7 @@ export function TeamDetailModal({
             onToggleIgnoreMatch={onToggleIgnoreMatch}
             onOpenPhoto={onOpenPhoto}
             hideComments={hideComments}
+            showMatchTypes={showMatchTypes}
           />
         </div>
       </div>
@@ -1544,11 +1559,11 @@ function baseScales(palette: { muted: string; grid: string }) {
   };
 }
 
-function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }): ChartConfiguration {
+function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
   return {
     type: "line",
     data: {
-      labels: team.matches.map((match) => `M${match.match}`),
+      labels: team.matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
       datasets: [
         {
           label: "综合分",
@@ -1574,11 +1589,11 @@ function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: str
   } as ChartConfiguration;
 }
 
-function teamBarConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }): ChartConfiguration {
+function teamBarConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
   return {
     type: "bar",
     data: {
-      labels: team.matches.map((match) => `M${match.match}`),
+      labels: team.matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
       datasets: [
         { label: "自动贡献", data: team.matches.map((match) => match.autoPts), backgroundColor: palette.accent, stack: "points" },
         { label: "手动贡献", data: team.matches.map((match) => match.telePts), backgroundColor: "#16a34a", stack: "points" },

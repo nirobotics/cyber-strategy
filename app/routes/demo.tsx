@@ -43,7 +43,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.39"
+      version="1.0.40"
       user={null}
       authLoading={false}
       allowGuest
@@ -59,6 +59,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           selectedEventKey={DEMO_EVENT_KEY}
           isAdmin={false}
           tierPercentages={DEFAULT_TIER_PERCENTAGES}
+          dataRange={["qualification"]}
           user={DEMO_USER}
           matchSchedule={loaderData.demo.matches}
           strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS), loaded: true }}

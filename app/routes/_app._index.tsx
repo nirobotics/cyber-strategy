@@ -33,6 +33,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     selectedEventKey,
     isAdmin: admin,
     tierPercentages,
+    dataRange,
     user,
     matchSchedule,
     strategyProposal: {
@@ -53,6 +54,7 @@ export default function IndexRoute({ loaderData }: Route.ComponentProps) {
       selectedEventKey={loaderData.selectedEventKey}
       isAdmin={loaderData.isAdmin}
       tierPercentages={loaderData.tierPercentages}
+      dataRange={loaderData.dataRange}
       user={loaderData.user}
       matchSchedule={loaderData.matchSchedule}
       strategyProposal={loaderData.strategyProposal}

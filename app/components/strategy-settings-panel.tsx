@@ -23,9 +23,7 @@ export function StrategySettingsPanel({
       <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="section-label">分档比例</p>
             <h2 className="text-lg font-semibold">综合均分排名</h2>
-            <p className="mt-1 text-sm text-ink-dim">综合分为 0 的队伍固定为待观察，不参与比例分档。</p>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">
             {readOnly ? "Demo 只读 · " : ""}合计 {RANKED_TIER_ORDER.reduce((sum, label) => sum + tierPercentages[label], 0)}%
@@ -67,7 +65,6 @@ export function StrategySettingsPanel({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="section-label">数据范围</p>
-            <h2 className="text-lg font-semibold">参与计算的比赛类型</h2>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">{dataRange.length} / {DATA_RANGE_OPTIONS.length}</Badge>
         </div>

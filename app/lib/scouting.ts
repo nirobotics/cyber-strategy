@@ -1,7 +1,10 @@
+import type { DataRange } from "./data-range";
+
 export type MatchAutoPathPoint = { node: string; atMs: number };
 
 export type ScoutingMatch = {
   match: number;
+  matchType?: DataRange;
   totalPts: number;
   autoPts: number;
   telePts: number;

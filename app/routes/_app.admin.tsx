@@ -1,10 +1,9 @@
-import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
+import { Link, redirect, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/_app.admin";
-import { Badge, Button, Card } from "../components/ui";
+import { Card } from "../components/ui";
 import { StrategySettingsPanel } from "../components/strategy-settings-panel";
 import { requireAdmin } from "../lib/auth.server";
 import { DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
-import { activateDataset, deleteDataset, listDatasets } from "../lib/datasets.server";
 import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
@@ -16,8 +15,8 @@ type ActionData = { error?: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const [datasets, tierPercentages, dataRange] = await Promise.all([listDatasets(), getTierPercentages(), getDataRange()]);
-  return { datasets, tierPercentages, dataRange };
+  const [tierPercentages, dataRange] = await Promise.all([getTierPercentages(), getDataRange()]);
+  return { tierPercentages, dataRange };
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
@@ -26,16 +25,6 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
   const intent = String(formData.get("intent") || "");
 
   try {
-    if (intent === "activate") {
-      await activateDataset(String(formData.get("id") || ""), user.feishuOpenId);
-      throw redirect("/admin");
-    }
-
-    if (intent === "delete") {
-      await deleteDataset(String(formData.get("id") || ""), user.feishuOpenId);
-      throw redirect("/admin");
-    }
-
     if (intent === "save-tier-percentages") {
       const percentages = parseTierPercentages((label) => formData.get(`tier_${label}`));
       const validationError = validateTierPercentages(percentages);
@@ -91,59 +80,6 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
       ) : null}
 
       <StrategySettingsPanel tierPercentages={loaderData.tierPercentages} dataRange={loaderData.dataRange} busy={busy} />
-
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-line p-3">
-          <h2 className="section-label">已保存数据集</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
-            <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
-              <tr>
-                <th className="px-3 py-2 text-left">标题</th>
-                <th className="px-3 py-2 text-left">赛事</th>
-                <th className="px-3 py-2 text-left">队伍数</th>
-                <th className="px-3 py-2 text-left">更新时间</th>
-                <th className="px-3 py-2 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loaderData.datasets.map((dataset) => (
-                <tr key={dataset.id} className="border-t border-line">
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{dataset.title}</span>
-                      {dataset.isActive ? <Badge className="border-ok/40 bg-ok/10 text-ok">当前</Badge> : null}
-                    </div>
-                    <p className="text-xs text-ink-faint">{dataset.sourceFilename || dataset.id}</p>
-                  </td>
-                  <td className="px-3 py-2">{dataset.eventKey}</td>
-                  <td className="px-3 py-2">{Object.keys(dataset.teamData).length}</td>
-                  <td className="px-3 py-2 text-ink-dim">{dataset.updatedAt ? new Date(dataset.updatedAt).toLocaleString() : "-"}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex justify-end gap-2">
-                      {!dataset.isActive ? (
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="activate" />
-                          <input type="hidden" name="id" value={dataset.id} />
-                          <Button type="submit" disabled={busy}>设为当前</Button>
-                        </Form>
-                      ) : null}
-                      {!dataset.id.startsWith("sample-") ? (
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="delete" />
-                          <input type="hidden" name="id" value={dataset.id} />
-                          <Button type="submit" disabled={busy}>删除</Button>
-                        </Form>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
     </div>
   );
 }

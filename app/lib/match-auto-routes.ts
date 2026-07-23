@@ -13,6 +13,7 @@ export type MatchAutoRoute = {
   scoutName: string;
   matches: Array<{
     match: number;
+    matchType?: ScoutingMatch["matchType"];
     alliance: string;
     startPosition: string;
     flipped: boolean;
@@ -99,6 +100,7 @@ export function buildMatchAutoRoutes(team: TeamSummary): MatchAutoRoute[] {
     const existing = bySignature.get(signature);
     const matchInfo = {
       match: match.match,
+      matchType: match.matchType,
       alliance: match.autoAlliance || "",
       startPosition: match.autoStartPosition || "",
       flipped: Boolean(match.autoFieldSideFlipped),

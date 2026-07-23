@@ -334,6 +334,7 @@ function toScoutingMatch({
 
   return {
     match,
+    matchType: normal?.matchType ?? superRecord?.matchType,
     totalPts: totalScore,
     autoPts: round1(safeAuto),
     telePts: round1(Math.max(0, totalScore - safeAuto)),
