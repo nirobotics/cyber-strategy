@@ -642,7 +642,7 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   return (
     <div className="space-y-3">
       <Card className="p-3">
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-3 md:items-end">
           {[0, 1, 2].map((index) => (
             <label key={index} className="grid gap-1 text-sm">
               <span className="font-medium text-ink-dim">Team {index + 1}</span>
@@ -660,9 +660,6 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
               </select>
             </label>
           ))}
-          <div className="rounded-md border border-line bg-surface-2 px-3 py-2 text-sm text-ink-dim">
-            已选择 {compared.length} 支
-          </div>
         </div>
       </Card>
 
