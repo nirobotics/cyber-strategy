@@ -25,9 +25,6 @@ export function StrategySettingsPanel({
           <div>
             <h2 className="text-lg font-semibold">综合均分排名</h2>
           </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">
-            {readOnly ? "Demo 只读 · " : ""}合计 {RANKED_TIER_ORDER.reduce((sum, label) => sum + tierPercentages[label], 0)}%
-          </Badge>
         </div>
         <Form method="post" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
           <input type="hidden" name="intent" value="save-tier-percentages" />
@@ -64,7 +61,7 @@ export function StrategySettingsPanel({
       <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="section-label">数据范围</p>
+            <h2 className="text-lg font-semibold">数据范围</h2>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">{dataRange.length} / {DATA_RANGE_OPTIONS.length}</Badge>
         </div>
