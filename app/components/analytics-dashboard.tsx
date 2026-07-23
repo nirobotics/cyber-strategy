@@ -915,11 +915,7 @@ function PicklistBoard({
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-line p-3">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="section-label">Picklist</p>
-              <h2 className="text-base font-semibold text-ink">{pickTitle}</h2>
-            </div>
+          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
             <div className="flex items-center gap-2">
               <span className="text-sm text-ink-dim">{pickTeams.length} 支</span>
               <Button
