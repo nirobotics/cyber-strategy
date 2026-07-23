@@ -841,10 +841,7 @@ function PicklistBoard({
   return (
     <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
-          <div>
-            <p className="section-label">{pickTitle}</p>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line p-3">
           <span className="text-sm text-ink-dim">{poolTeams.length} 支队伍</span>
         </div>
         <div data-picklist-scroll className="max-h-[68dvh] overflow-y-auto p-2">

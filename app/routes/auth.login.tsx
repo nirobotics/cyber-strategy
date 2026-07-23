@@ -57,7 +57,7 @@ export default function LoginPage() {
           进入 Demo
         </Link>
       </main>
-      <AppFooter version="1.0.36" />
+      <AppFooter version="1.0.37" />
     </>
   );
 }
