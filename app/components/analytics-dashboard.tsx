@@ -394,6 +394,14 @@ export function matchDisplayLabel(match: Pick<ScoutingMatch, "match" | "matchTyp
   return `${prefix}${match.match}`;
 }
 
+export function compareTeamDetailMatches(
+  a: Pick<ScoutingMatch, "match" | "matchType">,
+  b: Pick<ScoutingMatch, "match" | "matchType">,
+) {
+  const matchTypeOrder = (matchType?: DataRange) => matchType === "practice" ? 0 : matchType === "playoff" ? 2 : 1;
+  return matchTypeOrder(a.matchType) - matchTypeOrder(b.matchType) || a.match - b.match;
+}
+
 function TeamDetail({
   team,
   tier,
@@ -419,7 +427,9 @@ function TeamDetail({
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
-  const tableMatches = displayMatches ?? team.matches;
+  const tableMatches = (displayMatches ?? team.matches)
+    .map((match, originalIndex) => ({ match, originalIndex }))
+    .sort((a, b) => compareTeamDetailMatches(a.match, b.match) || a.originalIndex - b.originalIndex);
   const trendText = team.trend === "up" ? "上升" : team.trend === "down" ? "下降" : "稳定";
   return (
     <div className="min-w-0 space-y-3">
@@ -572,10 +582,10 @@ function TeamDetail({
               </tr>
             </thead>
             <tbody>
-              {tableMatches.map((match, matchIndex) => {
-                const ignored = ignoredMatchKeys?.has(matchIgnoreKey(team.team, match.match, matchIndex)) ?? false;
+              {tableMatches.map(({ match, originalIndex }) => {
+                const ignored = ignoredMatchKeys?.has(matchIgnoreKey(team.team, match.match, originalIndex)) ?? false;
                 return (
-                  <tr key={`${match.match}:${matchIndex}`} className={cn("border-t border-line align-top", ignored && "bg-danger/5 opacity-55")}>
+                  <tr key={`${match.matchType ?? "qualification"}:${match.match}:${originalIndex}`} className={cn("border-t border-line align-top", ignored && "bg-danger/5 opacity-55")}>
                     <td className="px-3 py-2 font-semibold">
                       <div className="flex items-center gap-2">
                         {onToggleIgnoreMatch ? (
@@ -587,7 +597,7 @@ function TeamDetail({
                               "inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-line text-ink-faint transition hover:border-brand hover:text-brand",
                               ignored && "border-danger/40 bg-danger/10 text-danger hover:text-danger",
                             )}
-                            onClick={() => onToggleIgnoreMatch(team.team, match.match, matchIndex)}
+                            onClick={() => onToggleIgnoreMatch(team.team, match.match, originalIndex)}
                           >
                             {ignored ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
                           </button>

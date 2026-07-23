@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { matchDisplayLabel, ratingDotClassName } from "./analytics-dashboard";
+import { compareTeamDetailMatches, matchDisplayLabel, ratingDotClassName } from "./analytics-dashboard";
+import type { ScoutingMatch } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
   it("uses exactly one background class for rating dots", () => {
@@ -14,5 +15,25 @@ describe("analytics dashboard UI helpers", () => {
     expect(matchDisplayLabel({ match: 6, matchType: "qualification" }, true)).toBe("Q6");
     expect(matchDisplayLabel({ match: 3, matchType: "playoff" }, true)).toBe("M3");
     expect(matchDisplayLabel({ match: 6, matchType: "qualification" }, false)).toBe("M6");
+  });
+
+  it("sorts team detail matches by practice, qualification, playoff, then match number", () => {
+    const matches: Array<Pick<ScoutingMatch, "match" | "matchType">> = [
+      { match: 3, matchType: "playoff" },
+      { match: 6, matchType: "qualification" },
+      { match: 9, matchType: "practice" },
+      { match: 1, matchType: "playoff" },
+      { match: 2, matchType: "practice" },
+      { match: 1, matchType: "qualification" },
+    ];
+
+    expect(matches.sort(compareTeamDetailMatches).map((match) => matchDisplayLabel(match, true))).toEqual([
+      "P2",
+      "P9",
+      "Q1",
+      "Q6",
+      "M1",
+      "M3",
+    ]);
   });
 });
