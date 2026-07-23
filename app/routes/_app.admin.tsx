@@ -68,7 +68,6 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="section-label">管理</p>
-          <h1 className="text-2xl font-semibold text-ink">数据集</h1>
         </div>
         <Link to="/" className="btn">
           返回
