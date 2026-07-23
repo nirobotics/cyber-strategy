@@ -1631,7 +1631,7 @@ function compareLineConfig(teams: TeamSummary[], palette: ChartPaletteLike): Cha
       scales: {
         x: {
           type: "linear",
-          title: { display: true, text: "队伍第 n 场", color: palette.muted },
+          title: { display: true, text: "比赛场数", color: palette.muted },
           ticks: { color: palette.muted, precision: 0, callback: (value) => `M${value}` },
           grid: { color: palette.grid },
         },
