@@ -21,7 +21,6 @@ import {
   proposalMatchForKeyOrFirst,
   proposalMatchIncludesTeam,
   proposalMatchesForTeam,
-  proposalMatchMatchesTeamQuery,
   type ProposalMatch,
 } from "../lib/strategy-proposal-matches";
 import {
@@ -92,7 +91,6 @@ export function StrategyProposalPanel({
   const [searchParams] = useSearchParams();
   const actionData = proposalFetcher.data;
   const [statusFilter, setStatusFilter] = useState<StrategyProposalStatus | "all">("all");
-  const [matchFilter, setMatchFilter] = useState("all");
   const [teamFilter, setTeamFilter] = useState("");
   const [selectedId, setSelectedId] = useState(initialSelectedId);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
@@ -115,7 +113,6 @@ export function StrategyProposalPanel({
   const restorable = canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && data.isAdmin);
   const teamFilterDigits = teamFilter.replace(/\D/g, "");
-  const matchFilterOptions = data.matches.filter((match) => proposalMatchMatchesTeamQuery(match, teamFilter));
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
     ...selected,
     lastApprovedSnapshot: approvedSnapshot,
@@ -127,7 +124,6 @@ export function StrategyProposalPanel({
   }));
   const filteredProposals = matchProposals.filter((proposal) =>
     (statusFilter === "all" || proposal.status === statusFilter) &&
-    (matchFilter === "all" || proposal.matchKey === matchFilter) &&
     proposalMatchesOwnTeamQuery(proposal, teamFilterDigits)
   );
   const teamDetail = detailTeam ? data.dataset.teamData[detailTeam] : null;
@@ -209,12 +205,6 @@ export function StrategyProposalPanel({
     }));
   }
 
-  function updateTeamFilter(value: string) {
-    setTeamFilter(value);
-    const selectedMatchFilter = data.matches.find((match) => match.key === matchFilter) ?? null;
-    if (selectedMatchFilter && !proposalMatchMatchesTeamQuery(selectedMatchFilter, value)) setMatchFilter("all");
-  }
-
   function exportProposals() {
     setPrintProposals([...filteredProposals]);
   }
@@ -279,18 +269,12 @@ export function StrategyProposalPanel({
             </select>
             <input
               value={teamFilter}
-              onChange={(event) => updateTeamFilter(event.target.value)}
+              onChange={(event) => setTeamFilter(event.target.value)}
               inputMode="numeric"
               className="input h-9 font-sans"
               placeholder="按己方队号查找"
               aria-label="按己方队号查找 proposal"
             />
-            <select value={matchFilter} onChange={(event) => setMatchFilter(event.target.value)} className="input h-9 font-sans">
-              <option value="all">所有己方比赛</option>
-              {matchFilterOptions.map((match) => (
-                <option key={match.key} value={match.key}>{match.label} · R {match.redTeams.join("/")} · B {match.blueTeams.join("/")}</option>
-              ))}
-            </select>
           </div>
           <div className="max-h-[72dvh] overflow-y-auto">
             {!filteredProposals.length ? (
