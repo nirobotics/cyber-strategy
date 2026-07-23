@@ -244,11 +244,7 @@ export function StrategyProposalPanel({
 
       <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="overflow-hidden p-0">
-          <div className="flex items-center justify-between gap-2 border-b border-line p-3">
-            <div>
-              <p className="section-label">比赛策略</p>
-              <h2 className="text-lg font-semibold text-ink">列表</h2>
-            </div>
+          <div className="flex items-center justify-end gap-2 border-b border-line p-3">
             <div className="flex gap-2">
               {data.isAdmin ? (
                 <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表为 PDF">
