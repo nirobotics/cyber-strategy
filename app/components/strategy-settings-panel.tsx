@@ -84,12 +84,6 @@ export function StrategySettingsPanel({
           </div>
           {!readOnly ? <Button type="submit" variant="primary" disabled={busy} className="w-fit">保存范围</Button> : null}
         </Form>
-        {!readOnly ? (
-          <Form method="post" className="mt-2">
-            <input type="hidden" name="intent" value="reset-data-range" />
-            <Button type="submit" disabled={busy}>恢复默认</Button>
-          </Form>
-        ) : null}
       </Card>
     </div>
   );

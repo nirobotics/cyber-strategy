@@ -3,7 +3,7 @@ import type { Route } from "./+types/_app.admin";
 import { Card } from "../components/ui";
 import { StrategySettingsPanel } from "../components/strategy-settings-panel";
 import { requireAdmin } from "../lib/auth.server";
-import { DEFAULT_DATA_RANGE, parseDataRange, validateDataRange } from "../lib/data-range";
+import { parseDataRange, validateDataRange } from "../lib/data-range";
 import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
@@ -46,10 +46,6 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
       throw redirect("/admin");
     }
 
-    if (intent === "reset-data-range") {
-      await saveDataRange(DEFAULT_DATA_RANGE, user.feishuOpenId);
-      throw redirect("/admin");
-    }
   } catch (error) {
     if (error instanceof Response) throw error;
     return { error: error instanceof Error ? error.message : "操作失败。" };
