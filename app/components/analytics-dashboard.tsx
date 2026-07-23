@@ -1113,7 +1113,7 @@ const PICKLIST_PRINT_CSS = `
   .picklist-print-header p { color: #6b7280; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
   .picklist-print-header h1 { margin-top: 2px; font-size: 22px; }
   .picklist-print-header > div:last-child { display: grid; gap: 2px; color: #6b7280; font-size: 9px; text-align: right; }
-  .picklist-print-lists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10mm; margin-top: 7mm; }
+  .picklist-print-lists { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10mm; margin-top: 7mm; }
   .picklist-print-lists section { min-width: 0; }
   .picklist-print-lists h2 { margin: 0 0 3mm; font-size: 15px; }
   .picklist-print-row { display: grid; grid-template-columns: 7mm minmax(0, 1fr); gap: 3mm; break-inside: avoid; margin-bottom: 2mm; border: 1px solid #e5e7eb; border-radius: 5px; padding: 2.5mm; }
