@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
 import {
   BarChart3,
@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { NavLink, useNavigate, useSearchParams } from "react-router";
+import { NavLink, useFetcher, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import type { ScoutingLeadPanelData } from "./scouting-lead-panel";
@@ -52,16 +52,24 @@ import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercent
 import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
 import type { CombinedMatch } from "../lib/match-analysis";
 import type { DataRange } from "../lib/data-range";
+import { dashboardResourcePath } from "../lib/dashboard-performance";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
 const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
 const PICK_DRAG_SOURCE_TYPE = "application/x-cyber-strategy-source";
-const MatchAnalysis = lazy(() => import("./match-analysis").then((module) => ({ default: module.MatchAnalysis })));
-const ScoutingLeadPanel = lazy(() => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel })));
-const StrategyProposalPanel = lazy(() => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel })));
-const StrategySettingsPanel = lazy(() => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel })));
+const loadMatchAnalysis = () => import("./match-analysis").then((module) => ({ default: module.MatchAnalysis }));
+const loadScoutingLeadPanel = () => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel }));
+const loadStrategyProposalPanel = () => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel }));
+const loadStrategySettingsPanel = () => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel }));
+const MatchAnalysis = lazy(loadMatchAnalysis);
+const ScoutingLeadPanel = lazy(loadScoutingLeadPanel);
+const StrategyProposalPanel = lazy(loadStrategyProposalPanel);
+const StrategySettingsPanel = lazy(loadStrategySettingsPanel);
+
+type MatchScheduleResource = { eventKey: string | null; matches: CombinedMatch[] };
+type StrategyProposalResource = Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { selectedEventKey: string };
 
 export function AnalyticsDashboard({
   dataset,
@@ -91,12 +99,16 @@ export function AnalyticsDashboard({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => readDashboardTab(searchParams.get("tab")));
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(() => new Set([readDashboardTab(searchParams.get("tab"))]));
   const [selectedTeam, setSelectedTeam] = useState("");
   const [search, setSearch] = useState("");
   const [hiddenTeams, setHiddenTeams] = useStoredList(`cyber-strategy:hidden:${dataset.id}`);
   const [ignoredMatches, setIgnoredMatches] = useStoredList(`cyber-strategy:ignored-matches:${dataset.id}`);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
+  const matchScheduleFetcher = useFetcher<MatchScheduleResource>();
+  const strategyProposalFetcher = useFetcher<StrategyProposalResource>();
+  const scoutingLeadFetcher = useFetcher<ScoutingLeadPanelData>();
 
   const analysisTeamData = useMemo(() => applyIgnoredMatchesToTeamData(dataset.teamData, ignoredMatches), [dataset.teamData, ignoredMatches]);
   const analysisDataset = useMemo(() => ({ ...dataset, teamData: analysisTeamData }), [dataset, analysisTeamData]);
@@ -117,6 +129,37 @@ export function AnalyticsDashboard({
   const canViewLead = isAdmin || demoMode;
   const activeTab = (tab === "lead" || tab === "settings") && !canViewLead ? "browser" : tab;
   const showMatchTypes = dataRange.length > 1;
+  const fetchedMatchSchedule = matchScheduleFetcher.data?.eventKey === resolvedEventKey ? matchScheduleFetcher.data.matches : null;
+  const fetchedStrategyProposal = strategyProposalFetcher.data?.selectedEventKey === resolvedEventKey ? strategyProposalFetcher.data : null;
+  const resolvedStrategyProposal = demoMode || strategyProposal.loaded ? strategyProposal : fetchedStrategyProposal;
+  const resolvedScoutingLead = demoMode
+    ? scoutingLead
+    : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
+
+  const prepareTab = useCallback((next: Tab) => {
+    if (next === "match") void loadMatchAnalysis();
+    if (next === "proposal") void loadStrategyProposalPanel();
+    if (next === "lead") void loadScoutingLeadPanel();
+    if (next === "settings") void loadStrategySettingsPanel();
+    if (demoMode) return;
+
+    if (next === "match" && matchScheduleFetcher.state === "idle" && matchScheduleFetcher.data?.eventKey !== resolvedEventKey) {
+      matchScheduleFetcher.load(dashboardResourcePath("match", resolvedEventKey));
+    }
+    if (next === "proposal" && strategyProposalFetcher.state === "idle" && strategyProposalFetcher.data?.selectedEventKey !== resolvedEventKey) {
+      strategyProposalFetcher.load(dashboardResourcePath("proposal", resolvedEventKey));
+    }
+    if (next === "lead" && isAdmin && scoutingLeadFetcher.state === "idle" && scoutingLeadFetcher.data?.selectedEventKey !== resolvedEventKey) {
+      scoutingLeadFetcher.load(dashboardResourcePath("lead", resolvedEventKey));
+    }
+  }, [
+    demoMode,
+    isAdmin,
+    matchScheduleFetcher,
+    resolvedEventKey,
+    scoutingLeadFetcher,
+    strategyProposalFetcher,
+  ]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -139,6 +182,17 @@ export function AnalyticsDashboard({
     navigate(`${routeBase}?${params.toString()}`, { replace: true });
   }, [demoMode, events, navigate, routeBase]);
 
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void Promise.allSettled([loadMatchAnalysis(), loadStrategyProposalPanel(), loadScoutingLeadPanel(), loadStrategySettingsPanel()]);
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
+    prepareTab(activeTab);
+  }, [activeTab, prepareTab]);
+
   function selectEvent(eventKey: string) {
     if (demoMode) return;
     const params = new URLSearchParams(window.location.search);
@@ -154,7 +208,9 @@ export function AnalyticsDashboard({
   }
 
   function selectTab(next: Tab) {
+    prepareTab(next);
     setTab(next);
+    setVisitedTabs((current) => current.has(next) ? current : new Set(current).add(next));
     const params = new URLSearchParams(window.location.search);
     if (next === "browser") params.delete("tab");
     else params.set("tab", next);
@@ -162,11 +218,7 @@ export function AnalyticsDashboard({
     if (next !== "lead") params.delete("view");
     const search = params.toString();
     const path = search ? `${routeBase}?${search}` : routeBase;
-    if (!demoMode && ((next === "proposal" && !strategyProposal.loaded) || (next === "lead" && !scoutingLead))) {
-      navigate(path);
-    } else {
-      window.history.replaceState(null, "", path);
-    }
+    window.history.replaceState(null, "", path);
   }
 
   function toggleHidden(team: string) {
@@ -188,27 +240,27 @@ export function AnalyticsDashboard({
             <SegmentedTab active={tab} value="compare" onClick={selectTab} icon={<BarChart3 className="size-4" />}>
               队伍对比
             </SegmentedTab>
-            <SegmentedTab active={tab} value="match" onClick={selectTab} icon={<Table2 className="size-4" />}>
+            <SegmentedTab active={tab} value="match" onClick={selectTab} onPrefetch={prepareTab} icon={<Table2 className="size-4" />}>
               赛程分析
             </SegmentedTab>
             <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
               Picklist
             </SegmentedTab>
-            <SegmentedTab active={tab} value="proposal" onClick={selectTab} icon={<FileText className="size-4" />}>
+            <SegmentedTab active={tab} value="proposal" onClick={selectTab} onPrefetch={prepareTab} icon={<FileText className="size-4" />}>
               Strategy Proposal
             </SegmentedTab>
             {canViewLead ? (
               <>
-                <SegmentedTab active={tab} value="lead" onClick={selectTab} icon={<ShieldCheck className="size-4" />}>
+                <SegmentedTab active={tab} value="lead" onClick={selectTab} onPrefetch={prepareTab} icon={<ShieldCheck className="size-4" />}>
                   Scouting Lead
                 </SegmentedTab>
                 {isAdmin ? (
-                  <NavLink to="/admin" className={dashboardNavItemClass()}>
+                  <NavLink to="/admin" prefetch="intent" className={dashboardNavItemClass()}>
                     <Settings className="size-4" />
                     管理
                   </NavLink>
                 ) : (
-                  <SegmentedTab active={tab} value="settings" onClick={selectTab} icon={<Settings className="size-4" />}>
+                  <SegmentedTab active={tab} value="settings" onClick={selectTab} onPrefetch={prepareTab} icon={<Settings className="size-4" />}>
                     设置
                   </SegmentedTab>
                 )}
@@ -320,8 +372,12 @@ export function AnalyticsDashboard({
       ) : null}
 
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
-      {activeTab === "match" ? (
-        <MatchAnalysis eventKey={dataset.eventKey} schedule={demo?.matches ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
+      {visitedTabs.has("match") ? (
+        <div hidden={activeTab !== "match"}>
+          {demoMode || fetchedMatchSchedule ? (
+            <MatchAnalysis eventKey={dataset.eventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
+          ) : <TabLoading label="正在加载赛程数据" />}
+        </div>
       ) : null}
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
@@ -333,24 +389,30 @@ export function AnalyticsDashboard({
           onOpenTeam={setDetailTeam}
         />
       ) : null}
-      {activeTab === "proposal" ? (
-        <StrategyProposalPanel
-          data={{
-            dataset: analysisDataset,
-            events,
-            selectedEventKey: resolvedEventKey,
-            isAdmin,
-            user,
-            ...strategyProposal,
-          }}
-          initialSelectedId={searchParams.get("proposal")}
-          embedded
-          demoMode={demoMode}
-          ownTeams={demo?.ownTeams}
-          routeBase={routeBase}
-        />
+      {visitedTabs.has("proposal") ? (
+        <div hidden={activeTab !== "proposal"}>
+          {resolvedStrategyProposal ? (
+            <StrategyProposalPanel
+              data={{
+                dataset: analysisDataset,
+                selectedEventKey: resolvedEventKey,
+                isAdmin,
+                user,
+                ...resolvedStrategyProposal,
+              }}
+              initialSelectedId={searchParams.get("proposal")}
+              demoMode={demoMode}
+              ownTeams={demo?.ownTeams}
+              routeBase={routeBase}
+            />
+          ) : <TabLoading label="正在加载 Strategy Proposal" />}
+        </div>
       ) : null}
-      {activeTab === "lead" && scoutingLead ? <ScoutingLeadPanel data={scoutingLead} embedded readOnly={demoMode} routeBase={routeBase} /> : null}
+      {visitedTabs.has("lead") ? (
+        <div hidden={activeTab !== "lead"}>
+          {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
+        </div>
+      ) : null}
       {activeTab === "settings" && demo ? (
         <StrategySettingsPanel tierPercentages={tierPercentages} dataRange={demo.dataRange} readOnly />
       ) : null}
@@ -1375,23 +1437,31 @@ function SegmentedTab({
   icon,
   children,
   onClick,
+  onPrefetch,
 }: {
   active: Tab;
   value: Tab;
   icon: ReactNode;
   children: ReactNode;
   onClick: (value: Tab) => void;
+  onPrefetch?: (value: Tab) => void;
 }) {
   return (
     <button
       type="button"
       onClick={() => onClick(value)}
+      onPointerEnter={() => onPrefetch?.(value)}
+      onFocus={() => onPrefetch?.(value)}
       className={dashboardNavItemClass(active === value)}
     >
       {icon}
       {children}
     </button>
   );
+}
+
+function TabLoading({ label }: { label: string }) {
+  return <Card className="p-6 text-sm text-ink-dim">{label}</Card>;
 }
 
 function dashboardNavItemClass(active = false) {

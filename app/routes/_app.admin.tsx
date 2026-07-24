@@ -65,7 +65,7 @@ export default function AdminRoute({ loaderData }: Route.ComponentProps) {
         <div>
           <p className="section-label">管理</p>
         </div>
-        <Link to="/" className="btn">
+        <Link to="/" prefetch="intent" className="btn">
           返回
         </Link>
       </div>

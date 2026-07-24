@@ -9,13 +9,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useFetcher, useNavigation, useSearchParams } from "react-router";
 import { PhotoLightbox, TeamDetailModal } from "./analytics-dashboard";
 import { StrategyBoard } from "./strategy-board";
-import { StrategyNavigation } from "./strategy-navigation";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
-import { reliability, type ScoutingDataset, type ScoutingEventOption, type TeamPitInfo, type TeamSummary } from "../lib/scouting";
+import { reliability, type ScoutingDataset, type TeamPitInfo, type TeamSummary } from "../lib/scouting";
 import {
   firstProposalMatchForTeam,
   proposalMatchForKeyOrFirst,
@@ -53,7 +52,6 @@ import {
 export type StrategyProposalActionData = { error?: string; ok?: boolean; proposalId?: string; deleted?: boolean };
 export type StrategyProposalPanelData = {
   dataset: ScoutingDataset;
-  events: ScoutingEventOption[];
   selectedEventKey: string;
   isAdmin: boolean;
   user: SessionUser;
@@ -73,19 +71,16 @@ type EditorState = {
 export function StrategyProposalPanel({
   data,
   initialSelectedId,
-  embedded = false,
   demoMode = false,
   ownTeams = ownStrategyTeams,
   routeBase = "/",
 }: {
   data: StrategyProposalPanelData;
   initialSelectedId: string | null;
-  embedded?: boolean;
   demoMode?: boolean;
   ownTeams?: readonly string[];
   routeBase?: string;
 }) {
-  const navigate = useNavigate();
   const navigation = useNavigation();
   const proposalFetcher = useFetcher<StrategyProposalActionData>();
   const [searchParams] = useSearchParams();
@@ -135,7 +130,7 @@ export function StrategyProposalPanel({
       const timeout = window.setTimeout(() => {
         setSelectedId(null);
         setEditor(initialEditorState(null, data.matches, ownTeams));
-        replaceProposalUrl(searchParams, null, embedded, routeBase);
+        replaceProposalUrl(searchParams, null, routeBase);
       }, 0);
       return () => window.clearTimeout(timeout);
     }
@@ -144,10 +139,10 @@ export function StrategyProposalPanel({
     const timeout = window.setTimeout(() => {
       setSelectedId(proposalId);
       setEditor((current) => ({ ...current, id: proposalId }));
-      replaceProposalUrl(searchParams, proposalId, embedded, routeBase);
+      replaceProposalUrl(searchParams, proposalId, routeBase);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, embedded, ownTeams, routeBase]);
+  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, ownTeams, routeBase]);
 
   useEffect(() => {
     if (!printProposals?.length) return;
@@ -160,25 +155,17 @@ export function StrategyProposalPanel({
     };
   }, [printProposals]);
 
-  function selectEvent(eventKey: string) {
-    const params = new URLSearchParams(searchParams);
-    params.set("event", eventKey);
-    params.delete("proposal");
-    if (embedded) params.set("tab", "proposal");
-    navigate(`${embedded ? routeBase : "/strategy-proposal"}?${params.toString()}`);
-  }
-
   function newProposal() {
     setSelectedId(null);
     setEditor(initialEditorState(null, data.matches, ownTeams));
-    replaceProposalUrl(searchParams, null, embedded, routeBase);
+    replaceProposalUrl(searchParams, null, routeBase);
   }
 
   function openProposal(id: string) {
     const proposal = matchProposals.find((item) => item.id === id) ?? null;
     setSelectedId(id);
     setEditor(initialEditorState(proposal, data.matches, ownTeams));
-    replaceProposalUrl(searchParams, id, embedded, routeBase);
+    replaceProposalUrl(searchParams, id, routeBase);
   }
 
   function updateOwnTeam(ownTeam: string) {
@@ -211,34 +198,6 @@ export function StrategyProposalPanel({
 
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-3">
-      {!embedded ? <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <p className="section-label">Strategy Proposal</p>
-          <p className="mt-1 text-sm text-ink-dim">
-            {data.selectedEventKey} · {matchProposals.length} 个比赛策略 · {data.matches.length} 场比赛
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={data.selectedEventKey}
-            onChange={(event) => selectEvent(event.target.value)}
-            className="input h-9 min-w-[180px] font-sans"
-            disabled={!data.events.length}
-            title="选择赛事"
-          >
-            {!data.events.some((event) => event.eventKey === data.selectedEventKey) ? (
-              <option value={data.selectedEventKey}>{data.selectedEventKey}</option>
-            ) : null}
-            {data.events.map((event) => (
-              <option key={event.eventKey} value={event.eventKey}>
-                {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
-              </option>
-            ))}
-          </select>
-          <StrategyNavigation active="proposal" eventKey={data.selectedEventKey} isAdmin={data.isAdmin} />
-        </div>
-      </div> : null}
-
       {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
       {data.proposalError ? <Card className="border-warn/40 bg-warn/10 p-3 text-sm text-warn">{data.proposalError}</Card> : null}
 
@@ -1026,14 +985,13 @@ function opponentTeams(match: ProposalMatch | null, ownTeam: string) {
   return [];
 }
 
-function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, embedded: boolean, routeBase: string) {
+function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, routeBase: string) {
   const params = new URLSearchParams(searchParams);
   if (id) params.set("proposal", id);
   else params.delete("proposal");
-  if (embedded) params.set("tab", "proposal");
+  params.set("tab", "proposal");
   const search = params.toString();
-  const path = embedded ? routeBase : "/strategy-proposal";
-  window.history.replaceState(null, "", search ? `${path}?${search}` : path);
+  window.history.replaceState(null, "", search ? `${routeBase}?${search}` : routeBase);
 }
 
 function proposalTypeLabel(type: StrategyProposalType) {

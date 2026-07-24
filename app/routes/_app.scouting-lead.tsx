@@ -1,5 +1,5 @@
+import { Navigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.scouting-lead";
-import { ScoutingLeadPanel, type ScoutingLeadActionData } from "../components/scouting-lead-panel";
 import { requireAdmin } from "../lib/auth.server";
 import {
   deleteCyberScoutAssignment,
@@ -7,6 +7,8 @@ import {
   loadScoutConfidenceForRequest,
   saveCyberScoutAssignment,
 } from "../lib/cyber-scout.server";
+
+type ScoutingLeadActionData = { error?: string; ok?: boolean; view?: "confidence" | "records" | "assignments" };
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -50,5 +52,9 @@ export async function action({ request }: Route.ActionArgs): Promise<ScoutingLea
 }
 
 export default function ScoutingLeadRoute({ loaderData }: Route.ComponentProps) {
-  return <ScoutingLeadPanel data={loaderData} />;
+  const [searchParams] = useSearchParams();
+  const params = new URLSearchParams(searchParams);
+  if (loaderData.selectedEventKey) params.set("event", loaderData.selectedEventKey);
+  params.set("tab", "lead");
+  return <Navigate to={`/?${params.toString()}`} replace />;
 }

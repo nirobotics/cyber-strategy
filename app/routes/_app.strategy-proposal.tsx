@@ -1,10 +1,10 @@
-import { useSearchParams } from "react-router";
+import { Navigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.strategy-proposal";
-import { StrategyProposalPanel, type StrategyProposalActionData } from "../components/strategy-proposal-panel";
 import { requireUser } from "../lib/auth.server";
-import { getStrategyDatasetForRequest, loadCyberScoutProposalMatches } from "../lib/cyber-scout.server";
+import { loadCyberScoutProposalMatches } from "../lib/cyber-scout.server";
 import { isAdmin } from "../lib/profiles.server";
 import { getDataRange } from "../lib/settings.server";
+import { cleanTbaEventKey } from "../lib/tba.server";
 import {
   deleteStrategyProposal,
   listStrategyProposals,
@@ -13,14 +13,22 @@ import {
   saveStrategyProposal,
 } from "../lib/strategy-proposals.server";
 
+type StrategyProposalActionData = { error?: string; ok?: boolean; proposalId?: string; deleted?: boolean };
+
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = requireUser(request, { redirectToLogin: true });
+  requireUser(request, { redirectToLogin: true });
+  const selectedEventKey = cleanTbaEventKey(new URL(request.url).searchParams.get("event"));
+  if (!selectedEventKey) {
+    return {
+      selectedEventKey: "",
+      proposals: [],
+      proposalError: null,
+      matches: [],
+    };
+  }
   const dataRange = await getDataRange();
-  const data = await getStrategyDatasetForRequest(request, { includedMatchTypes: dataRange });
-  const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
   let proposalError: string | null = null;
-  const [admin, proposals, matches] = await Promise.all([
-    isAdmin(user.feishuOpenId),
+  const [proposals, matches] = await Promise.all([
     listStrategyProposals(selectedEventKey).catch((error) => {
       proposalError = error instanceof Error ? error.message : "Strategy Proposal 数据表不可用。";
       return [];
@@ -29,10 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
 
   return {
-    ...data,
     selectedEventKey,
-    isAdmin: admin,
-    user,
     proposals,
     proposalError,
     matches,
@@ -101,13 +106,10 @@ export async function action({ request }: Route.ActionArgs): Promise<StrategyPro
 
 export default function StrategyProposalRoute({ loaderData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
-  return (
-    <StrategyProposalPanel
-      key={`${loaderData.selectedEventKey}:${loaderData.dataset.id}`}
-      data={loaderData}
-      initialSelectedId={searchParams.get("proposal")}
-    />
-  );
+  const params = new URLSearchParams(searchParams);
+  if (loaderData.selectedEventKey) params.set("event", loaderData.selectedEventKey);
+  params.set("tab", "proposal");
+  return <Navigate to={`/?${params.toString()}`} replace />;
 }
 
 function parsePayload(value: string) {

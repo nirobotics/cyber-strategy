@@ -8,8 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { useFetcher, useNavigate, useNavigation, useSearchParams } from "react-router";
-import { StrategyNavigation } from "./strategy-navigation";
+import { useFetcher, useNavigation, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import type {
   ScoutConfidenceResult,
@@ -38,70 +37,26 @@ const scoutPositions = ["R1", "R2", "R3", "B1", "B2", "B3"] as const;
 
 export function ScoutingLeadPanel({
   data,
-  embedded = false,
   readOnly = false,
   routeBase = "/",
 }: {
   data: ScoutingLeadPanelData;
-  embedded?: boolean;
   readOnly?: boolean;
   routeBase?: string;
 }) {
-  const navigate = useNavigate();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const [view, setView] = useState<LeadView>(() => readView(searchParams.get("view")));
-  const { report, events, selectedEventKey, sourceStatus, leadData } = data;
+  const { report, selectedEventKey, leadData } = data;
   const busy = navigation.state !== "idle";
-
-  function selectEvent(eventKey: string) {
-    if (readOnly) return;
-    const params = new URLSearchParams(searchParams);
-    if (eventKey) params.set("event", eventKey);
-    else params.delete("event");
-    if (embedded) params.set("tab", "lead");
-    navigate(`${embedded ? routeBase : "/scouting-lead"}?${params.toString()}`);
-  }
 
   function selectView(next: LeadView) {
     setView(next);
-    replaceLeadViewUrl(searchParams, next, embedded, routeBase);
+    replaceLeadViewUrl(searchParams, next, routeBase);
   }
 
   return (
     <div className="mx-auto grid w-full max-w-[1500px] gap-3">
-      {!embedded ? <div className="flex flex-col gap-3 rounded-card border border-line bg-surface p-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <p className="section-label">Scouting Lead</p>
-          <h1 className="text-2xl font-semibold text-ink">{viewTitle(view)}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
-            <Badge className="border-brand/40 bg-brand/10 text-brand">{sourceStatus.label}</Badge>
-            <span>{sourceStatus.message}</span>
-            {sourceStatus.updatedAt ? <span>{new Date(sourceStatus.updatedAt).toLocaleString()}</span> : null}
-          </div>
-          {sourceStatus.error ? <p className="mt-1 text-xs text-warn">{sourceStatus.error}</p> : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selectedEventKey ?? ""}
-            onChange={(event) => selectEvent(event.target.value)}
-            className="input h-9 min-w-[180px] font-sans"
-            disabled={readOnly || !events.length}
-            title="选择 cyber-scout 赛事"
-          >
-            {!events.some((event) => event.eventKey === selectedEventKey) ? (
-              <option value={selectedEventKey ?? ""}>{selectedEventKey ?? "无赛事"}</option>
-            ) : null}
-            {events.map((event) => (
-              <option key={event.eventKey} value={event.eventKey}>
-                {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
-              </option>
-            ))}
-          </select>
-          <StrategyNavigation active="lead" eventKey={selectedEventKey} isAdmin />
-        </div>
-      </div> : null}
-
       <div className="flex flex-wrap gap-2 rounded-card border border-line bg-surface p-2">
         {leadViews.map((item) => (
           <Button key={item.id} type="button" variant={view === item.id ? "active" : "default"} onClick={() => selectView(item.id)}>
@@ -656,17 +611,11 @@ function readView(value: string | null): LeadView {
   return value === "records" || value === "assignments" ? value : "confidence";
 }
 
-function viewTitle(view: LeadView) {
-  if (view === "records") return "提交记录查询";
-  if (view === "assignments") return "人员分配";
-  return "信心分排行";
-}
-
-function replaceLeadViewUrl(searchParams: URLSearchParams, view: LeadView, embedded: boolean, routeBase: string) {
+function replaceLeadViewUrl(searchParams: URLSearchParams, view: LeadView, routeBase: string) {
   const params = new URLSearchParams(searchParams);
   params.set("view", view);
-  if (embedded) params.set("tab", "lead");
-  window.history.replaceState(null, "", `${embedded ? routeBase : "/scouting-lead"}?${params.toString()}`);
+  params.set("tab", "lead");
+  window.history.replaceState(null, "", `${routeBase}?${params.toString()}`);
 }
 
 function formatDate(value: string | null) {
