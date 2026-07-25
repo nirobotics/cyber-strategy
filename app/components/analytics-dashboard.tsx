@@ -22,7 +22,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { NavLink, useFetcher, useNavigate, useSearchParams } from "react-router";
+import { useFetcher, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
 import type { ScoutingLeadPanelData } from "./scouting-lead-panel";
@@ -254,16 +254,9 @@ export function AnalyticsDashboard({
                 <SegmentedTab active={tab} value="lead" onClick={selectTab} onPrefetch={prepareTab} icon={<ShieldCheck className="size-4" />}>
                   Scouting Lead
                 </SegmentedTab>
-                {isAdmin ? (
-                  <NavLink to="/admin" prefetch="intent" className={dashboardNavItemClass()}>
-                    <Settings className="size-4" />
-                    管理
-                  </NavLink>
-                ) : (
-                  <SegmentedTab active={tab} value="settings" onClick={selectTab} onPrefetch={prepareTab} icon={<Settings className="size-4" />}>
-                    设置
-                  </SegmentedTab>
-                )}
+                <SegmentedTab active={tab} value="settings" onClick={selectTab} onPrefetch={prepareTab} icon={<Settings className="size-4" />}>
+                  {isAdmin ? "管理" : "设置"}
+                </SegmentedTab>
               </>
             ) : null}
           </nav>
@@ -413,8 +406,10 @@ export function AnalyticsDashboard({
           {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
         </div>
       ) : null}
-      {activeTab === "settings" && demo ? (
-        <StrategySettingsPanel tierPercentages={tierPercentages} dataRange={demo.dataRange} readOnly />
+      {visitedTabs.has("settings") ? (
+        <div hidden={activeTab !== "settings"}>
+          <StrategySettingsPanel tierPercentages={tierPercentages} dataRange={demo?.dataRange ?? dataRange} readOnly={demoMode} />
+        </div>
       ) : null}
 
       {detail ? (

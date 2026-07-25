@@ -1,22 +1,19 @@
-import { Link, redirect, useActionData, useNavigation } from "react-router";
+import { Navigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/_app.admin";
-import { Card } from "../components/ui";
-import { StrategySettingsPanel } from "../components/strategy-settings-panel";
 import { requireAdmin } from "../lib/auth.server";
 import { parseDataRange, validateDataRange } from "../lib/data-range";
-import { getDataRange, getTierPercentages, saveDataRange, saveTierPercentages } from "../lib/settings.server";
+import { saveDataRange, saveTierPercentages } from "../lib/settings.server";
 import {
   DEFAULT_TIER_PERCENTAGES,
   parseTierPercentages,
   validateTierPercentages,
 } from "../lib/tier-settings";
 
-type ActionData = { error?: string };
+type ActionData = { error?: string; ok?: boolean };
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const [tierPercentages, dataRange] = await Promise.all([getTierPercentages(), getDataRange()]);
-  return { tierPercentages, dataRange };
+  return null;
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
@@ -30,12 +27,12 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
       const validationError = validateTierPercentages(percentages);
       if (validationError) return { error: validationError };
       await saveTierPercentages(percentages, user.feishuOpenId);
-      throw redirect("/admin");
+      return { ok: true };
     }
 
     if (intent === "reset-tier-percentages") {
       await saveTierPercentages(DEFAULT_TIER_PERCENTAGES, user.feishuOpenId);
-      throw redirect("/admin");
+      return { ok: true };
     }
 
     if (intent === "save-data-range") {
@@ -43,38 +40,19 @@ export async function action({ request }: Route.ActionArgs): Promise<Response | 
       const validationError = validateDataRange(range);
       if (validationError) return { error: validationError };
       await saveDataRange(range, user.feishuOpenId);
-      throw redirect("/admin");
+      return { ok: true };
     }
 
   } catch (error) {
-    if (error instanceof Response) throw error;
     return { error: error instanceof Error ? error.message : "操作失败。" };
   }
 
   return { error: "未知操作。" };
 }
 
-export default function AdminRoute({ loaderData }: Route.ComponentProps) {
-  const actionData = useActionData<ActionData>();
-  const navigation = useNavigation();
-  const busy = navigation.state !== "idle";
-
-  return (
-    <div className="mx-auto grid w-full max-w-5xl gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="section-label">管理</p>
-        </div>
-        <Link to="/" prefetch="intent" className="btn">
-          返回
-        </Link>
-      </div>
-
-      {actionData?.error ? (
-        <Card className="border-danger/40 bg-danger/10 p-3 text-danger">{actionData.error}</Card>
-      ) : null}
-
-      <StrategySettingsPanel tierPercentages={loaderData.tierPercentages} dataRange={loaderData.dataRange} busy={busy} />
-    </div>
-  );
+export default function AdminRoute() {
+  const [searchParams] = useSearchParams();
+  const params = new URLSearchParams(searchParams);
+  params.set("tab", "settings");
+  return <Navigate to={`/?${params.toString()}`} replace />;
 }

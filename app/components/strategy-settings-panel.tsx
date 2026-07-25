@@ -1,4 +1,4 @@
-import { Form } from "react-router";
+import { useFetcher } from "react-router";
 import { Badge, Button, Card, Input } from "./ui";
 import { DATA_RANGE_OPTIONS, type DataRange } from "../lib/data-range";
 import {
@@ -10,23 +10,29 @@ import {
 export function StrategySettingsPanel({
   tierPercentages,
   dataRange,
-  busy = false,
   readOnly = false,
 }: {
   tierPercentages: TierPercentages;
   dataRange: DataRange[];
-  busy?: boolean;
   readOnly?: boolean;
 }) {
+  const fetcher = useFetcher<{ error?: string; ok?: boolean }>();
+  const busy = fetcher.state !== "idle";
+  const tierKey = RANKED_TIER_ORDER.map((label) => tierPercentages[label]).join(":");
+
   return (
     <div className="mx-auto grid w-full max-w-5xl gap-3">
+      {fetcher.data?.error ? (
+        <Card className="border-danger/40 bg-danger/10 p-3 text-danger">{fetcher.data.error}</Card>
+      ) : null}
+
       <Card className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">综合均分排名</h2>
           </div>
         </div>
-        <Form method="post" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
+        <fetcher.Form key={tierKey} method="post" action="/admin" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
           <input type="hidden" name="intent" value="save-tier-percentages" />
           <div className="grid gap-2 sm:grid-cols-4">
             {RANKED_TIER_ORDER.map((label) => (
@@ -49,12 +55,12 @@ export function StrategySettingsPanel({
             ))}
           </div>
           {!readOnly ? <Button type="submit" variant="primary" disabled={busy} className="w-fit">保存比例</Button> : null}
-        </Form>
+        </fetcher.Form>
         {!readOnly ? (
-          <Form method="post" className="mt-2">
+          <fetcher.Form method="post" action="/admin" className="mt-2">
             <input type="hidden" name="intent" value="reset-tier-percentages" />
             <Button type="submit" disabled={busy}>恢复默认</Button>
-          </Form>
+          </fetcher.Form>
         ) : null}
       </Card>
 
@@ -65,7 +71,7 @@ export function StrategySettingsPanel({
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">{dataRange.length} / {DATA_RANGE_OPTIONS.length}</Badge>
         </div>
-        <Form method="post" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
+        <fetcher.Form key={dataRange.join(":")} method="post" action="/admin" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
           <input type="hidden" name="intent" value="save-data-range" />
           <div className="grid gap-2 sm:grid-cols-3">
             {DATA_RANGE_OPTIONS.map((option) => (
@@ -83,7 +89,7 @@ export function StrategySettingsPanel({
             ))}
           </div>
           {!readOnly ? <Button type="submit" variant="primary" disabled={busy} className="w-fit">保存范围</Button> : null}
-        </Form>
+        </fetcher.Form>
       </Card>
     </div>
   );
