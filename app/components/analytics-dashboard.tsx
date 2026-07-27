@@ -484,6 +484,7 @@ function TeamDetail({
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
   const matchAutoRoutes = useMemo(() => buildMatchAutoRoutes(team), [team]);
+  const chartMatches = [...team.matches].sort(compareTeamDetailMatches);
   const tableMatches = (displayMatches ?? team.matches)
     .map((match, originalIndex) => ({ match, originalIndex }))
     .sort((a, b) => compareTeamDetailMatches(a.match, b.match) || a.originalIndex - b.originalIndex);
@@ -603,8 +604,8 @@ function TeamDetail({
           </h3>
           <ChartCanvas
             label={`Team ${team.team} 逐场综合分`}
-            configKey={`team-line:${team.team}:${team.matches.map((match) => match.totalPts).join(",")}`}
-            buildConfig={(palette) => teamLineConfig(team, palette, showMatchTypes)}
+            configKey={`team-line:${team.team}:${showMatchTypes}:${chartMatches.map((match) => `${match.matchType}:${match.match}:${match.totalPts}`).join(",")}`}
+            buildConfig={(palette) => teamLineConfig(chartMatches, palette, showMatchTypes)}
           />
         </Card>
         <Card className="p-4">
@@ -614,8 +615,8 @@ function TeamDetail({
           </h3>
           <ChartCanvas
             label={`Team ${team.team} 自动和手动贡献拆分`}
-            configKey={`team-bars:${team.team}:${team.matches.map((match) => `${match.autoPts}/${match.telePts}`).join(",")}`}
-            buildConfig={(palette) => teamBarConfig(team, palette, showMatchTypes)}
+            configKey={`team-bars:${team.team}:${showMatchTypes}:${chartMatches.map((match) => `${match.matchType}:${match.match}:${match.autoPts}/${match.telePts}`).join(",")}`}
+            buildConfig={(palette) => teamBarConfig(chartMatches, palette, showMatchTypes)}
           />
         </Card>
       </div>
@@ -1631,18 +1632,18 @@ function baseScales(palette: { muted: string; grid: string }) {
   };
 }
 
-function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
+function teamLineConfig(matches: ScoutingMatch[], palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
   return {
     type: "line",
     data: {
-      labels: team.matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
+      labels: matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
       datasets: [
         {
           label: "综合分",
-          data: team.matches.map((match) => match.totalPts),
+          data: matches.map((match) => match.totalPts),
           borderColor: palette.accent,
           backgroundColor: `${palette.accent}18`,
-          pointBackgroundColor: team.matches.map((match) =>
+          pointBackgroundColor: matches.map((match) =>
             match.botState === 4 ? "#dc2626" : match.botState === 2 ? "#f97316" : palette.accent,
           ),
           pointRadius: 5,
@@ -1661,14 +1662,14 @@ function teamLineConfig(team: TeamSummary, palette: { accent: string; muted: str
   } as ChartConfiguration;
 }
 
-function teamBarConfig(team: TeamSummary, palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
+function teamBarConfig(matches: ScoutingMatch[], palette: { accent: string; muted: string; grid: string; panel: string }, showMatchTypes: boolean): ChartConfiguration {
   return {
     type: "bar",
     data: {
-      labels: team.matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
+      labels: matches.map((match) => matchDisplayLabel(match, showMatchTypes)),
       datasets: [
-        { label: "自动贡献", data: team.matches.map((match) => match.autoPts), backgroundColor: palette.accent, stack: "points" },
-        { label: "手动贡献", data: team.matches.map((match) => match.telePts), backgroundColor: "#16a34a", stack: "points" },
+        { label: "自动贡献", data: matches.map((match) => match.autoPts), backgroundColor: palette.accent, stack: "points" },
+        { label: "手动贡献", data: matches.map((match) => match.telePts), backgroundColor: "#16a34a", stack: "points" },
       ],
     },
     options: {
