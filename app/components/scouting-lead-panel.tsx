@@ -91,7 +91,6 @@ function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>
-            <p className="section-label">个人排序</p>
             <h2 className="text-lg font-semibold text-ink">净信心分</h2>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">{report.people.length} 人</Badge>
