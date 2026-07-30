@@ -249,13 +249,7 @@ function RecordModal({
             <div key={record.id} className="rounded-md border border-line bg-surface-2 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge className={record.recordType === "normal_match" ? "border-info/40 bg-info/10 text-info" : "border-brand/40 bg-brand/10 text-brand"}>
-                      {record.recordType === "normal_match" ? "普通 Scout" : "超级 Scout"}
-                    </Badge>
-                    <span className="font-semibold text-ink">{record.label}</span>
-                  </div>
-                  <p className="mt-1 text-sm text-ink-dim">上传人：{record.completedBy}</p>
+                  <p className="text-sm text-ink-dim">上传人：{record.completedBy}</p>
                   <p className="mt-1 text-xs text-ink-faint">上传 {formatDate(record.uploadedAt)}</p>
                 </div>
                 {!readOnly ? <recordFetcher.Form method="post" action="/scouting-lead">
