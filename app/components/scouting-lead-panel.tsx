@@ -17,7 +17,6 @@ import type {
   ScoutScheduleMatch,
 } from "../lib/cyber-scout.server";
 import type {
-  ScoutConfidenceCalibration,
   ScoutConfidenceMatch,
   ScoutConfidencePerson,
   ScoutConfidenceReport,
@@ -98,25 +97,13 @@ function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
         <PeopleTable people={report.people} />
       </Card>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <Card className="overflow-hidden p-0">
-          <div className="border-b border-line p-3">
-            <p className="section-label">比赛统计</p>
-            <h2 className="text-lg font-semibold text-ink">预测分布</h2>
-          </div>
-          <MatchTable matches={report.matches} />
-        </Card>
-
-        <div className="grid gap-3">
-          <Card className="overflow-hidden p-0">
-            <div className="border-b border-line p-3">
-              <p className="section-label">校准</p>
-              <h2 className="text-lg font-semibold text-ink">按信心值</h2>
-            </div>
-            <CalibrationList rows={report.calibration} />
-          </Card>
+      <Card className="overflow-hidden p-0">
+        <div className="border-b border-line p-3">
+          <p className="section-label">比赛统计</p>
+          <h2 className="text-lg font-semibold text-ink">预测分布</h2>
         </div>
-      </div>
+        <MatchTable matches={report.matches} />
+      </Card>
     </>
   );
 }
@@ -547,29 +534,6 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-function CalibrationList({ rows }: { rows: ScoutConfidenceCalibration[] }) {
-  return (
-    <div className="divide-y divide-line">
-      {rows.map((row) => (
-        <div key={row.confidence} className="grid grid-cols-[2rem_1fr_auto] items-center gap-3 p-3 text-sm">
-          <div className="grid size-8 place-items-center rounded-md bg-brand/10 font-semibold text-brand">{row.confidence}</div>
-          <div className="min-w-0">
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full rounded-full bg-ok" style={{ width: `${Math.round((row.accuracy ?? 0) * 100)}%` }} />
-            </div>
-            <p className="mt-1 text-xs text-ink-faint">
-              对 {row.correctCount} · 错 {row.wrongCount} · 待验证 {row.pendingCount}
-            </p>
-          </div>
-          <div className={cn("text-right font-semibold tabular-nums", row.netScore >= 0 ? "text-ok" : "text-danger")}>
-            {signed(row.netScore)}
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
