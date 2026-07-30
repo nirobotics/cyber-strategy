@@ -126,7 +126,7 @@ export function AnalyticsDashboard({
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
   const demoMode = Boolean(demo);
   const routeBase = demo?.routeBase ?? "/";
-  const canViewLead = isAdmin;
+  const canViewLead = isAdmin || demoMode;
   const canViewSettings = isAdmin || demoMode;
   const activeTab = (tab === "lead" && !canViewLead) || (tab === "settings" && !canViewSettings) ? "browser" : tab;
   const showMatchTypes = dataRange.length > 1;

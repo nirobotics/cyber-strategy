@@ -327,7 +327,8 @@ export async function loadScoutConfidenceReport(
     ]);
     const includedMatchTypes = opts.includedMatchTypes ?? DEFAULT_DATA_RANGE;
     const includedTypes = new Set(includedMatchTypes);
-    let scheduleMatches = toCyberScoutMatches(eventConfig.matches, includedMatchTypes);
+    const matchingConfig = eventConfig.tbaEventKey === event.tba_event_key;
+    let scheduleMatches = matchingConfig ? toCyberScoutMatches(eventConfig.matches, includedMatchTypes) : [];
     let tbaError: string | null = null;
     if (!scheduleMatches.length) {
       scheduleMatches = opts.tbaMatches ?? [];
@@ -359,10 +360,10 @@ export async function loadScoutConfidenceReport(
       },
       leadData: {
         recordSchedule: buildScoutRecordSchedule(scheduleMatches, visibleLeadRecords),
-        assignments: eventConfig.assignments,
+        assignments: matchingConfig ? eventConfig.assignments : [],
         users,
-        configEventKey: eventConfig.tbaEventKey || null,
-        configSavedAt: eventConfig.savedAt,
+        configEventKey: matchingConfig ? eventConfig.tbaEventKey : null,
+        configSavedAt: matchingConfig ? eventConfig.savedAt : null,
       },
     };
   } catch (error) {
