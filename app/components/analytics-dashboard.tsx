@@ -126,8 +126,9 @@ export function AnalyticsDashboard({
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
   const demoMode = Boolean(demo);
   const routeBase = demo?.routeBase ?? "/";
-  const canViewLead = isAdmin || demoMode;
-  const activeTab = (tab === "lead" || tab === "settings") && !canViewLead ? "browser" : tab;
+  const canViewLead = isAdmin;
+  const canViewSettings = isAdmin || demoMode;
+  const activeTab = (tab === "lead" && !canViewLead) || (tab === "settings" && !canViewSettings) ? "browser" : tab;
   const showMatchTypes = dataRange.length > 1;
   const fetchedMatchSchedule = matchScheduleFetcher.data?.eventKey === resolvedEventKey ? matchScheduleFetcher.data.matches : null;
   const fetchedStrategyProposal = strategyProposalFetcher.data?.selectedEventKey === resolvedEventKey ? strategyProposalFetcher.data : null;
@@ -250,14 +251,14 @@ export function AnalyticsDashboard({
               Strategy Proposal
             </SegmentedTab>
             {canViewLead ? (
-              <>
-                <SegmentedTab active={tab} value="lead" onClick={selectTab} onPrefetch={prepareTab} icon={<ShieldCheck className="size-4" />}>
-                  Scouting Lead
-                </SegmentedTab>
-                <SegmentedTab active={tab} value="settings" onClick={selectTab} onPrefetch={prepareTab} icon={<Settings className="size-4" />}>
-                  {isAdmin ? "管理" : "设置"}
-                </SegmentedTab>
-              </>
+              <SegmentedTab active={tab} value="lead" onClick={selectTab} onPrefetch={prepareTab} icon={<ShieldCheck className="size-4" />}>
+                Scouting Lead
+              </SegmentedTab>
+            ) : null}
+            {canViewSettings ? (
+              <SegmentedTab active={tab} value="settings" onClick={selectTab} onPrefetch={prepareTab} icon={<Settings className="size-4" />}>
+                {isAdmin ? "管理" : "设置"}
+              </SegmentedTab>
             ) : null}
           </nav>
           <label className="grid w-full max-w-full gap-1 text-sm sm:w-fit">

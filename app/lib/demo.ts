@@ -1,12 +1,11 @@
 import { matchTeams, type CombinedMatch } from "./match-analysis";
-import type { ScoutConfidenceResult } from "./cyber-scout.server";
 import type { ScoutingDataset, TeamPitData } from "./scouting";
 
 export const DEMO_EVENT_KEY = "2026txcmp2";
 export const DEMO_EVENT_NAME = "Event 1";
 export const DEMO_OWN_TEAMS = ["1000"] as const;
 
-export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[], scoutingLead?: ScoutConfidenceResult) {
+export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[]) {
   const originalTeams = [...new Set([
     ...Object.keys(dataset.teamData),
     ...matches.flatMap((match) => [...matchTeams(match, "red"), ...matchTeams(match, "blue")]),
@@ -17,7 +16,7 @@ export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[]
   }
 
   const teamMap = new Map(originalTeams.map((team, index) => [team, String(1000 + index)]));
-  const scoutMap = buildScoutMap(dataset, scoutingLead);
+  const scoutMap = buildScoutMap(dataset);
   const teamData = Object.fromEntries(Object.entries(dataset.teamData).map(([team, summary]) => {
     const demoTeam = mappedTeam(teamMap, team);
     return [demoTeam, {
@@ -49,24 +48,14 @@ export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[]
       isActive: true,
     },
     matches: matches.map((match) => anonymizeMatch(match, teamMap)),
-    scoutingLead: scoutingLead ? anonymizeScoutingLead(scoutingLead, teamMap, scoutMap) : null,
   };
 }
 
-function buildScoutMap(dataset: ScoutingDataset, scoutingLead?: ScoutConfidenceResult) {
-  const leadNames = scoutingLead ? [
-    ...scoutingLead.report.people.map((person) => person.scoutName),
-    ...scoutingLead.leadData.users.map((user) => user.displayName),
-    ...scoutingLead.leadData.assignments.map((assignment) => assignment.userName),
-    ...scoutingLead.leadData.recordSchedule.matches.flatMap((match) => [...match.red, ...match.blue].flatMap((cell) =>
-      [...cell.normalRecords, ...cell.superRecords].map((record) => record.completedBy),
-    )),
-  ] : [];
+function buildScoutMap(dataset: ScoutingDataset) {
   const names = [...new Set([
     ...Object.values(dataset.teamData).flatMap((team) =>
       team.matches.flatMap((match) => [match.scoutName, match.autoScoutName].filter((name): name is string => Boolean(name))),
     ),
-    ...leadNames.filter(Boolean),
   ])].sort((a, b) => stableHash(a) - stableHash(b) || a.localeCompare(b));
   return new Map(names.map((name, index) => [name, `scout ${index + 1}`]));
 }
@@ -83,70 +72,6 @@ function anonymizeMatch(match: CombinedMatch, teamMap: Map<string, string>): Com
     blue_alliance: mapTeamValues(match.blue_alliance, teamMap),
     tba: match.tba ? { ...match.tba, alliances: mapAlliances(match.tba.alliances, teamMap) } : undefined,
     videos: [],
-  };
-}
-
-function anonymizeScoutingLead(
-  data: ScoutConfidenceResult,
-  teamMap: Map<string, string>,
-  scoutMap: Map<string, string>,
-): ScoutConfidenceResult {
-  let recordIndex = 0;
-  const anonymizeRecord = (record: ScoutConfidenceResult["leadData"]["recordSchedule"]["matches"][number]["red"][number]["normalRecords"][number]) => {
-    const teamNumber = record.teamNumber ? mappedTeam(teamMap, record.teamNumber) : null;
-    return {
-      ...record,
-      id: `demo-record-${++recordIndex}`,
-      teamNumber,
-      completedBy: anonymizedScout(scoutMap, record.completedBy),
-      label: record.recordType === "normal_match"
-        ? `普通 Scout · Team ${teamNumber || "-"} · ${record.position || "-"}`
-        : `超级 Scout · ${record.alliance === "red" ? "红方" : record.alliance === "blue" ? "蓝方" : "联盟"}`,
-    };
-  };
-  const matches = data.leadData.recordSchedule.matches.map((match) => ({
-    ...match,
-    red: match.red.map((cell) => ({
-      ...cell,
-      team: mappedTeam(teamMap, cell.team),
-      normalRecords: cell.normalRecords.map(anonymizeRecord),
-      superRecords: cell.superRecords.map(anonymizeRecord),
-    })),
-    blue: match.blue.map((cell) => ({
-      ...cell,
-      team: mappedTeam(teamMap, cell.team),
-      normalRecords: cell.normalRecords.map(anonymizeRecord),
-      superRecords: cell.superRecords.map(anonymizeRecord),
-    })),
-  }));
-
-  return {
-    report: {
-      ...data.report,
-      people: data.report.people.map((person) => ({ ...person, scoutName: anonymizedScout(scoutMap, person.scoutName) })),
-    },
-    events: [{ eventKey: DEMO_EVENT_KEY, name: DEMO_EVENT_NAME, isActive: true, updatedAt: data.sourceStatus.updatedAt }],
-    selectedEventKey: DEMO_EVENT_KEY,
-    sourceStatus: {
-      source: "cyber-scout",
-      label: "Demo 数据",
-      message: DEMO_EVENT_NAME,
-      updatedAt: data.sourceStatus.updatedAt,
-    },
-    leadData: {
-      ...data.leadData,
-      recordSchedule: { ...data.leadData.recordSchedule, matches },
-      assignments: data.leadData.assignments.map((assignment, index) => ({
-        ...assignment,
-        id: `demo-assignment-${index + 1}`,
-        userName: anonymizedScout(scoutMap, assignment.userName),
-      })),
-      users: data.leadData.users.map((user, index) => ({
-        id: `demo-user-${index + 1}`,
-        displayName: anonymizedScout(scoutMap, user.displayName),
-      })),
-      configEventKey: DEMO_EVENT_NAME,
-    },
   };
 }
 
