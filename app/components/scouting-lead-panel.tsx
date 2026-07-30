@@ -314,7 +314,6 @@ function AssignmentsView({
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>
-            <p className="section-label">当前分配</p>
             <h2 className="text-lg font-semibold text-ink">Qualification Scout</h2>
           </div>
           <Badge className="border-line bg-surface-2 text-ink-dim">{assignments.length} 条</Badge>
