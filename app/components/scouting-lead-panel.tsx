@@ -256,9 +256,7 @@ function RecordModal({
                     <span className="font-semibold text-ink">{record.label}</span>
                   </div>
                   <p className="mt-1 text-sm text-ink-dim">上传人：{record.completedBy}</p>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    上传 {formatDate(record.uploadedAt)} · 本地创建 {formatDate(record.clientCreatedAt)}
-                  </p>
+                  <p className="mt-1 text-xs text-ink-faint">上传 {formatDate(record.uploadedAt)}</p>
                 </div>
                 {!readOnly ? <recordFetcher.Form method="post" action="/scouting-lead">
                   <input type="hidden" name="intent" value="delete-record" />
