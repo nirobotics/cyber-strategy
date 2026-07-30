@@ -203,20 +203,6 @@ export function StrategyProposalPanel({
 
       <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="overflow-hidden p-0">
-          <div className="flex items-center justify-end gap-2 border-b border-line p-3">
-            <div className="flex gap-2">
-              {data.isAdmin ? (
-                <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表为 PDF">
-                  <Download className="size-4" />
-                  导出 PDF
-                </Button>
-              ) : null}
-              <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
-                <Plus className="size-4" />
-                新建
-              </Button>
-            </div>
-          </div>
           <div className="grid gap-2 border-b border-line p-3">
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StrategyProposalStatus | "all")} className="input h-9 font-sans">
               <option value="all">所有状态</option>
@@ -230,6 +216,18 @@ export function StrategyProposalPanel({
               placeholder="按己方队号查找"
               aria-label="按己方队号查找 proposal"
             />
+            <div className="flex justify-end gap-2">
+              {data.isAdmin ? (
+                <Button type="button" onClick={exportProposals} disabled={!filteredProposals.length} title="导出当前列表为 PDF">
+                  <Download className="size-4" />
+                  导出 PDF
+                </Button>
+              ) : null}
+              <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
+                <Plus className="size-4" />
+                新建
+              </Button>
+            </div>
           </div>
           <div className="max-h-[72dvh] overflow-y-auto">
             {!filteredProposals.length ? (
