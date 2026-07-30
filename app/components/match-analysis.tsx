@@ -332,14 +332,12 @@ function MatchDetail({
             <ArrowLeft className="size-4" />
           </Button>
           <div className="min-w-0">
-            <p className="section-label">Match Analysis</p>
             <h3 className="truncate text-xl font-semibold text-ink">Match {matchLabel(match)}</h3>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <StatusPill label={actualLabel(score.actualRed, score.actualBlue)} tone={isActualScoreSource(score.source) ? "ok" : "muted"} />
           <StatusPill label={predictedLabel(score.predictedRed, score.predictedBlue)} tone="warn" />
-          <StatusPill label={probabilityLabel(probability)} tone={probability?.source === "strategy" ? "brand" : "info"} />
         </div>
       </Card>
 
@@ -537,11 +535,6 @@ function actualLabel(red: number | null, blue: number | null) {
 
 function predictedLabel(red: number | null, blue: number | null) {
   return red == null || blue == null ? "预测 暂无" : `预测 ${Math.round(red)}-${Math.round(blue)}`;
-}
-
-function probabilityLabel(probability: WinProbability | null) {
-  if (!probability) return "胜率暂无";
-  return probability.source === "strategy" ? "综合评分胜率" : "Statbotics 胜率";
 }
 
 function scoreBadgeClass(source: string) {

@@ -393,7 +393,6 @@ export function StrategyBoard({
                 disabled={disabled}
                 onChange={(event) => onChange({ ...normalized, teamNotes: { ...normalized.teamNotes, [team]: event.target.value } })}
                 className="input h-10 font-sans"
-                placeholder="分工、目标或注意事项"
               />
             </label>
           ))}

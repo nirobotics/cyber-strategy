@@ -137,9 +137,8 @@ function RecordsView({
   return (
     <>
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+        <div className="border-b border-line p-3">
           <h2 className="text-lg font-semibold text-ink">提交记录</h2>
-          <Badge className="border-line bg-surface-2 text-ink-dim">{schedule.matches.length} 场</Badge>
         </div>
         {!schedule.matches.length ? (
           <EmptyState text="暂无可展示的赛程或提交记录。" />

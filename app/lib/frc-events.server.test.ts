@@ -112,4 +112,19 @@ describe("FRC Events match results", () => {
       match_number: 2,
     });
   });
+
+  it("recognizes the third final from its double-elimination match number", () => {
+    expect(normalizeFrcSchedule({
+      Schedule: [{
+        tournamentLevel: "Playoff",
+        description: "Match 16",
+        matchNumber: 16,
+        teams: [],
+      }],
+    }, "Playoff")[0]).toMatchObject({
+      comp_level: "f",
+      set_number: 1,
+      match_number: 3,
+    });
+  });
 });

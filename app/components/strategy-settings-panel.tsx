@@ -32,7 +32,7 @@ export function StrategySettingsPanel({
             <h2 className="text-lg font-semibold">综合均分排名</h2>
           </div>
         </div>
-        <fetcher.Form key={tierKey} method="post" action="/admin" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
+        <fetcher.Form id="tier-percentages-form" key={tierKey} method="post" action="/admin" className="grid gap-3" onSubmit={readOnly ? (event) => event.preventDefault() : undefined}>
           <input type="hidden" name="intent" value="save-tier-percentages" />
           <div className="grid gap-2 sm:grid-cols-4">
             {RANKED_TIER_ORDER.map((label) => (
@@ -54,13 +54,15 @@ export function StrategySettingsPanel({
               </label>
             ))}
           </div>
-          {!readOnly ? <Button type="submit" variant="primary" disabled={busy} className="w-fit">保存比例</Button> : null}
         </fetcher.Form>
         {!readOnly ? (
-          <fetcher.Form method="post" action="/admin" className="mt-2">
-            <input type="hidden" name="intent" value="reset-tier-percentages" />
-            <Button type="submit" disabled={busy}>恢复默认</Button>
-          </fetcher.Form>
+          <div className="mt-3 flex gap-2">
+            <Button type="submit" form="tier-percentages-form" variant="primary" disabled={busy}>保存比例</Button>
+            <fetcher.Form method="post" action="/admin">
+              <input type="hidden" name="intent" value="reset-tier-percentages" />
+              <Button type="submit" disabled={busy}>恢复默认</Button>
+            </fetcher.Form>
+          </div>
         ) : null}
       </Card>
 

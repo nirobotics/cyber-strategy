@@ -174,6 +174,7 @@ function frcMatchIdentity(
       ? { comp_level: "sf", set_number: sequence, match_number: 1 }
       : legacyPlayoffIdentity("sf", sequence, 2);
   }
+  if (matchNumber >= 14) return { comp_level: "f", set_number: 1, match_number: matchNumber - 13 };
   const playoff = /^match\s+(\d+)/i.exec(description);
   return { comp_level: "sf", set_number: positiveInteger(playoff?.[1]) ?? matchNumber, match_number: 1 };
 }
