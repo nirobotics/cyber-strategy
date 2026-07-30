@@ -139,10 +139,7 @@ function RecordsView({
     <>
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
-          <div>
-            <p className="section-label">提交记录</p>
-            <h2 className="text-lg font-semibold text-ink">按赛程查询</h2>
-          </div>
+          <h2 className="text-lg font-semibold text-ink">提交记录</h2>
           <Badge className="border-line bg-surface-2 text-ink-dim">{schedule.matches.length} 场</Badge>
         </div>
         {!schedule.matches.length ? (
