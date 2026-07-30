@@ -133,7 +133,7 @@ function RecordsView({
   busy: boolean;
   readOnly: boolean;
 }) {
-  const [selected, setSelected] = useState<{ matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; cell: ScoutScheduleCell } | null>(null);
+  const [selected, setSelected] = useState<{ matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; label?: string; cell: ScoutScheduleCell } | null>(null);
 
   return (
     <>
@@ -159,13 +159,13 @@ function RecordsView({
               </thead>
               <tbody className="divide-y divide-line">
                 {schedule.matches.map((match) => (
-                  <tr key={`${match.matchType}-${match.matchNumber}`} className="align-top">
+                  <tr key={`${match.matchType}-${match.label ?? match.matchNumber}`} className="align-top">
                     <td className="px-3 py-3 font-semibold text-ink">{scoutMatchLabel(match)}</td>
                     <td className="px-3 py-2">
-                      <AllianceCells matchNumber={match.matchNumber} cells={match.red} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, cell })} />
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.red} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, label: match.label, cell })} />
                     </td>
                     <td className="px-3 py-2">
-                      <AllianceCells matchNumber={match.matchNumber} cells={match.blue} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, cell })} />
+                      <AllianceCells matchNumber={match.matchNumber} cells={match.blue} onSelect={(cell) => setSelected({ matchType: match.matchType, matchNumber: match.matchNumber, label: match.label, cell })} />
                     </td>
                   </tr>
                 ))}
@@ -221,7 +221,7 @@ function RecordModal({
   onClose,
 }: {
   eventKey: string | null;
-  selected: { matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; cell: ScoutScheduleCell };
+  selected: { matchType: ScoutScheduleMatch["matchType"]; matchNumber: number; label?: string; cell: ScoutScheduleCell };
   busy: boolean;
   readOnly: boolean;
   onClose: () => void;
@@ -637,7 +637,8 @@ function winnerLabel(value: ScoutConfidenceMatch["actualWinner"]) {
   return "暂无";
 }
 
-function scoutMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber">) {
+function scoutMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber"> & { label?: string }) {
+  if (match.label) return match.label;
   if (match.matchType === "practice") return `P${match.matchNumber}`;
   if (match.matchType === "qualification") return `Q${match.matchNumber}`;
   return `E${match.matchNumber}`;

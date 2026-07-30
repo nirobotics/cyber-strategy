@@ -31,6 +31,42 @@ describe("Scout Lead record schedule", () => {
       { matchType: "qualification", matchNumber: 1, normal: ["q-normal"], super: ["q-super"] },
     ]);
   });
+
+  it("uses playoff set numbers and final game numbers in schedule labels", () => {
+    const schedule = buildScoutRecordSchedule([
+      {
+        comp_level: "sf",
+        set_number: 1,
+        match_number: 1,
+        alliances: { red: { team_keys: ["frc8214"] } },
+      },
+      {
+        comp_level: "sf",
+        set_number: 2,
+        match_number: 1,
+        alliances: { red: { team_keys: ["frc8214"] } },
+      },
+      {
+        comp_level: "f",
+        set_number: 1,
+        match_number: 1,
+        alliances: { red: { team_keys: ["frc8214"] } },
+      },
+      {
+        comp_level: "f",
+        set_number: 1,
+        match_number: 2,
+        alliances: { red: { team_keys: ["frc8214"] } },
+      },
+    ], []);
+
+    expect(schedule.matches.map((match) => ({ label: match.label, matchNumber: match.matchNumber }))).toEqual([
+      { label: "SF1-1", matchNumber: 1 },
+      { label: "SF2-1", matchNumber: 2 },
+      { label: "F1", matchNumber: 1 },
+      { label: "F2", matchNumber: 2 },
+    ]);
+  });
 });
 
 function leadRecord(

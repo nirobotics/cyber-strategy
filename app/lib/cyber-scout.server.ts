@@ -13,7 +13,7 @@ import { fetchFrcMatchResults } from "./frc-events.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
 import { getDataRange } from "./settings.server";
-import { mergeMatchResults, toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
+import { matchLabel, mergeMatchResults, toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
 import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
@@ -71,6 +71,8 @@ export type ScoutScheduleCell = {
 export type ScoutScheduleMatch = {
   matchType: DataRange;
   matchNumber: number;
+  label?: string;
+  compLevel?: string;
   red: ScoutScheduleCell[];
   blue: ScoutScheduleCell[];
 };
@@ -624,10 +626,14 @@ function buildConfiguredSchedule(
     .filter((match) => matchTypeFromTbaCompLevel(match.comp_level) && positiveInteger(match.match_number))
     .map((match) => {
       const matchType = matchTypeFromTbaCompLevel(match.comp_level) ?? "qualification";
-      const matchNumber = match.match_number ?? 0;
+      const matchNumber = matchType === "playoff" && match.comp_level !== "f"
+        ? match.set_number ?? match.match_number ?? 0
+        : match.match_number ?? 0;
       return {
         matchType,
         matchNumber,
+        label: matchLabel(match),
+        compLevel: match.comp_level,
         red: buildAllianceCells(matchType, matchNumber, "red", match.alliances?.red?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
         blue: buildAllianceCells(matchType, matchNumber, "blue", match.alliances?.blue?.team_keys ?? [], normalByMatchTeam, superByMatchAlliance),
       };
@@ -807,7 +813,10 @@ function scheduleMatchKey(match: Pick<ScoutScheduleMatch, "matchType" | "matchNu
 
 function compareScheduleMatches(left: ScoutScheduleMatch, right: ScoutScheduleMatch) {
   const order: Record<DataRange, number> = { practice: 0, qualification: 1, playoff: 2 };
-  return order[left.matchType] - order[right.matchType] || left.matchNumber - right.matchNumber;
+  const levelOrder: Record<string, number> = { practice: 0, qm: 1, ef: 2, qf: 3, sf: 4, f: 5 };
+  return order[left.matchType] - order[right.matchType]
+    || (levelOrder[left.compLevel ?? ""] ?? 0) - (levelOrder[right.compLevel ?? ""] ?? 0)
+    || left.matchNumber - right.matchNumber;
 }
 
 function compareCells(left: ScoutScheduleCell, right: ScoutScheduleCell) {
