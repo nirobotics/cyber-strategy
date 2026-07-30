@@ -72,8 +72,6 @@ export function ScoutingLeadPanel({
           eventKey={selectedEventKey}
           assignments={leadData.assignments}
           users={leadData.users}
-          configEventKey={leadData.configEventKey}
-          configSavedAt={leadData.configSavedAt}
           busy={busy}
           readOnly={readOnly}
         />
@@ -272,31 +270,19 @@ function AssignmentsView({
   eventKey,
   assignments,
   users,
-  configEventKey,
-  configSavedAt,
   busy,
   readOnly,
 }: {
   eventKey: string | null;
   assignments: ScoutLeadAssignment[];
   users: Array<{ id: string; displayName: string }>;
-  configEventKey: string | null;
-  configSavedAt: string | null;
   busy: boolean;
   readOnly: boolean;
 }) {
   return (
     <div className="grid gap-3">
       {!readOnly ? <Card className="p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="section-label">人员分配</p>
-            <h2 className="text-lg font-semibold text-ink">新增分配</h2>
-          </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">
-            {configEventKey || "未绑定赛事"}{configSavedAt ? ` · ${new Date(configSavedAt).toLocaleString()}` : ""}
-          </Badge>
-        </div>
+        <h2 className="mb-3 text-lg font-semibold text-ink">新增分配</h2>
         <AssignmentForm eventKey={eventKey} users={users} busy={busy} />
       </Card> : null}
 
