@@ -7,6 +7,7 @@ type PredictionOutcome = "correct" | "wrong" | "pending" | "incomplete";
 
 export type ConfidenceMatchResult = {
   comp_level?: string;
+  set_number?: number;
   match_number?: number;
   winning_alliance?: string;
   alliances?: {
@@ -269,7 +270,10 @@ function buildActualWinnerMap(matches: ConfidenceMatchResult[]): Map<string, Act
     if (!match.match_number) continue;
     const matchType = matchTypeFromTbaCompLevel(match.comp_level);
     const winner = actualWinner(match);
-    if (matchType && winner) values.set(matchKey(matchType, match.match_number), winner);
+    const matchNumber = matchType === "playoff" && match.comp_level !== "f"
+      ? match.set_number ?? match.match_number
+      : match.match_number;
+    if (matchType && winner) values.set(matchKey(matchType, matchNumber), winner);
   }
   return values;
 }

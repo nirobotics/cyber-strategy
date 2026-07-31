@@ -78,6 +78,25 @@ describe("scout confidence scoring", () => {
     });
   });
 
+  it("matches playoff results by set number", () => {
+    const report = buildScoutConfidenceReport({
+      records: [
+        normal("elim-3", "Ada", 3, 9635, "red", 3, "playoff"),
+        normal("elim-12", "Ada", 12, 8214, "blue", 4, "playoff"),
+      ],
+      matchResults: [
+        { ...tba(1, "red", "sf"), set_number: 3 },
+        { ...tba(1, "blue", "sf"), set_number: 12 },
+      ],
+    });
+
+    expect(report.matches.map((match) => [match.matchNumber, match.actualWinner])).toEqual([
+      [3, "red"],
+      [12, "blue"],
+    ]);
+    expect(report.people[0]).toMatchObject({ netScore: 7, scoredCount: 2 });
+  });
+
   it("sorts people by net confidence, scored count, then accuracy", () => {
     const report = buildScoutConfidenceReport({
       records: [
