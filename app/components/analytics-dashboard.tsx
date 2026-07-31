@@ -917,7 +917,7 @@ function PicklistBoard({
   }
 
   return (
-    <div className="grid min-h-0 gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)]">
+    <div className="grid min-h-0 gap-3 min-[700px]:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
       <Card className="overflow-hidden p-0">
         <div data-picklist-scroll className="max-h-[68dvh] overflow-y-auto p-2">
           {poolTeams.map((team) => {
