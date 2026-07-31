@@ -97,7 +97,6 @@ function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
 
       <Card className="overflow-hidden p-0">
         <div className="border-b border-line p-3">
-          <p className="section-label">比赛统计</p>
           <h2 className="text-lg font-semibold text-ink">预测分布</h2>
         </div>
         <MatchTable matches={report.matches} />
