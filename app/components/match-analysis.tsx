@@ -40,13 +40,15 @@ export function MatchAnalysis({
   schedule,
   teamData,
   enrich = true,
+  initialMatchKey = null,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
   teamData: TeamData;
   enrich?: boolean;
+  initialMatchKey?: string | null;
 }) {
-  const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(null);
+  const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [state, setState] = useState<LoadState>(() => enrich
     ? { status: "idle" }
     : { status: "ready", matches: schedule, teamEvents: [] });
@@ -54,7 +56,7 @@ export function MatchAnalysis({
   useEffect(() => {
     if (!enrich) {
       queueMicrotask(() => {
-        setSelectedMatchKey(null);
+        setSelectedMatchKey(initialMatchKey);
         setState({ status: "ready", matches: schedule, teamEvents: [] });
       });
       return;
@@ -62,7 +64,7 @@ export function MatchAnalysis({
     let alive = true;
     queueMicrotask(() => {
       if (!alive) return;
-      setSelectedMatchKey(null);
+      setSelectedMatchKey(initialMatchKey);
       setState({ status: "loading" });
     });
     Promise.allSettled([
@@ -101,7 +103,7 @@ export function MatchAnalysis({
     return () => {
       alive = false;
     };
-  }, [enrich, eventKey, schedule]);
+  }, [enrich, eventKey, initialMatchKey, schedule]);
 
   const selectedMatch = state.status === "ready" && selectedMatchKey
     ? state.matches.find((match) => matchIdentity(match) === selectedMatchKey) ?? null

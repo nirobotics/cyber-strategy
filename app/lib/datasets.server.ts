@@ -18,6 +18,20 @@ export async function getActiveDataset(): Promise<ScoutingDataset> {
   return rowToDataset(data as ScoutingDatasetRow);
 }
 
+export async function getDatasetForEvent(eventKey: string): Promise<ScoutingDataset | null> {
+  const sb = getClient();
+  if (!sb) return SAMPLE_DATASET.eventKey === eventKey ? SAMPLE_DATASET : null;
+  const { data, error } = await sb
+    .from("scouting_datasets")
+    .select("*")
+    .eq("event_key", eventKey)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return rowToDataset(data as ScoutingDatasetRow);
+}
+
 export async function listDatasets(): Promise<ScoutingDataset[]> {
   const sb = getClient();
   if (!sb) return [SAMPLE_DATASET];

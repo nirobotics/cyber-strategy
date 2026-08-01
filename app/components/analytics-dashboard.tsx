@@ -460,7 +460,7 @@ export function compareTeamDetailMatches(
   return matchTypeOrder(a.matchType) - matchTypeOrder(b.matchType) || a.match - b.match;
 }
 
-function TeamDetail({
+export function TeamDetail({
   team,
   tier,
   photos,

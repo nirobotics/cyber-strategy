@@ -1003,3 +1003,23 @@
 - 类型检查、测试、Lint、生产构建和 `git diff --check` 全部通过。
 
 **风险 / 待办**：真实管理页需要管理员登录态，部署后需确认保存比例、恢复默认和保存数据范围三个写操作；未登录入口只能验证权限重定向。
+
+---
+
+## 2026-08-01 22:31:01 +08:00 · Cyber Pit 签名嵌入接入
+
+**当前状态**：Cyber Strategy 已为 Cyber Pit 提供短时签名的队伍详情和赛程分析嵌入页，版本升级为 `1.0.69`，生产链路已验证。
+
+**本轮完成**：
+- 新增仅接受服务端 Bearer secret 的 `/api/cyber-pit-embed` 预检接口，以及 5 分钟 HMAC 签名的 `/embed` 页面。
+- 赛事查找先核对当前/历史 Cyber Scout event，再尝试 Strategy 存储数据集；队伍或场次不存在时返回 404，由 Pit 保持界面不变。
+- 嵌入页直接复用 `TeamDetail` 和 `MatchAnalysis`，支持 Pit light/dark 主题；CSP 仅允许 `pit.team8214.com` 与 localhost frame ancestor。
+- 新增签名、过期、篡改与事件解析测试；版本号同步到 `package.json`、应用页脚、登录页页脚和 Demo 页脚。
+
+**验证**：
+- 17 files / 107 tests、typecheck、build、改动文件 ESLint、`git diff --check` 全部通过。
+- 生产队伍 8214、Q33 预检均返回 200，缺失赛事返回 404；签名嵌入返回 200，CSP/Referrer-Policy 正确。
+- 浏览器验证 Q33 实际比分、预测、六队数据和图表；桌面 dark、390×844 light 均正常且控制台无 error。
+- Production deployment `dpl_5JBJ6LnjF5uXWVooNtgHFuJcxD34` Ready，并绑定 `https://strategy.team8214.com`。
+
+**风险 / 待办**：嵌入队伍详情暂不加载照片，因为既有照片接口要求 Strategy 登录；其余详情复用原组件。Vercel 错误日志查询因 CLI scope 落到个人组织而未完成。

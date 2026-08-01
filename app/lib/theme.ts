@@ -21,7 +21,10 @@ export const themeBootstrapScript = `(() => {
   try {
     const key = 'cyber-strategy-theme';
     const stored = localStorage.getItem(key);
-    const theme = stored === 'light' || stored === 'dark'
+    const embedded = new URLSearchParams(location.search).get('theme');
+    const theme = embedded === 'light' || embedded === 'dark'
+      ? embedded
+      : stored === 'light' || stored === 'dark'
       ? stored
       : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.documentElement.dataset.theme = theme;
