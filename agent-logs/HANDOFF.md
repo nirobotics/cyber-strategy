@@ -1056,3 +1056,19 @@
 **生产证据**：最近请求日志中，Pit `/api/cyber-strategy` 同时存在 200/204，Strategy `/api/cyber-pit-embed` 同时存在 200/404，与上述键是否一致相符。
 
 **后续修复方向**：跨应用直接传递并匹配 FRC/TBA `match.key`，避免两边分别从比赛字段重新推导身份。
+
+---
+
+## 2026-08-02 01:11:34 +08:00 · Cyber Pit 完整场次键兼容
+
+**当前状态**：已修复 Cyber Pit 比赛悬浮窗因场次键不一致而自动关闭，版本升级为 `1.0.71`，生产部署 Ready。
+
+**本轮完成**：
+- 签名嵌入目标支持与 eventKey 同前缀的完整 FRC/TBA 场次键，并继续兼容已签发的旧短键。
+- 预检和详情解析统一使用同一个匹配函数；Practice、Qualification、常规淘汰赛可按完整键匹配，当前 FIRST 双败 `efNmN` 可映射到 Strategy 内部 `sf-N-1`。
+- 详情 loader 返回解析后的 Strategy 比赛身份，`MatchAnalysis` 不再直接使用 Pit 原始目标，因此 `ef5m5` 等别名能选中对应比赛。
+- 新增 Q33、`ef5m5`、`f1m3` 和数据范围回归测试；版本号同步到应用、登录页和 Demo 页脚。
+
+**验证**：17 files / 109 tests、typecheck、改动文件 ESLint、build、`git diff --check` 全部通过。Production deployment `https://cyber-strategy-kzy4no4is-ni-corporate.vercel.app` Ready，并绑定 `https://strategy.team8214.com`。
+
+**风险 / 待办**：命令行没有用户的 Pit 飞书登录态，无法代替用户完成最后一次受保护点击；签名校验与全部场次映射已由自动化测试覆盖。

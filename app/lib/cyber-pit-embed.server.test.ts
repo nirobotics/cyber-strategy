@@ -4,7 +4,7 @@ import {
   isCyberPitEmbedRequestAuthorized,
   verifyCyberPitEmbedUrl,
 } from "./cyber-pit-embed.server";
-import { cyberPitMatchDataRange } from "./cyber-pit-integration.server";
+import { cyberPitMatchDataRange, matchesCyberPitMatch } from "./cyber-pit-integration.server";
 
 const secret = "test-secret-with-enough-entropy";
 const now = Date.UTC(2026, 7, 1);
@@ -14,14 +14,14 @@ describe("Cyber Pit embed signing", () => {
     const url = new URL(createCyberPitEmbedUrl("https://strategy.team8214.com", {
       eventKey: "2026otsan",
       kind: "match",
-      target: "qm-0-33",
+      target: "2026otsan_qm33",
       theme: "dark",
     }, secret, now));
 
     expect(verifyCyberPitEmbedUrl(url, secret, now + 1_000)).toMatchObject({
       eventKey: "2026otsan",
       kind: "match",
-      target: "qm-0-33",
+      target: "2026otsan_qm33",
       theme: "dark",
     });
   });
@@ -52,5 +52,12 @@ describe("Cyber Pit embed signing", () => {
     expect(cyberPitMatchDataRange("practice-0-2")).toBe("practice");
     expect(cyberPitMatchDataRange("qm-0-33")).toBe("qualification");
     expect(cyberPitMatchDataRange("sf-2-1")).toBe("playoff");
+    expect(cyberPitMatchDataRange("2026otsan_qm33", "2026otsan")).toBe("qualification");
+  });
+
+  it("matches Pit event keys across FRC playoff normalization", () => {
+    expect(matchesCyberPitMatch({ comp_level: "qm", match_number: 33 }, "2026otsan", "2026otsan_qm33")).toBe(true);
+    expect(matchesCyberPitMatch({ comp_level: "sf", set_number: 5, match_number: 1 }, "2026otsan", "2026otsan_ef5m5")).toBe(true);
+    expect(matchesCyberPitMatch({ comp_level: "f", set_number: 1, match_number: 3 }, "2026otsan", "2026otsan_f1m3")).toBe(true);
   });
 });

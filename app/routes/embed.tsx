@@ -63,7 +63,7 @@ export default function CyberPitEmbed({ loaderData }: Route.ComponentProps) {
           schedule={schedule}
           teamData={dataset.teamData}
           enrich={false}
-          initialMatchKey={payload.target}
+          initialMatchKey={loaderData.selectedMatchKey}
         />
       )}
     </main>

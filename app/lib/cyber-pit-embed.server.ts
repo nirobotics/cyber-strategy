@@ -60,8 +60,15 @@ function normalizeEmbedPayload(value: Record<string, unknown>): CyberPitEmbedPay
   if (theme !== "light" && theme !== "dark") return null;
   if (!Number.isSafeInteger(expires)) return null;
   if (kind === "team" && !/^\d{1,6}$/.test(target)) return null;
-  if (kind === "match" && !/^(?:practice|qm|ef|qf|sf|f)-\d+-\d+$/.test(target)) return null;
+  if (kind === "match" && !validMatchTarget(target, eventKey)) return null;
   return { eventKey, kind, target, theme, expires };
+}
+
+function validMatchTarget(target: string, eventKey: string) {
+  const suffix = target.startsWith(`${eventKey}_`) ? target.slice(eventKey.length + 1) : "";
+  return /^(?:practice|qm)\d+$/.test(suffix)
+    || /^(?:ef|qf|sf|f)\d+m\d+$/.test(suffix)
+    || /^(?:practice|qm|ef|qf|sf|f)-\d+-\d+$/.test(target);
 }
 
 function signEmbedPayload(payload: CyberPitEmbedPayload, secret: string) {
