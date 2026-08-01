@@ -1041,3 +1041,18 @@
 - Production deployment `https://cyber-strategy-ds4drso1a-ni-corporate.vercel.app` Ready，并绑定 `https://strategy.team8214.com`。
 
 **风险 / 待办**：Vercel Sensitive secret 的 env pull 只返回占位值，未能从命令行对受保护预检做有效生产计时；没有输出或修改生产 secret。需由已有 Pit 登录态实际点击复核体感。
+
+---
+
+## 2026-08-02 01:02:46 +08:00 · Cyber Pit 场次弹窗消失诊断
+
+**当前状态**：已确认比赛弹窗自动消失来自跨应用场次键不一致；本轮仅诊断，未修改运行代码。
+
+**根因**：
+- Pit 的 Practice/Qualification 目标包含 `setNumber=1`，生成 `practice/qm-1-N`；Strategy 的 FRC 规范化结果没有 set number，查找键为 `practice/qm-0-N`。
+- 当前赛事双败淘汰赛在 Pit 生成 `ef-N-N`，Strategy 根据 `Match N` 生成 `sf-N-1`；Final 的 `f-1-N` 一致。
+- Strategy 预检因此对不一致目标返回 404，Pit 转为 204 并关闭加载弹窗。
+
+**生产证据**：最近请求日志中，Pit `/api/cyber-strategy` 同时存在 200/204，Strategy `/api/cyber-pit-embed` 同时存在 200/404，与上述键是否一致相符。
+
+**后续修复方向**：跨应用直接传递并匹配 FRC/TBA `match.key`，避免两边分别从比赛字段重新推导身份。
