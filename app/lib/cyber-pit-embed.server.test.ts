@@ -4,6 +4,7 @@ import {
   isCyberPitEmbedRequestAuthorized,
   verifyCyberPitEmbedUrl,
 } from "./cyber-pit-embed.server";
+import { cyberPitMatchDataRange } from "./cyber-pit-integration.server";
 
 const secret = "test-secret-with-enough-entropy";
 const now = Date.UTC(2026, 7, 1);
@@ -45,5 +46,11 @@ describe("Cyber Pit embed signing", () => {
     expect(isCyberPitEmbedRequestAuthorized(new Request("https://example.com", {
       headers: { Authorization: "Bearer wrong" },
     }), secret)).toBe(false);
+  });
+
+  it("limits match preflight to the relevant FRC schedule", () => {
+    expect(cyberPitMatchDataRange("practice-0-2")).toBe("practice");
+    expect(cyberPitMatchDataRange("qm-0-33")).toBe("qualification");
+    expect(cyberPitMatchDataRange("sf-2-1")).toBe("playoff");
   });
 });

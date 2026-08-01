@@ -5,7 +5,7 @@ import {
   type CyberPitEmbedKind,
   type CyberPitEmbedTheme,
 } from "../lib/cyber-pit-embed.server";
-import { resolveCyberPitEmbedData } from "../lib/cyber-pit-integration.server";
+import { canResolveCyberPitEmbed } from "../lib/cyber-pit-integration.server";
 
 export async function action({ request }: Route.ActionArgs) {
   const secret = process.env.CYBER_STRATEGY_EMBED_SECRET?.trim() ?? "";
@@ -23,7 +23,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
   const expires = Date.now() + 5 * 60_000;
   const payload = { eventKey, kind, target, theme, expires };
-  if (!await resolveCyberPitEmbedData(payload)) {
+  if (!await canResolveCyberPitEmbed(payload)) {
     return new Response(null, { status: 404, headers: { "Cache-Control": "no-store" } });
   }
 

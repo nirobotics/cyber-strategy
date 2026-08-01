@@ -32,6 +32,20 @@ export async function getDatasetForEvent(eventKey: string): Promise<ScoutingData
   return rowToDataset(data as ScoutingDatasetRow);
 }
 
+export async function hasStoredDatasetTarget(eventKey: string, teamNumber?: string): Promise<boolean> {
+  const sb = getClient();
+  if (!sb) return SAMPLE_DATASET.eventKey === eventKey && (!teamNumber || Boolean(SAMPLE_DATASET.teamData[teamNumber]));
+  const { data, error } = await sb
+    .from("scouting_datasets")
+    .select(teamNumber ? "team_data" : "id")
+    .eq("event_key", eventKey)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return false;
+  return teamNumber ? Boolean((data as Pick<ScoutingDatasetRow, "team_data">).team_data?.[teamNumber]) : true;
+}
+
 export async function listDatasets(): Promise<ScoutingDataset[]> {
   const sb = getClient();
   if (!sb) return [SAMPLE_DATASET];

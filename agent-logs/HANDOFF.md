@@ -1023,3 +1023,21 @@
 - Production deployment `dpl_5JBJ6LnjF5uXWVooNtgHFuJcxD34` Ready，并绑定 `https://strategy.team8214.com`。
 
 **风险 / 待办**：嵌入队伍详情暂不加载照片，因为既有照片接口要求 Strategy 登录；其余详情复用原组件。Vercel 错误日志查询因 CLI scope 落到个人组织而未完成。
+
+---
+
+## 2026-08-01 22:50:54 +08:00 · Cyber Pit 嵌入加载提速
+
+**当前状态**：Pit 嵌入预检改为轻量目标检查，详情数据请求并行化，版本升级为 `1.0.70`，生产部署 Ready。
+
+**本轮完成**：
+- 预检不再构建完整 Cyber Scout 数据集；当前赛事只查询事件/目标队伍存在性，未命中后才查 Strategy 存储数据集。
+- 比赛预检只请求目标所属的 Practice、Qualification 或 Playoff 单组 FRC 赛程，不再一次请求三组赛程。
+- 详情加载中的侦查记录、FRC 比分、TBA 赛程以及嵌入页附加数据改为并行请求，移除可避免的串行等待。
+- 新增比赛目标到数据范围的回归测试；版本号同步到应用、登录页和 Demo 页脚。
+
+**验证**：
+- 17 files / 108 tests、typecheck、改动文件 ESLint、build、`git diff --check` 全部通过。
+- Production deployment `https://cyber-strategy-ds4drso1a-ni-corporate.vercel.app` Ready，并绑定 `https://strategy.team8214.com`。
+
+**风险 / 待办**：Vercel Sensitive secret 的 env pull 只返回占位值，未能从命令行对受保护预检做有效生产计时；没有输出或修改生产 secret。需由已有 Pit 登录态实际点击复核体感。

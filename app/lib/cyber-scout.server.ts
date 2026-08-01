@@ -208,15 +208,18 @@ export async function loadCyberScoutDataset(
       };
     }
 
-    const records = await fetchRecords(db, event.id);
-    const officialResults = await fetchFrcMatchResults(event.tba_event_key).catch(() => []);
-    let tbaMatches: TbaMatch[] = [];
-    let tbaError: string | null = null;
-    try {
-      tbaMatches = await fetchTbaMatches(event.tba_event_key);
-    } catch (error) {
-      tbaError = error instanceof Error ? error.message : "读取 TBA 失败";
-    }
+    const [records, officialResults, tba] = await Promise.all([
+      fetchRecords(db, event.id),
+      fetchFrcMatchResults(event.tba_event_key).catch(() => []),
+      fetchTbaMatches(event.tba_event_key)
+        .then((matches) => ({ matches, error: null as string | null }))
+        .catch((error) => ({
+          matches: [] as TbaMatch[],
+          error: error instanceof Error ? error.message : "读取 TBA 失败",
+        })),
+    ]);
+    const tbaMatches = tba.matches;
+    const tbaError = tba.error;
     const dataset = buildCyberScoutDataset({ event, records, officialResults, tbaMatches, includedMatchTypes });
     const scoringMessages = [
       tbaError,
@@ -253,6 +256,27 @@ export async function loadCyberScoutDataset(
       },
     };
   }
+}
+
+export async function hasCyberScoutTarget(eventKey: string, teamNumber?: string): Promise<boolean> {
+  const db = getCyberScoutClient();
+  if (!db) return false;
+  const { data: event, error: eventError } = await db
+    .from("scouting_events")
+    .select("id")
+    .eq("tba_event_key", eventKey)
+    .limit(1)
+    .maybeSingle();
+  if (eventError || !event) return false;
+  if (!teamNumber) return true;
+  const { data: record, error: recordError } = await db
+    .from("scouting_records")
+    .select("id")
+    .eq("event_id", event.id)
+    .eq("team_number", Number(teamNumber))
+    .limit(1)
+    .maybeSingle();
+  return !recordError && Boolean(record);
 }
 
 export async function loadCyberScoutProposalMatches(eventKey: string, includedMatchTypes?: DataRange[]): Promise<ProposalMatch[]> {

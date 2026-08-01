@@ -23,16 +23,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   const secret = process.env.CYBER_STRATEGY_EMBED_SECRET?.trim() ?? "";
   const payload = verifyCyberPitEmbedUrl(new URL(request.url), secret);
   if (!payload) throw new Response("Not found", { status: 404 });
-  const resolved = await resolveCyberPitEmbedData(payload);
-  if (!resolved) throw new Response("Not found", { status: 404 });
 
   if (payload.kind === "team") {
+    const [resolved, tierPercentages] = await Promise.all([
+      resolveCyberPitEmbedData(payload),
+      getTierPercentages(),
+    ]);
+    if (!resolved) throw new Response("Not found", { status: 404 });
     const teams = Object.values(resolved.dataset.teamData).sort((a, b) => b.avgTotal - a.avgTotal || Number(a.team) - Number(b.team));
-    const tiers = buildTierAssignments(teams, await getTierPercentages());
+    const tiers = buildTierAssignments(teams, tierPercentages);
     return { payload, ...resolved, tier: tiers.get(payload.target) ?? null };
   }
 
-  const results = await fetchMatchResults(payload.eventKey).catch(() => []);
+  const [resolved, results] = await Promise.all([
+    resolveCyberPitEmbedData(payload),
+    fetchMatchResults(payload.eventKey).catch(() => []),
+  ]);
+  if (!resolved) throw new Response("Not found", { status: 404 });
   return { payload, ...resolved, schedule: enrichScheduledMatches(resolved.schedule, [], results), tier: null };
 }
 
