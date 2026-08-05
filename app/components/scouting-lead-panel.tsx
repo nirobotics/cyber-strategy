@@ -85,7 +85,7 @@ function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
     <>
       <SummaryGrid report={report} />
 
-      <Card className="overflow-hidden p-0">
+      <Card className="overflow-visible p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
           <div>
             <h2 className="text-lg font-semibold text-ink">净信心分</h2>
@@ -404,7 +404,7 @@ function UserSearchInput({ users, defaultValue }: { users: Array<{ id: string; d
   }
 
   return (
-    <div ref={rootRef} className="min-w-0">
+    <div ref={rootRef} className={cn("relative min-w-0", open && "z-30")}>
       <input type="hidden" name="userName" value={selectedName} />
       <Input
         value={query}
@@ -432,7 +432,7 @@ function UserSearchInput({ users, defaultValue }: { users: Array<{ id: string; d
         }}
       />
       {open ? (
-        <div id={listId} role="listbox" className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-xl">
+        <div id={listId} role="listbox" className="absolute left-0 right-0 top-full mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-xl">
           {visibleUsers.length ? visibleUsers.map((user) => (
             <button
               key={user.id}
