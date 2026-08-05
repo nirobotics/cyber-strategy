@@ -7,7 +7,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useFetcher, useNavigation, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import type {
@@ -339,8 +339,8 @@ function AssignmentForm({
   compact?: boolean;
 }) {
   const assignmentFetcher = useFetcher<ScoutingLeadActionData>();
+  const userListId = useId();
   const saving = busy || assignmentFetcher.state !== "idle";
-  const hasCurrentUser = assignment ? users.some((user) => user.displayName === assignment.userName) : true;
   return (
     <assignmentFetcher.Form method="post" action="/scouting-lead" className={cn("grid gap-2", compact ? "md:grid-cols-[110px_110px_110px_minmax(160px,1fr)_auto]" : "md:grid-cols-[120px_120px_120px_minmax(180px,1fr)_auto]")}>
       <input type="hidden" name="intent" value="save-assignment" />
@@ -364,10 +364,19 @@ function AssignmentForm({
       <label className="grid gap-1 text-sm">
         <span className="font-medium text-ink-dim">人员</span>
         {users.length ? (
-          <select name="userName" defaultValue={assignment?.userName ?? users[0]?.displayName ?? ""} className="input h-10 font-sans">
-            {assignment && !hasCurrentUser ? <option value={assignment.userName}>{assignment.userName}</option> : null}
-            {users.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}
-          </select>
+          <>
+            <Input
+              name="userName"
+              list={userListId}
+              defaultValue={assignment?.userName ?? users[0]?.displayName ?? ""}
+              placeholder="输入队号或姓名筛选"
+              autoComplete="off"
+              required
+            />
+            <datalist id={userListId}>
+              {users.map((user) => <option key={user.id} value={user.displayName} />)}
+            </datalist>
+          </>
         ) : (
           <Input name="userName" defaultValue={assignment?.userName ?? ""} placeholder="Scout 名字" required />
         )}
