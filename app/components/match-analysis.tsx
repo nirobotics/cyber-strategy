@@ -343,7 +343,7 @@ function MatchDetail({
         </div>
       </Card>
 
-      <WinProbabilityPanel probability={probability} score={score} />
+      <WinProbabilityPanel probability={probability} />
 
       <div className="space-y-3">
         <AllianceDetail
@@ -400,7 +400,7 @@ function MatchDetail({
   );
 }
 
-function WinProbabilityPanel({ probability, score }: { probability: WinProbability | null; score: ReturnType<typeof resolveMatchScores> }) {
+function WinProbabilityPanel({ probability }: { probability: WinProbability | null }) {
   if (!probability) {
     return (
       <Card className="p-4">
@@ -414,16 +414,9 @@ function WinProbabilityPanel({ probability, score }: { probability: WinProbabili
   const bluePct = 100 - redPct;
   return (
     <Card className="p-4">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="section-label">预测胜率</p>
-          {probability.source === "statbotics" ? <p className="mt-1 text-sm text-ink-dim">Statbotics fallback</p> : null}
-        </div>
-        {score.predictedRed != null && score.predictedBlue != null ? (
-          <div className="text-sm font-semibold text-ink-dim">
-            预测比分 {Math.round(score.predictedRed)} - {Math.round(score.predictedBlue)}
-          </div>
-        ) : null}
+      <div className="mb-3">
+        <p className="section-label">预测胜率</p>
+        {probability.source === "statbotics" ? <p className="mt-1 text-sm text-ink-dim">Statbotics fallback</p> : null}
       </div>
       <div className="grid gap-2 md:grid-cols-[auto_1fr_auto] md:items-center">
         <div className="text-danger">
