@@ -7,7 +7,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useFetcher, useNavigation, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import type {
@@ -339,7 +339,6 @@ function AssignmentForm({
   compact?: boolean;
 }) {
   const assignmentFetcher = useFetcher<ScoutingLeadActionData>();
-  const userListId = useId();
   const saving = busy || assignmentFetcher.state !== "idle";
   return (
     <assignmentFetcher.Form method="post" action="/scouting-lead" className={cn("grid gap-2", compact ? "md:grid-cols-[110px_110px_110px_minmax(160px,1fr)_auto]" : "md:grid-cols-[120px_120px_120px_minmax(180px,1fr)_auto]")}>
@@ -364,19 +363,7 @@ function AssignmentForm({
       <label className="grid gap-1 text-sm">
         <span className="font-medium text-ink-dim">人员</span>
         {users.length ? (
-          <>
-            <Input
-              name="userName"
-              list={userListId}
-              defaultValue={assignment?.userName ?? users[0]?.displayName ?? ""}
-              placeholder="输入队号或姓名筛选"
-              autoComplete="off"
-              required
-            />
-            <datalist id={userListId}>
-              {users.map((user) => <option key={user.id} value={user.displayName} />)}
-            </datalist>
-          </>
+          <UserSearchInput users={users} defaultValue={assignment?.userName ?? users[0]?.displayName ?? ""} />
         ) : (
           <Input name="userName" defaultValue={assignment?.userName ?? ""} placeholder="Scout 名字" required />
         )}
@@ -388,6 +375,85 @@ function AssignmentForm({
       </Button>
     </assignmentFetcher.Form>
   );
+}
+
+function UserSearchInput({ users, defaultValue }: { users: Array<{ id: string; displayName: string }>; defaultValue: string }) {
+  const listId = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [selectedName, setSelectedName] = useState(defaultValue);
+  const [query, setQuery] = useState(defaultValue);
+  const [open, setOpen] = useState(false);
+  const visibleUsers = filterAssignmentUsers(users, query);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery(selectedName);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open, selectedName]);
+
+  function selectUser(name: string) {
+    setSelectedName(name);
+    setQuery(name);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={rootRef} className="min-w-0">
+      <input type="hidden" name="userName" value={selectedName} />
+      <Input
+        value={query}
+        placeholder="输入队号或姓名筛选"
+        autoComplete="off"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        onFocus={() => {
+          setOpen(true);
+          if (selectedName) setQuery("");
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setOpen(false);
+            setQuery(selectedName);
+          } else if (event.key === "Enter" && visibleUsers[0]) {
+            event.preventDefault();
+            selectUser(visibleUsers[0].displayName);
+          }
+        }}
+      />
+      {open ? (
+        <div id={listId} role="listbox" className="mt-1 max-h-40 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-xl">
+          {visibleUsers.length ? visibleUsers.map((user) => (
+            <button
+              key={user.id}
+              type="button"
+              role="option"
+              aria-selected={user.displayName === selectedName}
+              className="block h-9 w-full truncate rounded px-2 text-left text-sm text-ink hover:bg-surface-2"
+              onClick={() => selectUser(user.displayName)}
+            >
+              {user.displayName}
+            </button>
+          )) : <div className="px-2 py-2 text-sm text-ink-faint">没有匹配人员</div>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function filterAssignmentUsers(users: Array<{ id: string; displayName: string }>, query: string) {
+  const normalized = query.trim().toLowerCase();
+  return normalized ? users.filter((user) => user.displayName.toLowerCase().includes(normalized)) : users;
 }
 
 function AssignmentDeleteForm({ eventKey, assignmentId, busy }: { eventKey: string | null; assignmentId: string; busy: boolean }) {
