@@ -987,22 +987,8 @@ function PicklistBoard({
       </Card>
 
       <Card className="overflow-hidden p-0">
-        <div className="border-b border-line p-3">
-          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-ink-dim">{pickTeams.length} 支</span>
-              <Button
-                type="button"
-                onClick={() => setPrinting(true)}
-                disabled={!firstPickTeams.length && !secondPickTeams.length}
-                title="导出 Picklist PDF"
-              >
-                <Download className="size-4" />
-                导出 PDF
-              </Button>
-            </div>
-          </div>
-          <div className="flex gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-line p-3">
+          <div className="flex shrink-0 gap-2">
             <Button type="button" variant={activePick === "first" ? "active" : "default"} onClick={() => setActivePick("first")}>
               1st Pick List
             </Button>
@@ -1010,6 +996,17 @@ function PicklistBoard({
               2nd Pick List
             </Button>
           </div>
+          <span className="ml-auto shrink-0 text-sm text-ink-dim">{pickTeams.length} 支</span>
+          <Button
+            type="button"
+            className="shrink-0"
+            onClick={() => setPrinting(true)}
+            disabled={!firstPickTeams.length && !secondPickTeams.length}
+            title="导出 Picklist PDF"
+          >
+            <Download className="size-4" />
+            导出 PDF
+          </Button>
         </div>
         <div
           data-picklist-scroll
