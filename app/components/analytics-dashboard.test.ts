@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareTeamDetailMatches, matchDisplayLabel, ratingDotClassName } from "./analytics-dashboard";
+import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, ratingDotClassName } from "./analytics-dashboard";
 import type { ScoutingMatch } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
@@ -35,5 +35,12 @@ describe("analytics dashboard UI helpers", () => {
       "M1",
       "M3",
     ]);
+  });
+
+  it("averages every radar metric across the region", () => {
+    expect(averageRadarMetrics([
+      [1, 2, 3, 4, 5, 0],
+      [3, 4, 5, 2, 1, 4],
+    ])).toEqual([2, 3, 4, 3, 3, 2]);
   });
 });

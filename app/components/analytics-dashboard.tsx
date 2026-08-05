@@ -703,6 +703,7 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
     return team && teamSet.has(team) ? team : defaults[index] ?? "";
   });
   const compared = selectedTeams.map((team) => teams.find((item) => item.team === team)).filter(Boolean) as TeamSummary[];
+  const regionRadarMetrics = averageRadarMetrics(teams.map(radarMetrics));
 
   function setTeam(index: number, team: string) {
     setSelected((current) => [0, 1, 2].map((slot) => (slot === index ? team : current[slot] ?? defaults[slot] ?? "")));
@@ -762,8 +763,8 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
           <h3 className="mb-3 text-sm font-semibold text-ink-dim">能力雷达</h3>
           <ChartCanvas
             label="队伍能力雷达对比"
-            configKey={`cmp-radar:${selectedTeams.join(",")}`}
-            buildConfig={(palette) => compareRadarConfig(compared, palette)}
+            configKey={`cmp-radar:${selectedTeams.join(",")}:${regionRadarMetrics.join(",")}`}
+            buildConfig={(palette) => compareRadarConfig(compared, regionRadarMetrics, palette)}
           />
         </Card>
         <Card className="p-4">
@@ -1754,21 +1755,39 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
   } as ChartConfiguration;
 }
 
-function compareRadarConfig(teams: TeamSummary[], palette: ChartPaletteLike): ChartConfiguration {
+function radarMetrics(team: TeamSummary) {
+  const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
+  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency];
+}
+
+export function averageRadarMetrics(metrics: number[][]) {
+  if (!metrics.length) return [0, 0, 0, 0, 0, 0];
+  return [0, 1, 2, 3, 4, 5].map((index) => round1(metrics.reduce((sum, values) => sum + (values[index] ?? 0), 0) / metrics.length));
+}
+
+function compareRadarConfig(teams: TeamSummary[], regionAverage: number[], palette: ChartPaletteLike): ChartConfiguration {
   return {
     type: "radar",
     data: {
       labels: ["Drive score", "Defence score", "BPS", "命中率", "可靠性", "稳定性"],
-      datasets: teams.map((team, index) => {
-        const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
-        return {
+      datasets: [
+        ...teams.map((team, index) => ({
           label: `Team ${team.team}`,
-          data: [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency],
+          data: radarMetrics(team),
           borderColor: palette.colors[index],
           backgroundColor: `${palette.colors[index]}22`,
           pointBackgroundColor: palette.colors[index],
-        };
-      }),
+        })),
+        {
+          label: "赛区平均",
+          data: regionAverage,
+          borderColor: palette.muted,
+          backgroundColor: "transparent",
+          pointBackgroundColor: palette.muted,
+          borderDash: [6, 4],
+          borderWidth: 2,
+        },
+      ],
     },
     options: {
       responsive: true,
