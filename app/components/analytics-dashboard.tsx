@@ -703,7 +703,10 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
     return team && teamSet.has(team) ? team : defaults[index] ?? "";
   });
   const compared = selectedTeams.map((team) => teams.find((item) => item.team === team)).filter(Boolean) as TeamSummary[];
-  const regionRadarMetrics = averageRadarMetrics(teams.map(radarMetrics));
+  const rankedRadarMetrics = rankRadarMetrics(teams.map(radarMetrics));
+  const radarMetricsByTeam = new Map(teams.map((team, index) => [team.team, rankedRadarMetrics[index] ?? [0, 0, 0, 0, 0, 0]]));
+  const regionRadarMetrics = averageRadarMetrics(rankedRadarMetrics);
+  const comparedRadarMetrics = compared.map((team) => radarMetricsByTeam.get(team.team) ?? [0, 0, 0, 0, 0, 0]);
 
   function setTeam(index: number, team: string) {
     setSelected((current) => [0, 1, 2].map((slot) => (slot === index ? team : current[slot] ?? defaults[slot] ?? "")));
@@ -763,8 +766,8 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
           <h3 className="mb-3 text-sm font-semibold text-ink-dim">能力雷达</h3>
           <ChartCanvas
             label="队伍能力雷达对比"
-            configKey={`cmp-radar:${selectedTeams.join(",")}:${regionRadarMetrics.join(",")}`}
-            buildConfig={(palette) => compareRadarConfig(compared, regionRadarMetrics, palette)}
+            configKey={`cmp-radar:${selectedTeams.join(",")}:${comparedRadarMetrics.flat().join(",")}:${regionRadarMetrics.join(",")}`}
+            buildConfig={(palette) => compareRadarConfig(compared, comparedRadarMetrics, regionRadarMetrics, palette)}
           />
         </Card>
         <Card className="p-4">
@@ -1753,8 +1756,17 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
 }
 
 function radarMetrics(team: TeamSummary) {
-  const consistency = Math.max(0, ((100 - team.stdDev) / 100) * 5);
-  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy / 20, (reliability(team) / 100) * 5, consistency];
+  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy, reliability(team), -team.stdDev];
+}
+
+export function rankRadarMetrics(metrics: number[][]) {
+  if (metrics.length <= 1) return metrics.map(() => [5, 5, 5, 5, 5, 5]);
+  const count = metrics.length;
+  return metrics.map((values) => values.map((value, index) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
+    const rank = 1 + metrics.filter((row) => (Number.isFinite(row[index]) ? row[index]! : 0) > safeValue).length;
+    return round1(5 * (count - rank) / (count - 1));
+  }));
 }
 
 export function averageRadarMetrics(metrics: number[][]) {
@@ -1762,7 +1774,7 @@ export function averageRadarMetrics(metrics: number[][]) {
   return [0, 1, 2, 3, 4, 5].map((index) => round1(metrics.reduce((sum, values) => sum + (values[index] ?? 0), 0) / metrics.length));
 }
 
-function compareRadarConfig(teams: TeamSummary[], regionAverage: number[], palette: ChartPaletteLike): ChartConfiguration {
+function compareRadarConfig(teams: TeamSummary[], teamMetrics: number[][], regionAverage: number[], palette: ChartPaletteLike): ChartConfiguration {
   return {
     type: "radar",
     data: {
@@ -1770,7 +1782,7 @@ function compareRadarConfig(teams: TeamSummary[], regionAverage: number[], palet
       datasets: [
         ...teams.map((team, index) => ({
           label: `Team ${team.team}`,
-          data: radarMetrics(team),
+          data: teamMetrics[index] ?? [0, 0, 0, 0, 0, 0],
           borderColor: palette.colors[index],
           backgroundColor: `${palette.colors[index]}22`,
           pointBackgroundColor: palette.colors[index],

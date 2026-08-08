@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, ratingDotClassName } from "./analytics-dashboard";
+import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, rankRadarMetrics, ratingDotClassName } from "./analytics-dashboard";
 import type { ScoutingMatch } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
@@ -42,5 +42,18 @@ describe("analytics dashboard UI helpers", () => {
       [1, 2, 3, 4, 5, 0],
       [3, 4, 5, 2, 1, 4],
     ])).toEqual([2, 3, 4, 3, 3, 2]);
+  });
+
+  it("scores radar metrics by regional rank with ties", () => {
+    expect(rankRadarMetrics([
+      [30, 10, 5, 80, 100, -2],
+      [20, 10, 3, 60, 90, -5],
+      [10, 5, 1, 40, 80, -8],
+    ])).toEqual([
+      [5, 5, 5, 5, 5, 5],
+      [2.5, 5, 2.5, 2.5, 2.5, 2.5],
+      [0, 0, 0, 0, 0, 0],
+    ]);
+    expect(rankRadarMetrics([[1, 1, 1, 1, 1, 1]])).toEqual([[5, 5, 5, 5, 5, 5]]);
   });
 });
