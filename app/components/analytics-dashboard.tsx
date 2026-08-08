@@ -703,7 +703,8 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
     return team && teamSet.has(team) ? team : defaults[index] ?? "";
   });
   const compared = selectedTeams.map((team) => teams.find((item) => item.team === team)).filter(Boolean) as TeamSummary[];
-  const rankedRadarMetrics = rankRadarMetrics(teams.map(radarMetrics));
+  const stabilityBaseline = nearestRankPercentile(teams.map((team) => team.avgTotal), 0.1);
+  const rankedRadarMetrics = rankRadarMetrics(teams.map((team) => radarMetrics(team, stabilityBaseline)));
   const radarMetricsByTeam = new Map(teams.map((team, index) => [team.team, rankedRadarMetrics[index] ?? [0, 0, 0, 0, 0, 0]]));
   const regionRadarMetrics = averageRadarMetrics(rankedRadarMetrics);
   const comparedRadarMetrics = compared.map((team) => radarMetricsByTeam.get(team.team) ?? [0, 0, 0, 0, 0, 0]);
@@ -1755,8 +1756,20 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
   } as ChartConfiguration;
 }
 
-function radarMetrics(team: TeamSummary) {
-  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy, reliability(team), -team.stdDev];
+function radarMetrics(team: TeamSummary, stabilityBaseline: number) {
+  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy, reliability(team), -relativeScoreVariation(team.stdDev, team.avgTotal, stabilityBaseline)];
+}
+
+export function nearestRankPercentile(values: number[], percentile: number) {
+  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  const rank = Math.ceil(sorted.length * Math.min(1, Math.max(0, percentile)));
+  return sorted[Math.max(0, rank - 1)] ?? 0;
+}
+
+export function relativeScoreVariation(stdDev: number, mean: number, baseline: number) {
+  const denominator = Math.max(0, mean, baseline);
+  return denominator > 0 ? stdDev / denominator : 0;
 }
 
 export function rankRadarMetrics(metrics: number[][]) {

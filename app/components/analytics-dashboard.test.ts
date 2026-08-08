@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, rankRadarMetrics, ratingDotClassName } from "./analytics-dashboard";
+import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, ratingDotClassName, relativeScoreVariation } from "./analytics-dashboard";
 import type { ScoutingMatch } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
@@ -55,5 +55,12 @@ describe("analytics dashboard UI helpers", () => {
       [0, 0, 0, 0, 0, 0],
     ]);
     expect(rankRadarMetrics([[1, 1, 1, 1, 1, 1]])).toEqual([[5, 5, 5, 5, 5, 5]]);
+  });
+
+  it("uses the regional tenth percentile as the relative variation floor", () => {
+    expect(nearestRankPercentile([110, 10, 90, 80, 70, 60, 50, 40, 30, 20, 100], 0.1)).toBe(20);
+    expect(relativeScoreVariation(10, 100, 20)).toBe(0.1);
+    expect(relativeScoreVariation(10, 5, 20)).toBe(0.5);
+    expect(relativeScoreVariation(0, 0, 0)).toBe(0);
   });
 });
