@@ -17,6 +17,10 @@ const DEMO_USER = {
   avatarUrl: null,
 };
 
+export function headers() {
+  return { "Cache-Control": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400" };
+}
+
 export async function loader() {
   const [source, scoutingLead] = await Promise.all([
     loadCyberScoutDataset(DEMO_EVENT_KEY),
@@ -42,7 +46,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.80"
+      version="1.0.81"
       user={null}
       authLoading={false}
       allowGuest
