@@ -254,11 +254,11 @@ export function AnalyticsDashboard({
               Picklist
             </SegmentedTab>
             <SegmentedTab active={tab} value="proposal" onClick={selectTab} onPrefetch={prepareTab} icon={<FileText className="size-4" />}>
-              Strategy Proposal
+              比赛策略
             </SegmentedTab>
             {canViewLead ? (
               <SegmentedTab active={tab} value="lead" onClick={selectTab} onPrefetch={prepareTab} icon={<ShieldCheck className="size-4" />}>
-                Scouting Lead
+                Scouting
               </SegmentedTab>
             ) : null}
             {canViewSettings ? (
