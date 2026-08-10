@@ -240,7 +240,7 @@ export function AnalyticsDashboard({
   return (
     <div className="flex w-full flex-col">
       {headerNavTarget ? createPortal(
-          <nav aria-label="功能选择" className="flex items-center gap-2 overflow-x-auto">
+          <nav aria-label="功能选择" className="flex items-center gap-2">
             <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
               队伍浏览
             </SegmentedTab>
