@@ -171,7 +171,8 @@ function MatchSchedule({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        {rows[0] ? <h3 className="section-label">{rows[0].group}</h3> : <span />}
         <label className="relative w-full sm:w-72">
           <span className="sr-only">查找队伍</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
@@ -185,9 +186,9 @@ function MatchSchedule({
         </label>
       </div>
       {teamQuery && !rows.length ? <Card className="p-8 text-center text-ink-dim">没有找到 Team {teamQuery} 参加的比赛。</Card> : null}
-      {rows.map(({ match, group, showGroup }) => (
+      {rows.map(({ match, group, showGroup }, index) => (
         <div key={matchIdentity(match)}>
-          {showGroup ? <h3 className="mb-2 section-label">{group}</h3> : null}
+          {showGroup && index > 0 ? <h3 className="mb-2 section-label">{group}</h3> : null}
           <MatchCard match={match} matches={matches} teamData={teamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
         </div>
       ))}
