@@ -48,22 +48,24 @@ export function AppHeader({
           <div className="flex h-10 min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="mx-auto flex h-full min-w-max items-center gap-2">
               <div id="app-header-navigation" className="shrink-0" />
-              {demoHref ? (
-                <NavLink
-                  to={demoHref}
-                  className={({ isActive }) => [
-                    "inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-xs font-black tracking-wider transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]",
-                    isActive
-                      ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                      : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]",
-                  ].join(" ")}
-                >
-                  DEMO
-                </NavLink>
-              ) : null}
-              <ThemeToggle className="shrink-0" />
-              <UserStatus user={user} loading={authLoading} allowGuest={allowGuest} onLogin={onLogin} />
             </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {demoHref ? (
+              <NavLink
+                to={demoHref}
+                className={({ isActive }) => [
+                  "inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-xs font-black tracking-wider transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]",
+                  isActive
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                    : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]",
+                ].join(" ")}
+              >
+                DEMO
+              </NavLink>
+            ) : null}
+            <ThemeToggle className="shrink-0" />
+            <UserStatus user={user} loading={authLoading} allowGuest={allowGuest} onLogin={onLogin} />
           </div>
         </div>
         {centerTitle ? (
