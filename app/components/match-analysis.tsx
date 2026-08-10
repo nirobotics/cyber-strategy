@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, ExternalLink, Gauge, PlayCircle, RefreshCw, Target, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, Gauge, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
-import { Button, Card, cn } from "./ui";
+import { Button, Card, Input, cn } from "./ui";
 import {
   buildTeamEventMap,
   enrichScheduledMatches,
   fmt,
   levelLabel,
+  matchHasTeam,
   matchIdentity,
   matchLabel,
   matchScheduleIdentity,
@@ -154,23 +155,40 @@ function MatchSchedule({
   teamData: TeamData;
   onSelectMatch: (match: CombinedMatch) => void;
 }) {
+  const [teamQuery, setTeamQuery] = useState("");
+
   if (!matches.length) {
     return <Card className="p-8 text-center text-ink-dim">暂无赛程数据。</Card>;
   }
 
   const sorted = sortedMatches(matches);
-  const rows = sorted.map((match, index) => {
+  const filtered = teamQuery ? sorted.filter((match) => matchHasTeam(match, teamQuery)) : sorted;
+  const rows = filtered.map((match, index) => {
     const group = levelLabel(match.comp_level ?? "qm");
-    const previous = index > 0 ? levelLabel(sorted[index - 1].comp_level ?? "qm") : "";
+    const previous = index > 0 ? levelLabel(filtered[index - 1].comp_level ?? "qm") : "";
     return { match, group, showGroup: group !== previous };
   });
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <label className="relative w-full sm:w-72">
+          <span className="sr-only">查找队伍</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
+          <Input
+            value={teamQuery}
+            onChange={(event) => setTeamQuery(event.target.value.replace(/\D/g, ""))}
+            inputMode="numeric"
+            placeholder="输入队号查找比赛"
+            className="h-10 pl-9"
+          />
+        </label>
+      </div>
+      {teamQuery && !rows.length ? <Card className="p-8 text-center text-ink-dim">没有找到 Team {teamQuery} 参加的比赛。</Card> : null}
       {rows.map(({ match, group, showGroup }) => (
         <div key={matchIdentity(match)}>
           {showGroup ? <h3 className="mb-2 section-label">{group}</h3> : null}
-          <MatchCard match={match} matches={matches} teamData={teamData} onSelect={() => onSelectMatch(match)} />
+          <MatchCard match={match} matches={matches} teamData={teamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
         </div>
       ))}
     </div>
@@ -181,11 +199,13 @@ function MatchCard({
   match,
   matches,
   teamData,
+  highlightTeam,
   onSelect,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
   teamData: TeamData;
+  highlightTeam: string;
   onSelect: () => void;
 }) {
   const redTeams = matchTeams(match, "red");
@@ -223,6 +243,7 @@ function MatchCard({
           actualScore={score.actualRed}
           predictedScore={score.predictedRed}
           teams={redTeams}
+          highlightTeam={highlightTeam}
         />
         <div className="grid justify-items-center gap-1 text-xs text-ink-faint">
           <span className="font-semibold uppercase">对阵</span>
@@ -244,6 +265,7 @@ function MatchCard({
           actualScore={score.actualBlue}
           predictedScore={score.predictedBlue}
           teams={blueTeams}
+          highlightTeam={highlightTeam}
         />
       </button>
     </div>
@@ -275,12 +297,14 @@ function AllianceBlock({
   actualScore,
   predictedScore,
   teams,
+  highlightTeam,
 }: {
   color: "red" | "blue";
   winner: boolean;
   actualScore: number | null;
   predictedScore: number | null;
   teams: string[];
+  highlightTeam: string;
 }) {
   const hasActual = actualScore != null;
   const primaryScore = hasActual ? actualScore : predictedScore;
@@ -298,7 +322,14 @@ function AllianceBlock({
       {hasActual && predictedScore != null ? (
         <div className="mt-0.5 text-[11px] font-medium text-ink-faint">预测 {Math.round(predictedScore)}</div>
       ) : null}
-      <div className="mt-1 text-xs leading-5 text-ink-dim">{teams.length ? teams.join(" · ") : "待定"}</div>
+      <div className="mt-1 text-xs leading-5 text-ink-dim">
+        {teams.length ? teams.map((team, index) => (
+          <span key={team}>
+            {index ? " · " : ""}
+            <span className={cn(team === highlightTeam && "rounded bg-brand px-1 py-0.5 font-bold text-brand-fg")}>{team}</span>
+          </span>
+        )) : "待定"}
+      </div>
     </div>
   );
 }

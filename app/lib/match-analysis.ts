@@ -164,6 +164,11 @@ export function matchTeams(match: CombinedMatch, color: "red" | "blue"): string[
   return teamNumbers(values);
 }
 
+export function matchHasTeam(match: CombinedMatch, team: string) {
+  const target = team.trim().replace(/^frc/i, "");
+  return Boolean(target) && [...matchTeams(match, "red"), ...matchTeams(match, "blue")].includes(target);
+}
+
 export function teamNumbers(values: Array<string | number> | undefined) {
   return (values ?? []).map((team) => String(team).replace(/^frc/, ""));
 }

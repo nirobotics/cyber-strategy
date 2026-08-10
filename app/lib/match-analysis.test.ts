@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTeamEventMap,
   enrichScheduledMatches,
+  matchHasTeam,
   matchTeams,
   mergeMatchResults,
   resolveMatchScores,
@@ -254,6 +255,9 @@ describe("match analysis calculations", () => {
       result: { source: "frc-events", alliances: { red: { score: 100 }, blue: { score: 90 } } },
     });
     expect(matchTeams(matches[0], "red")).toEqual(["1", "2", "3"]);
+    expect(matchHasTeam(matches[0], "2")).toBe(true);
+    expect(matchHasTeam(matches[0], "frc5")).toBe(true);
+    expect(matchHasTeam(matches[0], "9")).toBe(false);
   });
 });
 
