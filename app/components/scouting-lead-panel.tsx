@@ -575,24 +575,16 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
             <th className="px-3 py-2 text-right">蓝方预测</th>
             <th className="px-3 py-2 text-right">平均信心</th>
             <th className="px-3 py-2 text-right">实际胜方</th>
-            <th className="px-3 py-2 text-right">状态</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {matches.map((match) => (
             <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
               <td className="px-3 py-2 font-semibold text-ink">{scoutMatchLabel(match)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-danger">{match.redPredictions}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-info">{match.bluePredictions}</td>
+              <td className={cn("px-3 py-2 text-right tabular-nums text-danger", match.actualWinner === "red" && "font-bold")}>{match.redPredictions}</td>
+              <td className={cn("px-3 py-2 text-right tabular-nums text-info", match.actualWinner === "blue" && "font-bold")}>{match.bluePredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
               <td className="px-3 py-2 text-right text-ink-dim">{winnerLabel(match.actualWinner)}</td>
-              <td className="px-3 py-2">
-                <div className="flex justify-end gap-1">
-                  {match.hasDisagreement ? <SmallBadge tone="warn">分歧</SmallBadge> : null}
-                  {match.isLowConfidence ? <SmallBadge tone="danger">低信心</SmallBadge> : null}
-                  {!match.hasDisagreement && !match.isLowConfidence ? <SmallBadge>正常</SmallBadge> : null}
-                </div>
-              </td>
             </tr>
           ))}
         </tbody>
