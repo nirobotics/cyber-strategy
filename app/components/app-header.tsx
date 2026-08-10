@@ -32,7 +32,7 @@ export function AppHeader({
         <div className="relative flex min-w-0 items-center gap-3">
           <NavLink
             to="/"
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)] md:flex-none md:basis-80"
+            className="flex min-w-0 shrink-0 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)] md:basis-64 xl:basis-80"
           >
             <div className="grid size-10 shrink-0 place-items-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
               <Icon className="size-5" aria-hidden />
@@ -42,6 +42,7 @@ export function AppHeader({
               <p className="hidden truncate text-xs text-[var(--muted)] sm:block">{appSubtitle}</p>
             </div>
           </NavLink>
+          <div id="app-header-navigation" className="min-w-0 flex-1" />
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden w-[min(38vw,34rem)] -translate-x-1/2 -translate-y-1/2 text-center md:block">
             {centerTitle ? <p className="truncate text-base font-semibold">{centerTitle}</p> : null}
           </div>
@@ -63,7 +64,6 @@ export function AppHeader({
             <UserStatus user={user} loading={authLoading} allowGuest={allowGuest} onLogin={onLogin} />
           </div>
         </div>
-        <div id="app-header-navigation" className="min-w-0" />
         {centerTitle ? (
           <div className="min-w-0 text-center md:hidden">
             <p className="truncate text-sm font-semibold">{centerTitle}</p>

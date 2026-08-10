@@ -518,8 +518,8 @@ export function TeamDetail({
         <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} />
         <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} />
         <Stat label="可靠性" value={`${reliability(team)}%`} />
-        <Stat label="标准差" value={`±${team.stdDev}`} sub="稳定性" />
-        <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} sub="最低 / 最高" />
+        <Stat label="标准差" value={`±${team.stdDev}`} />
+        <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} />
         <Stat label="Drive score" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
         <Stat label="Defence score" value={defenceScore(team)} sub={<RatingDots value={defenceScore(team)} />} />
       </div>
