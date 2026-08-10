@@ -13,7 +13,7 @@ import { fetchFrcMatchResults } from "./frc-events.server";
 import { buildScoutConfidenceReport, emptyScoutConfidenceReport, type ScoutConfidenceReport } from "./scout-confidence";
 import type { DatasetSourceStatus, ScoutingDataset, ScoutingEventOption } from "./scouting";
 import { getDataRange } from "./settings.server";
-import { matchLabel, mergeMatchResults, toCyberScoutMatches, type CombinedMatch, type MatchResult } from "./match-analysis";
+import { matchLabel, mergeMatchResults, toCyberScoutMatches, toTbaMatchResults, type CombinedMatch, type MatchResult } from "./match-analysis";
 import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
 
@@ -368,7 +368,10 @@ export async function loadScoutConfidenceReport(
     }
     const confidenceRecords = records.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
     const visibleLeadRecords = leadRecords.filter((record) => includedTypes.has(confidenceRecordMatchType(record)));
-    const confidenceResults = mergeMatchResults(officialResults, buildSuperScoutMatchResults(confidenceRecords)).filter((match) => {
+    const confidenceResults = mergeMatchResults(
+      mergeMatchResults(officialResults, buildSuperScoutMatchResults(confidenceRecords)),
+      toTbaMatchResults(opts.tbaMatches ?? scheduleMatches),
+    ).filter((match) => {
       const type = matchTypeFromTbaCompLevel(match.comp_level);
       return type ? includedTypes.has(type) : false;
     });

@@ -2,8 +2,22 @@ import { describe, expect, it } from "vitest";
 import { buildScoutConfidenceReport } from "./scout-confidence";
 import type { CyberScoutRecordRow } from "./cyber-scout";
 import { matchTypeFromTbaCompLevel } from "./data-range";
+import { toTbaMatchResults } from "./match-analysis";
 
 describe("scout confidence scoring", () => {
+  it("validates qualification predictions with completed TBA schedule scores", () => {
+    const report = buildScoutConfidenceReport({
+      records: [normal("tba-result", "Ada", 1, 8214, "red", 5)],
+      matchResults: toTbaMatchResults([{
+        comp_level: "qm",
+        match_number: 1,
+        alliances: { red: { score: 123 }, blue: { score: 98 } },
+      }]),
+    });
+
+    expect(report.summary).toMatchObject({ scoredRecords: 1, pendingRecords: 0, totalNetScore: 5 });
+  });
+
   it("adds confidence for correct predictions and subtracts it for wrong predictions", () => {
     const report = buildScoutConfidenceReport({
       records: [

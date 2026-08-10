@@ -24,15 +24,15 @@ export function headers() {
 }
 
 export async function loader() {
-  const [source, scoutingLead, results] = await Promise.all([
+  const [source, results] = await Promise.all([
     loadCyberScoutDataset(DEMO_EVENT_KEY),
-    loadScoutConfidenceReport(DEMO_EVENT_KEY),
     fetchMatchResults(DEMO_EVENT_KEY),
   ]);
 
   if (!source.dataset) return { demo: null, error: "Demo 数据源暂不可用。" };
 
   try {
+    const scoutingLead = await loadScoutConfidenceReport(DEMO_EVENT_KEY, { tbaMatches: source.matches });
     const matches = enrichScheduledMatches(source.matches, [], mergeMatchResults(results, toTbaMatchResults(source.matches)));
     return {
       demo: buildDemoData(source.dataset, matches, scoutingLead),
