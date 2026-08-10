@@ -45,8 +45,8 @@ export function AppHeader({
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden w-[min(38vw,34rem)] -translate-x-1/2 -translate-y-1/2 text-center md:block">
             {centerTitle ? <p className="truncate text-base font-semibold">{centerTitle}</p> : null}
           </div>
-          <div className="min-w-0 flex-1 overflow-x-auto">
-            <div className="mx-auto flex w-max min-w-full items-center justify-center gap-2">
+          <div className="flex h-10 min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="mx-auto flex h-full w-max min-w-full items-center justify-center gap-2">
               <div id="app-header-navigation" className="shrink-0" />
               {demoHref ? (
                 <NavLink
