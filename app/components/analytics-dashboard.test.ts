@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
-import type { ScoutingMatch } from "../lib/scouting";
+import { averageRadarMetrics, compareRangeConfig, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
+import type { ScoutingMatch, TeamSummary } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
   it("distinguishes match types only when multiple types are selected", () => {
@@ -55,5 +55,18 @@ describe("analytics dashboard UI helpers", () => {
     expect(relativeScoreVariation(10, 100, 20)).toBe(0.1);
     expect(relativeScoreVariation(10, 5, 20)).toBe(0.5);
     expect(relativeScoreVariation(0, 0, 0)).toBe(0);
+  });
+
+  it("uses a directly selectable floating bar for each score range", () => {
+    const team = { team: "1036", minPts: 40, avgTotal: 75, maxPts: 110 } as TeamSummary;
+    const config = compareRangeConfig([team], {
+      muted: "#aaa",
+      grid: "#333",
+      panel: "#111",
+      colors: ["#8b5cf6"],
+    });
+
+    expect(config.data.datasets[0].data).toEqual([[40, 110]]);
+    expect(config.options?.interaction).toMatchObject({ mode: "index", axis: "x", intersect: false });
   });
 });

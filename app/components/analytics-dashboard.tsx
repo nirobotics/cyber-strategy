@@ -239,7 +239,8 @@ export function AnalyticsDashboard({
 
   return (
     <div
-      className={cn("flex w-full flex-col", activeTab === "proposal" && "xl:h-full xl:min-h-0")}
+      className={cn("flex w-full flex-col", activeTab === "browser" && "lg:h-full lg:min-h-0", (activeTab === "proposal" || activeTab === "lead") && "xl:h-full xl:min-h-0")}
+      data-fixed-browser={activeTab === "browser" ? "" : undefined}
       data-fixed-desktop={activeTab === "proposal" ? "" : undefined}
     >
       {headerNavTarget ? createPortal(
@@ -272,7 +273,7 @@ export function AnalyticsDashboard({
           </nav>
       , headerNavTarget) : null}
 
-      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "proposal" && "xl:min-h-0 xl:flex-1")}>
+      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "browser" && "lg:min-h-0 lg:flex-1", (activeTab === "proposal" || activeTab === "lead") && "xl:min-h-0 xl:flex-1")}>
       <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
@@ -281,8 +282,8 @@ export function AnalyticsDashboard({
       ) : null}
 
       {teams.length && activeTab === "browser" && selected ? (
-        <div className="grid min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <Card className="overflow-hidden p-0 lg:sticky lg:top-[4.75rem] lg:flex lg:h-[calc(100dvh-6.25rem)] lg:flex-col">
+        <div className="grid min-h-0 gap-3 lg:flex-1 lg:grid-cols-[340px_minmax(0,1fr)]">
+          <Card className="overflow-hidden p-0 lg:flex lg:min-h-0 lg:flex-col">
             <div className="flex shrink-0 items-center gap-2 border-b border-line p-3">
               <Search className="size-4 text-ink-faint" />
               <Input
@@ -339,18 +340,20 @@ export function AnalyticsDashboard({
             </div>
           </Card>
 
-          <TeamDetail
-            team={selected}
-            tier={tierByTeam.get(selected.team)}
-            photos={photos}
-            pitInfo={dataset.teamPitData?.[selected.team]}
-            displayMatches={selectedOriginal?.matches ?? selected.matches}
-            ignoredMatchKeys={ignoredMatchSet}
-            onToggleIgnoreMatch={toggleIgnoredMatch}
-            onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
-            hideComments={demoMode}
-            showMatchTypes={showMatchTypes}
-          />
+          <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+            <TeamDetail
+              team={selected}
+              tier={tierByTeam.get(selected.team)}
+              photos={photos}
+              pitInfo={dataset.teamPitData?.[selected.team]}
+              displayMatches={selectedOriginal?.matches ?? selected.matches}
+              ignoredMatchKeys={ignoredMatchSet}
+              onToggleIgnoreMatch={toggleIgnoredMatch}
+              onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
+              hideComments={demoMode}
+              showMatchTypes={showMatchTypes}
+            />
+          </div>
         </div>
       ) : null}
 
@@ -392,7 +395,7 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
       {visitedTabs.has("lead") ? (
-        <div hidden={activeTab !== "lead"}>
+        <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "lead"}>
           {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
         </div>
       ) : null}
@@ -1810,23 +1813,42 @@ function compareRadarConfig(teams: TeamSummary[], teamMetrics: number[][], regio
   } as ChartConfiguration;
 }
 
-function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLike): ChartConfiguration {
-  const avgPlugin = {
-    id: "avgLines",
-    afterDatasetsDraw(chart: { ctx: CanvasRenderingContext2D; scales: { x: { getPixelForValue: (value: number) => number; width: number }; y: { getPixelForValue: (value: number) => number } } }) {
-      const { ctx, scales } = chart;
+export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLike): ChartConfiguration {
+  const rangeLabelsPlugin = {
+    id: "rangeLabels",
+    afterDatasetsDraw(chart: {
+      ctx: CanvasRenderingContext2D;
+      getDatasetMeta: (index: number) => { data: Array<{ x: number; width: number }> };
+      scales: { y: { getPixelForValue: (value: number) => number } };
+    }) {
+      const { ctx } = chart;
       teams.forEach((team, index) => {
-        const x = scales.x.getPixelForValue(index);
-        const y = scales.y.getPixelForValue(team.avgTotal);
-        const halfWidth = scales.x.width / Math.max(teams.length, 1) * 0.15;
+        const bar = chart.getDatasetMeta(0).data[index];
+        if (!bar) return;
+        const top = chart.scales.y.getPixelForValue(team.maxPts);
+        const bottom = chart.scales.y.getPixelForValue(team.minPts);
+        const average = chart.scales.y.getPixelForValue(team.avgTotal);
+        const range = team.maxPts - team.minPts;
+
         ctx.save();
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = palette.muted;
+        ctx.fillText(String(team.maxPts), bar.x, top - 7);
+        ctx.fillText(String(team.minPts), bar.x, bottom + 14);
+
         ctx.strokeStyle = palette.colors[index];
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 2]);
         ctx.beginPath();
-        ctx.moveTo(x - halfWidth, y);
-        ctx.lineTo(x + halfWidth, y);
+        ctx.moveTo(bar.x - bar.width * 0.38, average);
+        ctx.lineTo(bar.x + bar.width * 0.38, average);
         ctx.stroke();
+
+        ctx.setLineDash([]);
+        ctx.fillStyle = palette.colors[index];
+        ctx.fillText(`平均 ${team.avgTotal}`, bar.x, average - 5);
+        ctx.fillText(`范围 ${range}`, bar.x, top + (bottom - top) * 0.68);
         ctx.restore();
       });
     },
@@ -1837,18 +1859,38 @@ function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLike): Ch
     data: {
       labels: teams.map((team) => `Team ${team.team}`),
       datasets: [
-        { label: "最低", data: teams.map((team) => team.minPts), backgroundColor: "transparent", borderColor: "transparent", stack: "range" },
-        { label: "范围", data: teams.map((team) => team.maxPts - team.minPts), backgroundColor: teams.map((_, index) => `${palette.colors[index]}44`), borderColor: teams.map((_, index) => palette.colors[index]), borderWidth: 1, stack: "range" },
+        {
+          label: "综合分范围",
+          data: teams.map((team) => [team.minPts, team.maxPts]),
+          backgroundColor: teams.map((_, index) => `${palette.colors[index]}44`),
+          borderColor: teams.map((_, index) => palette.colors[index]),
+          borderWidth: 1,
+          borderRadius: 4,
+          barPercentage: 0.72,
+        },
       ],
     },
-    plugins: [avgPlugin],
+    plugins: [rangeLabelsPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: tooltipOptions(palette) },
+      interaction: { mode: "index", axis: "x", intersect: false },
+      layout: { padding: { top: 18, bottom: 18 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...tooltipOptions(palette),
+          callbacks: {
+            label: (context: { dataIndex: number }) => {
+              const team = teams[context.dataIndex];
+              return [`最高 ${team.maxPts}`, `平均 ${team.avgTotal}`, `最低 ${team.minPts}`, `范围 ${team.maxPts - team.minPts}`];
+            },
+          },
+        },
+      },
       scales: {
-        x: { stacked: true, ticks: { color: palette.muted }, grid: { color: palette.grid } },
-        y: { stacked: true, ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
+        x: { ticks: { color: palette.muted }, grid: { color: palette.grid } },
+        y: { ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
       },
     },
   } as unknown as ChartConfiguration;
