@@ -12,6 +12,7 @@ import {
   strategyScoreSd,
   strategyWinProbability,
   toCyberScoutMatches,
+  toTbaMatchResults,
   type CombinedMatch,
 } from "./match-analysis";
 import type { TeamData, TeamSummary } from "./scouting";
@@ -168,6 +169,21 @@ describe("match analysis calculations", () => {
     const fallback = result("super-scout", 500, 400);
 
     expect(mergeMatchResults([official], [fallback])).toEqual([official]);
+  });
+
+  it("uses completed TBA schedule scores as match results", () => {
+    expect(toTbaMatchResults([
+      schedule(["1", "2", "3"], ["4", "5", "6"], {
+        comp_level: "qm",
+        match_number: 1,
+        alliances: { red: { score: 123 }, blue: { score: 98 } },
+      }),
+      schedule(["1", "2", "3"], ["4", "5", "6"], {
+        comp_level: "qm",
+        match_number: 2,
+        alliances: { red: { score: -1 }, blue: { score: -1 } },
+      }),
+    ])).toEqual([{ ...result("tba", 123, 98), winning_alliance: "red" }]);
   });
 
   it("falls back to EPA for a team without Strategy data", () => {
@@ -333,7 +349,7 @@ function cyberScoutMatch(id: string, matchType: string, matchNumber: number, tea
   };
 }
 
-function result(source: "frc-events" | "super-scout", red: number, blue: number) {
+function result(source: "frc-events" | "tba" | "super-scout", red: number, blue: number) {
   return {
     source,
     comp_level: "qm",

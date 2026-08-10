@@ -197,13 +197,13 @@ export function StrategyProposalPanel({
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1500px] gap-3">
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 xl:h-full xl:min-h-0">
       {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
       {data.proposalError ? <Card className="border-warn/40 bg-warn/10 p-3 text-sm text-warn">{data.proposalError}</Card> : null}
 
-      <div className="grid gap-3 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <Card className="overflow-hidden p-0">
-          <div className="grid gap-2 border-b border-line p-3">
+      <div className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[360px_minmax(0,1fr)]">
+        <Card className="overflow-hidden p-0 xl:flex xl:min-h-0 xl:flex-col">
+          <div className="grid shrink-0 gap-2 border-b border-line p-3">
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StrategyProposalStatus | "all")} className="input h-9 font-sans">
               <option value="all">所有状态</option>
               {proposalStatuses.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
@@ -229,7 +229,7 @@ export function StrategyProposalPanel({
               </Button>
             </div>
           </div>
-          <div className="max-h-[72dvh] overflow-y-auto">
+          <div className="max-h-[72dvh] overflow-y-auto xl:max-h-none xl:min-h-0 xl:flex-1">
             {!filteredProposals.length ? (
               <div className="p-6 text-center text-sm text-ink-dim">暂无比赛策略。</div>
             ) : (
@@ -255,8 +255,8 @@ export function StrategyProposalPanel({
           </div>
         </Card>
 
-        <Card className="overflow-hidden p-0">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+        <Card className="overflow-hidden p-0 xl:flex xl:min-h-0 xl:flex-col">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line p-3">
             <div>
               <h2 className="text-lg font-semibold text-ink">{selected ? "编辑比赛策略" : "新建比赛策略"}</h2>
             </div>
@@ -274,7 +274,7 @@ export function StrategyProposalPanel({
           <proposalFetcher.Form
             method="post"
             action="/strategy-proposal"
-            className="grid gap-4 p-3 md:p-4"
+            className="grid gap-4 p-3 md:p-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto"
             onSubmit={demoMode ? (event) => event.preventDefault() : undefined}
           >
             <input type="hidden" name="id" value={editor.id ?? ""} />

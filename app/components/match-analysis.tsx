@@ -566,6 +566,7 @@ function predictedLabel(red: number | null, blue: number | null) {
 
 function scoreBadgeClass(source: string) {
   if (source === "frc-events") return "bg-ok/10 text-ok";
+  if (source === "tba") return "bg-ok/10 text-ok";
   if (source === "super-scout") return "bg-brand/10 text-brand";
   if (source === "strategy") return "bg-warn/10 text-warn";
   if (source === "statbotics") return "bg-info/10 text-info";
@@ -573,7 +574,7 @@ function scoreBadgeClass(source: string) {
 }
 
 function isActualScoreSource(source: string) {
-  return source === "frc-events" || source === "super-scout";
+  return source === "frc-events" || source === "tba" || source === "super-scout";
 }
 
 function toneClass(tone: "brand" | "info" | "muted" | "ok" | "warn") {

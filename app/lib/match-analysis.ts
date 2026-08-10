@@ -40,7 +40,7 @@ export type TbaMatch = {
 };
 
 export type MatchResult = {
-  source: "frc-events" | "super-scout";
+  source: "frc-events" | "tba" | "super-scout";
   comp_level: string;
   match_number: number;
   set_number?: number;
@@ -141,6 +141,22 @@ export function mergeMatchResults(primary: MatchResult[], fallback: MatchResult[
   return [...results.values()];
 }
 
+export function toTbaMatchResults(matches: CombinedMatch[]): MatchResult[] {
+  return matches.flatMap((match) => {
+    const red = nonNegativeOrNull(match.alliances?.red?.score);
+    const blue = nonNegativeOrNull(match.alliances?.blue?.score);
+    if (red == null || blue == null || !match.comp_level || !match.match_number) return [];
+    return [{
+      source: "tba" as const,
+      comp_level: match.comp_level,
+      match_number: match.match_number,
+      ...(match.set_number == null ? {} : { set_number: match.set_number }),
+      winning_alliance: red > blue ? "red" as const : blue > red ? "blue" as const : "tie" as const,
+      alliances: { red: { score: red }, blue: { score: blue } },
+    }];
+  });
+}
+
 export function sortedMatches(matches: CombinedMatch[]): CombinedMatch[] {
   const levelOrder: Record<string, number> = { practice: -1, qm: 0, ef: 1, qf: 2, sf: 3, f: 4 };
   return [...matches].sort((a, b) => {
@@ -219,7 +235,9 @@ export function resolveMatchScores({
       source: actual.source,
       label: actual.source === "frc-events"
         ? "FRC Events 结果"
-        : actual.red != null && actual.blue != null ? "Super Scout 结果" : "Super Scout 部分结果",
+        : actual.source === "tba"
+          ? "TBA 结果"
+          : actual.red != null && actual.blue != null ? "Super Scout 结果" : "Super Scout 部分结果",
       winner: actual.winner,
     };
   }

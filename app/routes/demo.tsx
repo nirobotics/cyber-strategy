@@ -7,7 +7,7 @@ import { Card } from "../components/ui";
 import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
 import { startFeishuLogin } from "../lib/feishu";
-import { enrichScheduledMatches } from "../lib/match-analysis";
+import { enrichScheduledMatches, mergeMatchResults, toTbaMatchResults } from "../lib/match-analysis";
 import { fetchMatchResults } from "../lib/match-results.server";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import { DEFAULT_TIER_PERCENTAGES } from "../lib/tier-settings";
@@ -33,8 +33,9 @@ export async function loader() {
   if (!source.dataset) return { demo: null, error: "Demo 数据源暂不可用。" };
 
   try {
+    const matches = enrichScheduledMatches(source.matches, [], mergeMatchResults(results, toTbaMatchResults(source.matches)));
     return {
-      demo: buildDemoData(source.dataset, enrichScheduledMatches(source.matches, [], results), scoutingLead),
+      demo: buildDemoData(source.dataset, matches, scoutingLead),
       error: null,
     };
   } catch (error) {
@@ -49,7 +50,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.90"
+      version="1.0.93"
       user={null}
       authLoading={false}
       allowGuest

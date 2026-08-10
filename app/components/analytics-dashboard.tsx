@@ -238,7 +238,10 @@ export function AnalyticsDashboard({
   }
 
   return (
-    <div className="flex w-full flex-col">
+    <div
+      className={cn("flex w-full flex-col", activeTab === "proposal" && "xl:h-full xl:min-h-0")}
+      data-fixed-desktop={activeTab === "proposal" ? "" : undefined}
+    >
       {headerNavTarget ? createPortal(
           <nav aria-label="功能选择" className="flex items-center gap-2">
             <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
@@ -269,7 +272,7 @@ export function AnalyticsDashboard({
           </nav>
       , headerNavTarget) : null}
 
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "proposal" && "xl:min-h-0 xl:flex-1")}>
       <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
@@ -279,8 +282,8 @@ export function AnalyticsDashboard({
 
       {teams.length && activeTab === "browser" && selected ? (
         <div className="grid min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <Card className="overflow-hidden p-0 lg:sticky lg:top-3 lg:max-h-[calc(100dvh-13rem)]">
-            <div className="flex items-center gap-2 border-b border-line p-3">
+          <Card className="overflow-hidden p-0 lg:sticky lg:top-[4.75rem] lg:flex lg:h-[calc(100dvh-6.25rem)] lg:flex-col">
+            <div className="flex shrink-0 items-center gap-2 border-b border-line p-3">
               <Search className="size-4 text-ink-faint" />
               <Input
                 value={search}
@@ -290,7 +293,7 @@ export function AnalyticsDashboard({
                 className="h-9"
               />
             </div>
-            <div className="max-h-[460px] overflow-y-auto lg:max-h-[calc(100dvh-18rem)]">
+            <div className="max-h-[460px] overflow-y-auto lg:min-h-0 lg:max-h-none lg:flex-1">
               {visibleTeams.map((team) => (
                 <button
                   key={team.team}
@@ -370,7 +373,7 @@ export function AnalyticsDashboard({
         />
       ) : null}
       {visitedTabs.has("proposal") ? (
-        <div hidden={activeTab !== "proposal"}>
+        <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "proposal"}>
           {resolvedStrategyProposal ? (
             <StrategyProposalPanel
               data={{
@@ -520,8 +523,8 @@ export function TeamDetail({
         <Stat label="可靠性" value={`${reliability(team)}%`} />
         <Stat label="标准差" value={`±${team.stdDev}`} />
         <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} />
-        <Stat label="Drive score" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
-        <Stat label="Defence score" value={defenceScore(team)} sub={<RatingDots value={defenceScore(team)} />} />
+        <Stat label="Drive score" value={team.avgDriver} />
+        <Stat label="Defence score" value={defenceScore(team)} />
       </div>
 
       {photos.length ? (
@@ -1473,21 +1476,6 @@ function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: Re
       {sub ? <div className="mt-1 text-xs text-ink-dim">{sub}</div> : null}
     </Card>
   );
-}
-
-function RatingDots({ value }: { value: number }) {
-  const rounded = Math.round(value);
-  return (
-    <span className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((dot) => (
-        <span key={dot} className={ratingDotClassName(dot <= rounded)} />
-      ))}
-    </span>
-  );
-}
-
-export function ratingDotClassName(active: boolean) {
-  return cn("size-1.5 rounded-full", active ? "bg-brand" : "bg-line");
 }
 
 function defenceScore(team: TeamSummary) {

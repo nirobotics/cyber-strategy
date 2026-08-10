@@ -1,15 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, ratingDotClassName, relativeScoreVariation } from "./analytics-dashboard";
+import { averageRadarMetrics, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
 import type { ScoutingMatch } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
-  it("uses exactly one background class for rating dots", () => {
-    expect(ratingDotClassName(true)).toContain("bg-brand");
-    expect(ratingDotClassName(true)).not.toContain("bg-line");
-    expect(ratingDotClassName(false)).toContain("bg-line");
-    expect(ratingDotClassName(false)).not.toContain("bg-brand");
-  });
-
   it("distinguishes match types only when multiple types are selected", () => {
     expect(matchDisplayLabel({ match: 9, matchType: "practice" }, true)).toBe("P9");
     expect(matchDisplayLabel({ match: 6, matchType: "qualification" }, true)).toBe("Q6");

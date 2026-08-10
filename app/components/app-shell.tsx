@@ -17,7 +17,6 @@ export function AppShell({
   children,
   Icon,
   demoHref,
-  fixedDesktop = false,
 }: {
   appName: string;
   appSubtitle: string;
@@ -31,15 +30,9 @@ export function AppShell({
   children: ReactNode;
   Icon?: LucideIcon;
   demoHref?: string;
-  fixedDesktop?: boolean;
 }) {
   return (
-    <div
-      className={[
-        "flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)]",
-        fixedDesktop ? "md:h-dvh md:overflow-hidden" : "",
-      ].join(" ")}
-    >
+    <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)] has-[[data-fixed-desktop]]:xl:h-dvh has-[[data-fixed-desktop]]:xl:overflow-hidden">
       <TopProgressBar active={busy} />
       <AppHeader
         appName={appName}
@@ -52,7 +45,7 @@ export function AppShell({
         Icon={Icon}
         demoHref={demoHref}
       />
-      <main className={fixedDesktop ? "flex-1 p-2.5 md:min-h-0 md:overflow-hidden" : "flex-1 p-2.5"}>
+      <main className="flex-1 p-2.5 has-[[data-fixed-desktop]]:xl:min-h-0 has-[[data-fixed-desktop]]:xl:overflow-hidden">
         {children}
       </main>
       <AppFooter version={version} />
