@@ -32,7 +32,7 @@ export function AppHeader({
         <div className="relative flex min-w-0 items-center gap-3">
           <NavLink
             to="/"
-            className="flex min-w-0 shrink-0 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)] md:basis-64 xl:basis-80"
+            className="flex w-fit shrink-0 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
           >
             <div className="grid size-10 shrink-0 place-items-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
               <Icon className="size-5" aria-hidden />
