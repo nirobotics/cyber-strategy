@@ -233,27 +233,29 @@ export function StrategyBoard({
     <div className="grid gap-3">
       <Card className="overflow-hidden p-0">
         <div className="grid gap-3 border-b border-line p-3">
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" onClick={undo} disabled={disabled || !undoCounts[phase]}>
-              <Undo2 className="size-4" />撤销
-            </Button>
-            <Button type="button" onClick={clearStrokes} disabled={disabled || !phaseDraft.strokes.length}>
-              <Trash2 className="size-4" />清空笔迹
-            </Button>
-            <Button type="button" onClick={resetRobots} disabled={disabled}>
-              <RotateCw className="size-4" />重置机器人
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2" aria-label="比赛阶段">
-            {strategyBoardPhases.map((item) => (
-              <Button key={item} type="button" variant={phase === item ? "active" : "default"} onClick={() => {
-                setSelectedTeam(null);
-                setDraftStroke([]);
-                setPhase(item);
-              }}>
-                {phaseLabel(item)}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2" aria-label="比赛阶段">
+              {strategyBoardPhases.map((item) => (
+                <Button key={item} type="button" variant={phase === item ? "active" : "default"} onClick={() => {
+                  setSelectedTeam(null);
+                  setDraftStroke([]);
+                  setPhase(item);
+                }}>
+                  {phaseLabel(item)}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" onClick={undo} disabled={disabled || !undoCounts[phase]}>
+                <Undo2 className="size-4" />撤销
               </Button>
-            ))}
+              <Button type="button" onClick={clearStrokes} disabled={disabled || !phaseDraft.strokes.length}>
+                <Trash2 className="size-4" />清空笔迹
+              </Button>
+              <Button type="button" onClick={resetRobots} disabled={disabled}>
+                <RotateCw className="size-4" />重置机器人
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button type="button" variant={tool === "pen" ? "active" : "default"} onClick={() => setTool("pen")} disabled={disabled}>

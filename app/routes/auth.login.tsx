@@ -61,7 +61,7 @@ export default function LoginPage() {
           {demoLoading ? "Demo 加载中…" : "进入 Demo"}
         </Link>
       </main>
-      <AppFooter version="1.0.81" />
+      <AppFooter version="1.0.82" />
     </>
   );
 }
