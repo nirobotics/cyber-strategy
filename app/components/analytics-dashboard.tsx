@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { ChartConfiguration } from "chart.js";
 import {
   BarChart3,
@@ -106,6 +107,7 @@ export function AnalyticsDashboard({
   const [ignoredMatches, setIgnoredMatches] = useStoredList(`cyber-strategy:ignored-matches:${dataset.id}`);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
+  const [headerNavTarget, setHeaderNavTarget] = useState<HTMLElement | null>(null);
   const matchScheduleFetcher = useFetcher<MatchScheduleResource>();
   const strategyProposalFetcher = useFetcher<StrategyProposalResource>();
   const scoutingLeadFetcher = useFetcher<ScoutingLeadPanelData>();
@@ -163,7 +165,12 @@ export function AnalyticsDashboard({
   ]);
 
   useEffect(() => {
+    queueMicrotask(() => setHeaderNavTarget(document.getElementById("app-header-navigation")));
+  }, []);
+
+  useEffect(() => {
     if (demoMode) return;
+    if (!isAdmin) return;
     const params = new URLSearchParams(window.location.search);
     const eventFromUrl = params.get("event")?.trim();
     if (eventFromUrl) {
@@ -181,7 +188,7 @@ export function AnalyticsDashboard({
 
     params.set("event", storedEvent);
     navigate(`${routeBase}?${params.toString()}`, { replace: true });
-  }, [demoMode, events, navigate, routeBase]);
+  }, [demoMode, events, isAdmin, navigate, routeBase]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -195,7 +202,7 @@ export function AnalyticsDashboard({
   }, [activeTab, prepareTab]);
 
   function selectEvent(eventKey: string) {
-    if (demoMode) return;
+    if (demoMode || !isAdmin) return;
     const params = new URLSearchParams(window.location.search);
     if (eventKey) {
       storeSelectedEvent(eventKey);
@@ -232,8 +239,7 @@ export function AnalyticsDashboard({
 
   return (
     <div className="flex w-full flex-col">
-      <div className="-mx-2.5 -mt-2.5 border-b border-line bg-surface">
-        <div className="mx-auto grid w-full max-w-[1500px] grid-cols-[minmax(0,1fr)] gap-2 px-3 py-3 sm:px-4">
+      {headerNavTarget ? createPortal(
           <nav aria-label="功能选择" className="flex items-center gap-2 overflow-x-auto">
             <SegmentedTab active={tab} value="browser" onClick={selectTab} icon={<Bot className="size-4" />}>
               队伍浏览
@@ -261,29 +267,9 @@ export function AnalyticsDashboard({
               </SegmentedTab>
             ) : null}
           </nav>
-          <label className="grid w-full max-w-full gap-1 text-sm sm:w-fit">
-            <span className="sr-only">赛事</span>
-            <select
-              value={selectedEventKey ?? dataset.eventKey}
-              onChange={(event) => selectEvent(event.target.value)}
-              className="input h-9 max-w-full font-sans sm:w-fit sm:[field-sizing:content]"
-              disabled={demoMode || !events.length}
-              title="选择 cyber-scout 赛事"
-            >
-              {!events.some((event) => event.eventKey === (selectedEventKey ?? dataset.eventKey)) ? (
-                <option value={selectedEventKey ?? dataset.eventKey}>{selectedEventKey ?? dataset.eventKey}</option>
-              ) : null}
-              {events.map((event) => (
-                <option key={event.eventKey} value={event.eventKey}>
-                  {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
+      , headerNavTarget) : null}
 
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 pt-3">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
       <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
@@ -409,7 +395,14 @@ export function AnalyticsDashboard({
       ) : null}
       {visitedTabs.has("settings") ? (
         <div hidden={activeTab !== "settings"}>
-          <StrategySettingsPanel tierPercentages={tierPercentages} dataRange={demo?.dataRange ?? dataRange} readOnly={demoMode} />
+          <StrategySettingsPanel
+            tierPercentages={tierPercentages}
+            dataRange={demo?.dataRange ?? dataRange}
+            readOnly={demoMode}
+            events={isAdmin ? events : []}
+            selectedEventKey={resolvedEventKey}
+            onSelectEvent={selectEvent}
+          />
         </div>
       ) : null}
 
@@ -518,13 +511,13 @@ export function TeamDetail({
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label="平均综合分" value={team.avgTotal} sub="每场" />
-        <Stat label="自动贡献" value={team.avgAuto} sub="分" />
-        <Stat label="手动贡献" value={team.avgTele} sub="分" />
-        <Stat label="Transfer 球量" value={(team.avgTransferPieces ?? 0) > 0 ? team.avgTransferPieces : "-"} sub="平均" />
-        <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} sub="Scout" />
-        <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} sub="Scout" />
-        <Stat label="可靠性" value={`${reliability(team)}%`} sub="平均可用率" />
+        <Stat label="平均综合分" value={team.avgTotal} />
+        <Stat label="自动贡献" value={team.avgAuto} />
+        <Stat label="手动贡献" value={team.avgTele} />
+        <Stat label="Transfer 球量" value={(team.avgTransferPieces ?? 0) > 0 ? team.avgTransferPieces : "-"} />
+        <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} />
+        <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} />
+        <Stat label="可靠性" value={`${reliability(team)}%`} />
         <Stat label="标准差" value={`±${team.stdDev}`} sub="稳定性" />
         <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} sub="最低 / 最高" />
         <Stat label="Drive score" value={team.avgDriver} sub={<RatingDots value={team.avgDriver} />} />
@@ -1472,12 +1465,12 @@ function TierBadge({ tier, large = false }: { tier?: TierInfo; large?: boolean }
   return <Badge className={cn("shrink-0 whitespace-nowrap", tier.className, large && "px-3 py-1 text-sm")}>{tierDisplayLabel(tier.label)}</Badge>;
 }
 
-function Stat({ label, value, sub }: { label: string; value: ReactNode; sub: ReactNode }) {
+function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
   return (
     <Card className="p-3">
       <p className="text-[11px] font-semibold uppercase text-ink-faint">{label}</p>
       <p className="mt-1 break-words text-xl font-semibold text-ink">{value}</p>
-      <div className="mt-1 text-xs text-ink-dim">{sub}</div>
+      {sub ? <div className="mt-1 text-xs text-ink-dim">{sub}</div> : null}
     </Card>
   );
 }

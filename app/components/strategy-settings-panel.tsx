@@ -6,15 +6,22 @@ import {
   tierDisplayLabel,
   type TierPercentages,
 } from "../lib/tier-settings";
+import type { ScoutingEventOption } from "../lib/scouting";
 
 export function StrategySettingsPanel({
   tierPercentages,
   dataRange,
   readOnly = false,
+  events = [],
+  selectedEventKey,
+  onSelectEvent,
 }: {
   tierPercentages: TierPercentages;
   dataRange: DataRange[];
   readOnly?: boolean;
+  events?: ScoutingEventOption[];
+  selectedEventKey?: string;
+  onSelectEvent?: (eventKey: string) => void;
 }) {
   const fetcher = useFetcher<{ error?: string; ok?: boolean }>();
   const busy = fetcher.state !== "idle";
@@ -24,6 +31,26 @@ export function StrategySettingsPanel({
     <div className="mx-auto grid w-full max-w-5xl gap-3">
       {fetcher.data?.error ? (
         <Card className="border-danger/40 bg-danger/10 p-3 text-danger">{fetcher.data.error}</Card>
+      ) : null}
+
+      {!readOnly && events.length && selectedEventKey && onSelectEvent ? (
+        <Card className="p-4">
+          <label className="grid gap-2 text-sm font-medium text-ink-dim">
+            赛事
+            <select
+              value={selectedEventKey}
+              onChange={(event) => onSelectEvent(event.target.value)}
+              className="input h-10 w-full font-sans"
+            >
+              {!events.some((event) => event.eventKey === selectedEventKey) ? <option value={selectedEventKey}>{selectedEventKey}</option> : null}
+              {events.map((event) => (
+                <option key={event.eventKey} value={event.eventKey}>
+                  {event.name || event.eventKey}{event.isActive ? " · 当前" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </Card>
       ) : null}
 
       <Card className="p-4">

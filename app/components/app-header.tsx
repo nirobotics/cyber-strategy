@@ -63,6 +63,7 @@ export function AppHeader({
             <UserStatus user={user} loading={authLoading} allowGuest={allowGuest} onLogin={onLogin} />
           </div>
         </div>
+        <div id="app-header-navigation" className="min-w-0" />
         {centerTitle ? (
           <div className="min-w-0 text-center md:hidden">
             <p className="truncate text-sm font-semibold">{centerTitle}</p>
