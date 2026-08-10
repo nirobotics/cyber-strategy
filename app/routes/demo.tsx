@@ -7,6 +7,8 @@ import { Card } from "../components/ui";
 import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
 import { startFeishuLogin } from "../lib/feishu";
+import { enrichScheduledMatches } from "../lib/match-analysis";
+import { fetchMatchResults } from "../lib/match-results.server";
 import { toProposalMatches } from "../lib/strategy-proposal-matches";
 import { DEFAULT_TIER_PERCENTAGES } from "../lib/tier-settings";
 
@@ -18,20 +20,21 @@ const DEMO_USER = {
 };
 
 export function headers() {
-  return { "Cache-Control": "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400" };
+  return { "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=60" };
 }
 
 export async function loader() {
-  const [source, scoutingLead] = await Promise.all([
+  const [source, scoutingLead, results] = await Promise.all([
     loadCyberScoutDataset(DEMO_EVENT_KEY),
     loadScoutConfidenceReport(DEMO_EVENT_KEY),
+    fetchMatchResults(DEMO_EVENT_KEY),
   ]);
 
   if (!source.dataset) return { demo: null, error: "Demo 数据源暂不可用。" };
 
   try {
     return {
-      demo: buildDemoData(source.dataset, source.matches, scoutingLead),
+      demo: buildDemoData(source.dataset, enrichScheduledMatches(source.matches, [], results), scoutingLead),
       error: null,
     };
   } catch (error) {
@@ -46,7 +49,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.88"
+      version="1.0.89"
       user={null}
       authLoading={false}
       allowGuest

@@ -30,6 +30,13 @@ describe("Apollo demo data", () => {
         red: { team_keys: ["frc2000", "frc2001", "frc2002"] },
         blue: { team_keys: ["frc2003", "frc2004", "frc2005"] },
       },
+      result: {
+        source: "frc-events",
+        comp_level: "qm",
+        match_number: 1,
+        winning_alliance: "red",
+        alliances: { red: { score: 120 }, blue: { score: 100 } },
+      },
     }];
 
     const demo = buildDemoData(dataset, matches, scoutingLead());
@@ -41,6 +48,7 @@ describe("Apollo demo data", () => {
     expect(demo.dataset.teamPhotos).toEqual({});
     expect(demo.dataset.title).toBe("Event 1");
     expect(demo.matches[0].alliances?.red?.team_keys).toEqual(["frc1000", "frc1001", "frc1002"]);
+    expect(demo.matches[0].result?.alliances.red?.score).toBe(120);
     expect(toProposalMatches(demo.matches, DEMO_OWN_TEAMS)[0].redTeams).toContain("1000");
     expect(demo.scoutingLead.report.people[0].scoutName).toMatch(/^scout \d+$/);
     expect(demo.scoutingLead.leadData.recordSchedule.matches[0].red[0]).toMatchObject({
