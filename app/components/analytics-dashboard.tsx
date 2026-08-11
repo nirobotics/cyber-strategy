@@ -526,8 +526,8 @@ export function TeamDetail({
         <Stat label="可靠性" value={`${reliability(team)}%`} />
         <Stat label="标准差" value={`±${team.stdDev}`} />
         <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} />
-        <Stat label="Drive score" value={team.avgDriver} />
-        <Stat label="Defence score" value={defenceScore(team)} />
+        <Stat label="Drive score" value={`${team.avgDriver} / 5`} />
+        <Stat label="Defence score" value={`${defenceScore(team)} / 5`} />
       </div>
 
       {photos.length ? (
