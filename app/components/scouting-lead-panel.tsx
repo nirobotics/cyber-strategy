@@ -55,8 +55,11 @@ export function ScoutingLeadPanel({
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1500px] gap-3">
-      <div className="flex flex-wrap gap-2 rounded-card border border-line bg-surface p-2">
+    <div
+      className={cn("mx-auto grid w-full max-w-[1500px] gap-3", view === "confidence" && "h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]")}
+      data-fixed-page={view === "confidence" ? "" : undefined}
+    >
+      <div className="flex shrink-0 flex-wrap gap-2 rounded-card border border-line bg-surface p-2">
         {leadViews.map((item) => (
           <Button key={item.id} type="button" variant={view === item.id ? "active" : "default"} onClick={() => selectView(item.id)}>
             {item.icon}
@@ -82,26 +85,28 @@ export function ScoutingLeadPanel({
 
 function ConfidenceView({ report }: { report: ScoutConfidenceReport }) {
   return (
-    <>
+    <div className="flex min-h-0 flex-col gap-3">
       <SummaryGrid report={report} />
 
-      <Card className="overflow-visible p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line p-3">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">净信心分</h2>
+      <div className="grid min-h-0 min-w-0 flex-1 grid-cols-2 gap-3">
+        <Card className="flex min-h-0 min-w-0 flex-col overflow-hidden p-0">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line p-3">
+            <div>
+              <h2 className="text-lg font-semibold text-ink">净信心分</h2>
+            </div>
+            <Badge className="border-line bg-surface-2 text-ink-dim">{report.people.length} 人</Badge>
           </div>
-          <Badge className="border-line bg-surface-2 text-ink-dim">{report.people.length} 人</Badge>
-        </div>
-        <PeopleTable people={report.people} />
-      </Card>
+          <PeopleTable people={report.people} />
+        </Card>
 
-      <Card className="overflow-hidden p-0">
-        <div className="border-b border-line p-3">
-          <h2 className="text-lg font-semibold text-ink">预测分布</h2>
-        </div>
-        <MatchTable matches={report.matches} />
-      </Card>
-    </>
+        <Card className="flex min-h-0 min-w-0 flex-col overflow-hidden p-0">
+          <div className="shrink-0 border-b border-line p-3">
+            <h2 className="text-lg font-semibold text-ink">预测分布</h2>
+          </div>
+          <MatchTable matches={report.matches} />
+        </Card>
+      </div>
+    </div>
   );
 }
 
@@ -523,37 +528,31 @@ function PeopleTable({ people }: { people: ScoutConfidencePerson[] }) {
   if (!people.length) return <EmptyState text="暂无可排序的信心分记录。" />;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-left text-sm">
-        <thead className="bg-surface-2 text-xs uppercase text-ink-faint">
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <table className="w-full table-fixed text-center text-xs">
+        <thead className="sticky top-0 bg-surface-2 text-xs uppercase text-ink-faint">
           <tr>
-            <th className="px-3 py-2">#</th>
-            <th className="px-3 py-2">Scout</th>
-            <th className="px-3 py-2 text-right">净信心分</th>
-            <th className="px-3 py-2 text-right">正确加分</th>
-            <th className="px-3 py-2 text-right">错误扣分</th>
-            <th className="px-3 py-2 text-right">已计分</th>
-            <th className="px-3 py-2 text-right">待验证</th>
-            <th className="px-3 py-2 text-right">未完成</th>
-            <th className="px-3 py-2 text-right">准确率</th>
-            <th className="px-3 py-2 text-right">平均净分</th>
+            <th className="w-8 px-2 py-2">#</th>
+            <th className="w-20 px-2 py-2">Scout</th>
+            <th className="px-2 py-2">净信心分</th>
+            <th className="px-2 py-2">错误扣分</th>
+            <th className="px-2 py-2">已计分</th>
+            <th className="px-2 py-2">准确率</th>
+            <th className="px-2 py-2">平均净分</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {people.map((person, index) => (
             <tr key={person.scoutName} className="hover:bg-surface-2/70">
-              <td className="px-3 py-2 text-ink-faint">{index + 1}</td>
-              <td className="px-3 py-2 font-semibold text-ink">{person.scoutName}</td>
-              <td className={cn("px-3 py-2 text-right font-semibold tabular-nums", person.netScore >= 0 ? "text-ok" : "text-danger")}>
+              <td className="px-2 py-2 text-ink-faint">{index + 1}</td>
+              <td className="truncate px-2 py-2 font-semibold text-ink">{person.scoutName}</td>
+              <td className={cn("px-2 py-2 font-semibold tabular-nums", person.netScore >= 0 ? "text-ok" : "text-danger")}>
                 {signed(person.netScore)}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums text-ok">+{person.correctPoints}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-danger">-{person.wrongPenalty}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{person.scoredCount}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{person.pendingCount}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{person.incompleteCount}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{percent(person.accuracy)}</td>
-              <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{person.averageNet == null ? "-" : signed(round1(person.averageNet))}</td>
+              <td className="px-2 py-2 tabular-nums text-danger">-{person.wrongPenalty}</td>
+              <td className="px-2 py-2 tabular-nums text-ink-dim">{person.scoredCount}</td>
+              <td className="px-2 py-2 tabular-nums text-ink-dim">{percent(person.accuracy)}</td>
+              <td className="px-2 py-2 tabular-nums text-ink-dim">{person.averageNet == null ? "-" : signed(round1(person.averageNet))}</td>
             </tr>
           ))}
         </tbody>
@@ -566,25 +565,23 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
   if (!matches.length) return <EmptyState text="暂无比赛信心分记录。" />;
 
   return (
-    <div className="max-h-[560px] overflow-auto">
-      <table className="w-full min-w-[640px] text-left text-sm">
+    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+      <table className="w-full table-fixed text-left text-sm">
         <thead className="sticky top-0 bg-surface-2 text-xs uppercase text-ink-faint">
           <tr>
             <th className="px-3 py-2">比赛</th>
-            <th className="px-3 py-2 text-right">红方预测</th>
-            <th className="px-3 py-2 text-right">蓝方预测</th>
+            <th className="px-3 py-2 text-center">红方预测</th>
+            <th className="px-3 py-2 text-center">蓝方预测</th>
             <th className="px-3 py-2 text-right">平均信心</th>
-            <th className="px-3 py-2 text-right">实际胜方</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {matches.map((match) => (
             <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
               <td className="px-3 py-2 font-semibold text-ink">{scoutMatchLabel(match)}</td>
-              <td className={cn("px-3 py-2 text-right tabular-nums text-danger", match.actualWinner === "red" && "font-bold")}>{match.redPredictions}</td>
-              <td className={cn("px-3 py-2 text-right tabular-nums text-info", match.actualWinner === "blue" && "font-bold")}>{match.bluePredictions}</td>
+              <td className={cn("px-3 py-2 text-center tabular-nums text-danger", match.actualWinner === "red" && "text-base font-black")}>{match.redPredictions}</td>
+              <td className={cn("px-3 py-2 text-center tabular-nums text-info", match.actualWinner === "blue" && "text-base font-black")}>{match.bluePredictions}</td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
-              <td className="px-3 py-2 text-right text-ink-dim">{winnerLabel(match.actualWinner)}</td>
             </tr>
           ))}
         </tbody>
@@ -633,13 +630,6 @@ function signed(value: number) {
 
 function percent(value: number | null) {
   return value == null ? "-" : `${Math.round(value * 100)}%`;
-}
-
-function winnerLabel(value: ScoutConfidenceMatch["actualWinner"]) {
-  if (value === "red") return "红方";
-  if (value === "blue") return "蓝方";
-  if (value === "tie") return "平局";
-  return "暂无";
 }
 
 function scoutMatchLabel(match: Pick<ScoutConfidenceMatch, "matchType" | "matchNumber"> & { label?: string }) {

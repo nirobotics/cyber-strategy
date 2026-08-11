@@ -239,7 +239,7 @@ export function AnalyticsDashboard({
 
   return (
     <div
-      className={cn("flex w-full flex-col", activeTab === "browser" && "lg:h-full lg:min-h-0", (activeTab === "proposal" || activeTab === "lead") && "xl:h-full xl:min-h-0")}
+      className={cn("flex w-full flex-col", activeTab === "browser" && "lg:h-full lg:min-h-0", activeTab === "proposal" && "xl:h-full xl:min-h-0", activeTab === "lead" && "h-full min-h-0")}
       data-fixed-browser={activeTab === "browser" ? "" : undefined}
       data-fixed-desktop={activeTab === "proposal" ? "" : undefined}
     >
@@ -273,7 +273,7 @@ export function AnalyticsDashboard({
           </nav>
       , headerNavTarget) : null}
 
-      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "browser" && "lg:min-h-0 lg:flex-1", (activeTab === "proposal" || activeTab === "lead") && "xl:min-h-0 xl:flex-1")}>
+      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "browser" && "lg:min-h-0 lg:flex-1", activeTab === "proposal" && "xl:min-h-0 xl:flex-1", activeTab === "lead" && "min-h-0 flex-1")}>
       <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
@@ -395,7 +395,7 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
       {visitedTabs.has("lead") ? (
-        <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "lead"}>
+        <div className="min-h-0 flex-1" hidden={activeTab !== "lead"}>
           {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
         </div>
       ) : null}
