@@ -79,6 +79,10 @@ export type TeamEvent = {
 
 export type MatchScoreSource = MatchResult["source"] | "strategy" | "statbotics" | "none";
 
+export function hasLargeScoutingDifference(actual: number | null, scouting: number | null) {
+  return actual != null && scouting != null && Math.abs(actual - scouting) > actual * 0.4;
+}
+
 export type MatchScores = {
   actualRed: number | null;
   actualBlue: number | null;

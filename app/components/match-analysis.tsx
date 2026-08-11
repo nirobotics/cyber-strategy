@@ -7,6 +7,7 @@ import {
   buildTeamEventMap,
   enrichScheduledMatches,
   fmt,
+  hasLargeScoutingDifference,
   levelLabel,
   matchHasTeam,
   matchIdentity,
@@ -323,6 +324,7 @@ function AllianceBlock({
 }) {
   const hasActual = actualScore != null;
   const primaryScore = hasActual ? actualScore : predictedScore;
+  const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
     <div
       className={cn(
@@ -331,13 +333,16 @@ function AllianceBlock({
         winner && (color === "red" ? "ring-2 ring-danger" : "ring-2 ring-info"),
       )}
     >
-      <div className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
-        {primaryScore == null ? "-" : hasActual ? Math.round(primaryScore) : `~${Math.round(primaryScore)}`}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
+          {primaryScore == null ? "-" : hasActual ? Math.round(primaryScore) : `~${Math.round(primaryScore)}`}
+        </span>
+        {hasLargeDifference ? <span className="badge border-warning/30 bg-warning/10 text-warning">差异过大</span> : null}
       </div>
-      {hasActual && predictedScore != null ? (
-        <div className="mt-0.5 text-[11px] font-medium text-ink-faint">预测 {Math.round(predictedScore)}</div>
-      ) : null}
-      <div className="mt-0.5 text-[11px] font-medium text-ink-faint">Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</div>
+      <div className="mt-0.5 flex items-center justify-center gap-x-2 whitespace-nowrap text-[11px] font-medium text-ink-faint">
+        {hasActual && predictedScore != null ? <span>预测 {Math.round(predictedScore)}</span> : null}
+        <span>Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</span>
+      </div>
       <div className="mt-1 text-xs leading-5 text-ink-dim">
         {teams.length ? teams.map((team, index) => (
           <span key={team}>

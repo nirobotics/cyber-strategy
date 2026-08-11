@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildTeamEventMap,
   enrichScheduledMatches,
+  hasLargeScoutingDifference,
   matchHasTeam,
   matchTeams,
   mergeMatchResults,
@@ -18,6 +19,13 @@ import {
 import type { TeamData, TeamSummary } from "./scouting";
 
 describe("match analysis calculations", () => {
+  it("flags Scouting differences only when they exceed 40 percent of the actual score", () => {
+    expect(hasLargeScoutingDifference(100, 141)).toBe(true);
+    expect(hasLargeScoutingDifference(100, 60)).toBe(false);
+    expect(hasLargeScoutingDifference(100, 59)).toBe(true);
+    expect(hasLargeScoutingDifference(100, null)).toBe(false);
+  });
+
   it("uses Strategy composite ratings for win probability before Statbotics", () => {
     const teamData = teams({
       1: 100,
