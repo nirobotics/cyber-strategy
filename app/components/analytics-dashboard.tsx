@@ -127,7 +127,7 @@ export function AnalyticsDashboard({
     ? scoutingLead
     : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
   const resolvedPicklists: PicklistResource | null = demoMode
-    ? { selectedEventKey: resolvedEventKey, isAdmin: false, userOpenId: user.feishuOpenId, lists: [], error: null }
+    ? { selectedEventKey: resolvedEventKey, isAdmin: true, userOpenId: user.feishuOpenId, lists: [], error: null }
     : picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
 
   const prepareTab = useCallback((next: Tab) => {
