@@ -127,14 +127,15 @@ describe("match analysis calculations", () => {
     });
   });
 
-  it("keeps the raw Super Scout alliance total separate from actual and predicted scores", () => {
-    const teamData = teams({ 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60 });
-    teamData["1"].matches[0].scoutingPts = 10;
-    teamData["2"].matches[0].scoutingPts = 20;
-    teamData["3"].matches[0].scoutingPts = 30;
-    teamData["4"].matches[0].scoutingPts = 40;
-    teamData["5"].matches[0].scoutingPts = 50;
-    teamData["6"].matches[0].scoutingPts = 60;
+  it("keeps Scouting scores independent from ignored match filtering", () => {
+    const scoutingTeamData = teams({ 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60 });
+    scoutingTeamData["1"].matches[0].scoutingPts = 10;
+    scoutingTeamData["2"].matches[0].scoutingPts = 20;
+    scoutingTeamData["3"].matches[0].scoutingPts = 30;
+    scoutingTeamData["4"].matches[0].scoutingPts = 40;
+    scoutingTeamData["5"].matches[0].scoutingPts = 50;
+    scoutingTeamData["6"].matches[0].scoutingPts = 60;
+    const teamData = { ...scoutingTeamData, "4": { ...scoutingTeamData["4"], matches: [] } };
 
     expect(resolveMatchScores({
       match: schedule(["1", "2", "3"], ["4", "5", "6"], {
@@ -143,6 +144,7 @@ describe("match analysis calculations", () => {
       redTeams: ["1", "2", "3"],
       blueTeams: ["4", "5", "6"],
       teamData,
+      scoutingTeamData,
     })).toMatchObject({
       actualRed: 123,
       actualBlue: 98,

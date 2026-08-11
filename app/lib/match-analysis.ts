@@ -215,18 +215,20 @@ export function resolveMatchScores({
   redTeams,
   blueTeams,
   teamData,
+  scoutingTeamData = teamData,
 }: {
   match: CombinedMatch;
   redTeams: string[];
   blueTeams: string[];
   teamData: TeamData;
+  scoutingTeamData?: TeamData;
 }): MatchScores {
   const actual = matchActualScore(match);
   const strategy = strategyPrediction(redTeams, blueTeams, teamData);
   const statbotics = statboticsPrediction(match);
   const predicted = strategy ?? statbotics;
-  const scoutingRed = scoutingAllianceScore(match, redTeams, teamData);
-  const scoutingBlue = scoutingAllianceScore(match, blueTeams, teamData);
+  const scoutingRed = scoutingAllianceScore(match, redTeams, scoutingTeamData);
+  const scoutingBlue = scoutingAllianceScore(match, blueTeams, scoutingTeamData);
 
   if (actual) {
     return {

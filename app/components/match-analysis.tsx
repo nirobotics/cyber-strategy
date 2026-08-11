@@ -40,12 +40,14 @@ export function MatchAnalysis({
   eventKey,
   schedule,
   teamData,
+  scoutingTeamData = teamData,
   enrich = true,
   initialMatchKey = null,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData?: TeamData;
   enrich?: boolean;
   initialMatchKey?: string | null;
 }) {
@@ -133,6 +135,7 @@ export function MatchAnalysis({
           match={selectedMatch}
           matches={state.matches}
           teamData={teamData}
+          scoutingTeamData={scoutingTeamData}
           teamEvents={state.teamEvents}
           onBack={() => setSelectedMatchKey(null)}
         />
@@ -141,6 +144,7 @@ export function MatchAnalysis({
         <MatchSchedule
           matches={state.matches}
           teamData={teamData}
+          scoutingTeamData={scoutingTeamData}
           onSelectMatch={(match) => setSelectedMatchKey(matchIdentity(match))}
         />
       ) : null}
@@ -151,10 +155,12 @@ export function MatchAnalysis({
 function MatchSchedule({
   matches,
   teamData,
+  scoutingTeamData,
   onSelectMatch,
 }: {
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   onSelectMatch: (match: CombinedMatch) => void;
 }) {
   const [teamQuery, setTeamQuery] = useState("");
@@ -191,7 +197,7 @@ function MatchSchedule({
       {rows.map(({ match, group, showGroup }, index) => (
         <div key={matchIdentity(match)}>
           {showGroup && index > 0 ? <h3 className="mb-2 section-label">{group}</h3> : null}
-          <MatchCard match={match} matches={matches} teamData={teamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
+          <MatchCard match={match} matches={matches} teamData={teamData} scoutingTeamData={scoutingTeamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
         </div>
       ))}
     </div>
@@ -202,18 +208,20 @@ function MatchCard({
   match,
   matches,
   teamData,
+  scoutingTeamData,
   highlightTeam,
   onSelect,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   highlightTeam: string;
   onSelect: () => void;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
-  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData });
+  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
   const videos = match.videos ?? [];
 
@@ -346,18 +354,20 @@ function MatchDetail({
   match,
   matches,
   teamData,
+  scoutingTeamData,
   teamEvents,
   onBack,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   teamEvents: TeamEvent[];
   onBack: () => void;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
-  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData });
+  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
   const teamEventMap = useMemo(() => buildTeamEventMap(teamEvents), [teamEvents]);
   const matchNumber = match.match_number ?? null;
@@ -522,6 +532,9 @@ function AllianceDetail({
 }
 
 function TeamMetricCard({ metric }: { metric: TeamMetric }) {
+  const scoutingTotal = metric.scoutMatch?.scoutingPts ?? null;
+  const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
+  const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
   return (
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -541,7 +554,7 @@ function TeamMetricCard({ metric }: { metric: TeamMetric }) {
       </div>
       {metric.scoutMatch ? (
         <div className="mt-2 rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-dim">
-          本场 Scout：{fmt(metric.scoutMatch.totalPts)} / A {fmt(metric.scoutMatch.autoPts)} / T {fmt(metric.scoutMatch.telePts)}
+          本场 Scouting：{fmt(scoutingTotal)} / A {fmt(scoutingAuto)} / T {fmt(scoutingTele)}
         </div>
       ) : null}
     </div>

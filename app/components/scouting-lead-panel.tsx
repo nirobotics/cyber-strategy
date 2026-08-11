@@ -579,8 +579,18 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
           {matches.map((match) => (
             <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
               <td className="px-3 py-2 font-semibold text-ink">{scoutMatchLabel(match)}</td>
-              <td className={cn("px-3 py-2 text-center tabular-nums text-danger", match.actualWinner === "red" && "text-base font-black")}>{match.redPredictions}</td>
-              <td className={cn("px-3 py-2 text-center tabular-nums text-info", match.actualWinner === "blue" && "text-base font-black")}>{match.bluePredictions}</td>
+              <td
+                className={cn("cursor-help px-3 py-2 text-center tabular-nums text-danger", match.actualWinner === "red" && "text-base font-black")}
+                title={match.redPredictors.length ? `预测红方获胜：${match.redPredictors.join("、")}` : undefined}
+              >
+                {match.redPredictions}
+              </td>
+              <td
+                className={cn("cursor-help px-3 py-2 text-center tabular-nums text-info", match.actualWinner === "blue" && "text-base font-black")}
+                title={match.bluePredictors.length ? `预测蓝方获胜：${match.bluePredictors.join("、")}` : undefined}
+              >
+                {match.bluePredictions}
+              </td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
             </tr>
           ))}
