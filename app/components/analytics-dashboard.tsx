@@ -1825,18 +1825,9 @@ export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLi
       teams.forEach((team, index) => {
         const bar = chart.getDatasetMeta(0).data[index];
         if (!bar) return;
-        const top = chart.scales.y.getPixelForValue(team.maxPts);
-        const bottom = chart.scales.y.getPixelForValue(team.minPts);
         const average = chart.scales.y.getPixelForValue(team.avgTotal);
-        const range = team.maxPts - team.minPts;
 
         ctx.save();
-        ctx.font = "11px sans-serif";
-        ctx.textAlign = "center";
-        ctx.fillStyle = palette.muted;
-        ctx.fillText(String(team.maxPts), bar.x, top - 7);
-        ctx.fillText(String(team.minPts), bar.x, bottom + 14);
-
         ctx.strokeStyle = palette.colors[index];
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 2]);
@@ -1845,10 +1836,6 @@ export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLi
         ctx.lineTo(bar.x + bar.width * 0.38, average);
         ctx.stroke();
 
-        ctx.setLineDash([]);
-        ctx.fillStyle = palette.colors[index];
-        ctx.fillText(`平均 ${team.avgTotal}`, bar.x, average - 5);
-        ctx.fillText(`范围 ${range}`, bar.x, top + (bottom - top) * 0.68);
         ctx.restore();
       });
     },
@@ -1875,7 +1862,6 @@ export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLi
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", axis: "x", intersect: false },
-      layout: { padding: { top: 18, bottom: 18 } },
       plugins: {
         legend: { display: false },
         tooltip: {
