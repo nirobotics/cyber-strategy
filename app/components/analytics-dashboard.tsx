@@ -573,7 +573,6 @@ export function TeamDetail({
                   ))}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
-                  <Badge className="border-line bg-surface-2 text-ink-dim">{route.alliance === "blue" ? "蓝方" : "红方"}</Badge>
                   {route.startPosition ? <Badge className="border-line bg-surface-2 text-ink-dim">起点 {route.startPosition}</Badge> : null}
                   {route.flipped ? <Badge className="border-line bg-surface-2 text-ink-dim">镜像</Badge> : null}
                   {route.scoutName ? <Badge className="border-line bg-surface-2 text-ink-dim">记录员 {route.scoutName}</Badge> : null}
