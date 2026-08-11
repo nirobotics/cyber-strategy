@@ -14,6 +14,7 @@ import {
   matchLabel,
   matchScheduleIdentity,
   matchTeams,
+  needsScoutingReview,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -511,23 +512,27 @@ function AllianceDetail({
   scoutingScore: number | null;
   winner: boolean;
 }) {
+  const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
     <Card className={cn("overflow-hidden p-0", color === "red" ? "border-danger/30" : "border-info/30")}>
       <div className={cn("grid gap-3 p-3 lg:grid-cols-[140px_minmax(0,1fr)]", color === "red" ? "bg-danger/10" : "bg-info/10")}>
         <div className="flex items-center justify-between gap-3 lg:grid lg:content-center lg:justify-start">
           <div>
-            <p className={cn("text-xs font-semibold uppercase", color === "red" ? "text-danger" : "text-info")}>{label}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className={cn("text-xs font-semibold uppercase", color === "red" ? "text-danger" : "text-info")}>{label}</p>
+              {hasLargeDifference ? <span className="badge border-warning/30 bg-warning/10 text-warning">差异过大</span> : null}
+            </div>
             <p className={cn("text-3xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
               {actualScore == null ? predictedScore == null ? "-" : `~${Math.round(predictedScore)}` : Math.round(actualScore)}
             </p>
             {predictedScore != null ? <p className="text-xs text-ink-dim">预测 {Math.round(predictedScore)}</p> : null}
             <p className="text-xs text-ink-dim">Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</p>
           </div>
-          {winner ? <span className="rounded-full bg-ok/10 px-2 py-1 text-xs font-semibold text-ok">胜方</span> : null}
+          {winner ? <span className="w-fit rounded-full bg-ok/10 px-2 py-1 text-xs font-semibold text-ok">胜方</span> : null}
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {metrics.map((metric) => (
-            <TeamMetricCard key={metric.team} metric={metric} />
+            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} />
           ))}
           {!teams.length ? <div className="rounded-md border border-line bg-surface p-3 text-sm text-ink-dim">待定</div> : null}
         </div>
@@ -536,10 +541,11 @@ function AllianceDetail({
   );
 }
 
-function TeamMetricCard({ metric }: { metric: TeamMetric }) {
+function TeamMetricCard({ metric, allianceDifferenceIsLarge }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean }) {
   const scoutingTotal = metric.scoutMatch?.scoutingPts ?? null;
   const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
   const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
+  const reviewRecommended = needsScoutingReview(allianceDifferenceIsLarge, metric.rating, scoutingTotal);
   return (
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -547,7 +553,10 @@ function TeamMetricCard({ metric }: { metric: TeamMetric }) {
           <p className="text-sm font-semibold text-brand">Team {metric.team}</p>
           <p className="text-[11px] font-semibold uppercase text-ink-faint">{metric.ratingLabel}</p>
         </div>
-        <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
+          {reviewRecommended ? <span className="badge border-warning/30 bg-warning/10 text-warning">建议重新核查</span> : null}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs text-ink-dim">
         <span>Auto {fmt(metric.auto)}</span>

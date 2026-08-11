@@ -6,6 +6,7 @@ import {
   matchHasTeam,
   matchTeams,
   mergeMatchResults,
+  needsScoutingReview,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -24,6 +25,13 @@ describe("match analysis calculations", () => {
     expect(hasLargeScoutingDifference(100, 60)).toBe(false);
     expect(hasLargeScoutingDifference(100, 59)).toBe(true);
     expect(hasLargeScoutingDifference(100, null)).toBe(false);
+  });
+
+  it("recommends review only for a large alliance difference and a team difference over 100 percent", () => {
+    expect(needsScoutingReview(true, 50, 101)).toBe(true);
+    expect(needsScoutingReview(true, 50, 100)).toBe(false);
+    expect(needsScoutingReview(false, 50, 101)).toBe(false);
+    expect(needsScoutingReview(true, 50, null)).toBe(false);
   });
 
   it("uses Strategy composite ratings for win probability before Statbotics", () => {

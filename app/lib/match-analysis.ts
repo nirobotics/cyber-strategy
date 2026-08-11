@@ -83,6 +83,10 @@ export function hasLargeScoutingDifference(actual: number | null, scouting: numb
   return actual != null && scouting != null && Math.abs(actual - scouting) > actual * 0.4;
 }
 
+export function needsScoutingReview(allianceDifferenceIsLarge: boolean, rating: number | null, scouting: number | null) {
+  return allianceDifferenceIsLarge && rating != null && scouting != null && Math.abs(rating - scouting) > rating;
+}
+
 export type MatchScores = {
   actualRed: number | null;
   actualBlue: number | null;
