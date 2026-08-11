@@ -821,7 +821,6 @@ export function TeamDetailModal({
         <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
           <div className="min-w-0">
             <p className="section-label">队伍详情</p>
-            <h2 className="truncate text-lg font-semibold text-ink">Team {team.team}</h2>
           </div>
           <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
             <X className="size-4" />
