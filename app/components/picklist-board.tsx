@@ -183,7 +183,7 @@ function PicklistColumnView({
   );
 }
 
-function SortableTeamCard(props: Omit<Parameters<typeof TeamCard>[0], "dragHandleProps" | "style">) {
+function SortableTeamCard(props: Omit<Parameters<typeof TeamCard>[0], "dragProps" | "style">) {
   const { attributes, listeners, isDragging, isOver, setNodeRef, transform, transition } = useSortable({
     id: teamDragId(props.team.team),
     data: { type: "team", team: props.team.team, column: props.column },
@@ -192,7 +192,7 @@ function SortableTeamCard(props: Omit<Parameters<typeof TeamCard>[0], "dragHandl
     <TeamCard
       {...props}
       cardRef={setNodeRef}
-      dragHandleProps={{ ...attributes, ...listeners }}
+      dragProps={{ ...attributes, ...listeners }}
       className={cn(isDragging && "opacity-25", isOver && !isDragging && "border-brand ring-2 ring-brand/20")}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     />
@@ -205,7 +205,7 @@ function TeamCard({
   rank,
   onOpenTeam,
   cardRef,
-  dragHandleProps,
+  dragProps,
   className,
   style,
   overlay = false,
@@ -216,7 +216,7 @@ function TeamCard({
   rank?: number;
   onOpenTeam: (team: string) => void;
   cardRef?: (node: HTMLElement | null) => void;
-  dragHandleProps?: React.ButtonHTMLAttributes<HTMLButtonElement>;
+  dragProps?: React.HTMLAttributes<HTMLElement>;
   className?: string;
   style?: React.CSSProperties;
   overlay?: boolean;
@@ -225,21 +225,17 @@ function TeamCard({
     <article
       ref={cardRef}
       style={style}
+      {...dragProps}
       className={cn(
-        "rounded-md border border-line bg-surface-2 p-2.5 shadow-sm transition-colors hover:border-brand/45",
+        "cursor-grab select-none rounded-md border border-line bg-surface-2 p-2.5 shadow-sm transition-colors hover:border-brand/45 active:cursor-grabbing",
         overlay && "w-60 rotate-1 border-brand shadow-lg",
         className,
       )}
     >
       <div className="flex min-w-0 items-center gap-1.5">
-        <button
-          type="button"
-          {...dragHandleProps}
-          className="grid size-8 shrink-0 touch-none place-items-center rounded-md text-ink-faint hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-          aria-label={`拖拽 Team ${team.team}`}
-        >
+        <span className="grid size-8 shrink-0 place-items-center text-ink-faint" aria-hidden="true">
           <GripVertical className="size-4" />
-        </button>
+        </span>
         <span className="w-6 shrink-0 text-right text-xs tabular-nums text-ink-faint">{rank ?? "-"}</span>
         <button
           type="button"
