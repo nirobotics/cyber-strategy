@@ -76,13 +76,11 @@ export function PicklistBoard({
   function previewDrag(event: DragOverEvent) {
     const target = readDragTarget(event);
     if (!target || target.beforeTeam === target.team) return;
-    setPreviewBoard((current) => {
-      const base = current ?? board;
-      const next = previewPicklistTeam(base, validTeams, dragColumn.current ?? target.column, target);
-      previewBoardRef.current = next;
-      return next;
-    });
+    const base = previewBoardRef.current ?? board;
+    const next = previewPicklistTeam(base, validTeams, dragColumn.current ?? target.column, target);
+    previewBoardRef.current = next;
     dragColumn.current = target.column;
+    setPreviewBoard(next);
   }
 
   function finishDrag(event: DragEndEvent) {
