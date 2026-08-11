@@ -5,6 +5,7 @@ export type MatchAutoPathPoint = { node: string; atMs: number };
 export type ScoutingMatch = {
   match: number;
   matchType?: DataRange;
+  scoutingPts?: number;
   totalPts: number;
   autoPts: number;
   telePts: number;

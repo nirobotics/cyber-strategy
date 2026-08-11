@@ -245,6 +245,7 @@ function MatchCard({
           winner={score.winner === "red"}
           actualScore={score.actualRed}
           predictedScore={score.predictedRed}
+          scoutingScore={score.scoutingRed}
           teams={redTeams}
           highlightTeam={highlightTeam}
         />
@@ -267,6 +268,7 @@ function MatchCard({
           winner={score.winner === "blue"}
           actualScore={score.actualBlue}
           predictedScore={score.predictedBlue}
+          scoutingScore={score.scoutingBlue}
           teams={blueTeams}
           highlightTeam={highlightTeam}
         />
@@ -299,6 +301,7 @@ function AllianceBlock({
   winner,
   actualScore,
   predictedScore,
+  scoutingScore,
   teams,
   highlightTeam,
 }: {
@@ -306,6 +309,7 @@ function AllianceBlock({
   winner: boolean;
   actualScore: number | null;
   predictedScore: number | null;
+  scoutingScore: number | null;
   teams: string[];
   highlightTeam: string;
 }) {
@@ -325,6 +329,7 @@ function AllianceBlock({
       {hasActual && predictedScore != null ? (
         <div className="mt-0.5 text-[11px] font-medium text-ink-faint">预测 {Math.round(predictedScore)}</div>
       ) : null}
+      <div className="mt-0.5 text-[11px] font-medium text-ink-faint">Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</div>
       <div className="mt-1 text-xs leading-5 text-ink-dim">
         {teams.length ? teams.map((team, index) => (
           <span key={team}>
@@ -374,6 +379,7 @@ function MatchDetail({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <StatusPill label={actualLabel(score.actualRed, score.actualBlue)} tone={isActualScoreSource(score.source) ? "ok" : "muted"} />
           <StatusPill label={predictedLabel(score.predictedRed, score.predictedBlue)} tone="warn" />
+          <StatusPill label={scoutingLabel(score.scoutingRed, score.scoutingBlue)} tone="info" />
         </div>
       </Card>
 
@@ -387,6 +393,7 @@ function MatchDetail({
           metrics={redMetrics}
           actualScore={score.actualRed}
           predictedScore={score.predictedRed}
+          scoutingScore={score.scoutingRed}
           winner={score.winner === "red"}
         />
         <AllianceDetail
@@ -396,6 +403,7 @@ function MatchDetail({
           metrics={blueMetrics}
           actualScore={score.actualBlue}
           predictedScore={score.predictedBlue}
+          scoutingScore={score.scoutingBlue}
           winner={score.winner === "blue"}
         />
       </div>
@@ -476,6 +484,7 @@ function AllianceDetail({
   metrics,
   actualScore,
   predictedScore,
+  scoutingScore,
   winner,
 }: {
   color: "red" | "blue";
@@ -484,6 +493,7 @@ function AllianceDetail({
   metrics: TeamMetric[];
   actualScore: number | null;
   predictedScore: number | null;
+  scoutingScore: number | null;
   winner: boolean;
 }) {
   return (
@@ -496,6 +506,7 @@ function AllianceDetail({
               {actualScore == null ? predictedScore == null ? "-" : `~${Math.round(predictedScore)}` : Math.round(actualScore)}
             </p>
             {predictedScore != null ? <p className="text-xs text-ink-dim">预测 {Math.round(predictedScore)}</p> : null}
+            <p className="text-xs text-ink-dim">Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</p>
           </div>
           {winner ? <span className="rounded-full bg-ok/10 px-2 py-1 text-xs font-semibold text-ok">胜方</span> : null}
         </div>
@@ -564,6 +575,11 @@ function actualLabel(red: number | null, blue: number | null) {
 
 function predictedLabel(red: number | null, blue: number | null) {
   return red == null || blue == null ? "预测 暂无" : `预测 ${Math.round(red)}-${Math.round(blue)}`;
+}
+
+function scoutingLabel(red: number | null, blue: number | null) {
+  if (red == null && blue == null) return "Scouting 暂无";
+  return `Scouting ${red == null ? "-" : Math.round(red)}-${blue == null ? "-" : Math.round(blue)}`;
 }
 
 function scoreBadgeClass(source: string) {

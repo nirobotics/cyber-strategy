@@ -1072,3 +1072,38 @@
 **验证**：17 files / 109 tests、typecheck、改动文件 ESLint、build、`git diff --check` 全部通过。Production deployment `https://cyber-strategy-kzy4no4is-ni-corporate.vercel.app` Ready，并绑定 `https://strategy.team8214.com`。
 
 **风险 / 待办**：命令行没有用户的 Pit 飞书登录态，无法代替用户完成最后一次受保护点击；签名校验与全部场次映射已由自动化测试覆盖。
+
+---
+
+## 2026-08-11 · 赛程分析增加 Scouting 原始联盟分
+
+**当前状态**：赛程卡片和比赛详情会分别展示真实得分、预测得分与 Scouting 原始联盟总分，版本升级为 `1.0.107`。
+
+**本轮完成**：
+- 保留 Super Scout 记录中的原始 `autoScore + teleopScore`，不使用按权重分配到三队后的队伍分数。
+- 按比赛和红/蓝联盟解析原始 Scouting 总分，并在赛程卡片、详情顶部及联盟详情中展示。
+- 缺少原始联盟分时显示 `Scouting -` / `Scouting 暂无`，不伪造数据。
+- 版本号同步到 `package.json`、应用页脚、登录页页脚和 Demo 页脚。
+
+**验证**：
+- 18 个测试文件、116 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+- 本地 Demo 真实浏览器检查桌面 1440px、移动 390px、light/dark、赛程列表和比赛详情，均无横向溢出；当前 Demo 源数据没有原始联盟分，因此正确显示暂无。
+
+**风险 / 待办**：历史记录若未保存 Super Scout `autoScore` / `teleopScore`，无法回算原始 Scouting 联盟分，只能显示暂无。
+
+---
+
+## 2026-08-11 · 改用逐队 Scout 数据计算联盟分
+
+**当前状态**：赛程分析的 Scouting 分已改为三队逐队计算后求和，版本升级为 `1.0.108`。
+
+**本轮完成**：
+- Auto 使用官方联盟 Auto 分按 Super Scout Auto 占比分配后的单队值。
+- Teleop 使用 Normal Scout 联盟区射击时间 × Super Scout BPS × 命中率的原始值，不按官方 Teleop 分缩放；另计爬升分。
+- 联盟 Scouting 分仅在三队本场记录完整时展示，缺失记录不按 0 伪造完整总分。
+
+**验证**：
+- 18 个测试文件、116 项测试、类型检查、Lint、生产构建和 `git diff --check` 全部通过。
+- Demo Q1 红方由原始 Teleop 49 加入按比例分配的 Auto 后显示 Scouting 151；390px light/dark 无横向溢出。
+
+**风险 / 待办**：Cyber Scout 当前赛事只有 289 条 Normal Scout 记录，部分比赛联盟缺少一支或多支队伍记录，这些联盟继续显示暂无。

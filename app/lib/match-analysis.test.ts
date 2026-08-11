@@ -127,6 +127,32 @@ describe("match analysis calculations", () => {
     });
   });
 
+  it("keeps the raw Super Scout alliance total separate from actual and predicted scores", () => {
+    const teamData = teams({ 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60 });
+    teamData["1"].matches[0].scoutingPts = 10;
+    teamData["2"].matches[0].scoutingPts = 20;
+    teamData["3"].matches[0].scoutingPts = 30;
+    teamData["4"].matches[0].scoutingPts = 40;
+    teamData["5"].matches[0].scoutingPts = 50;
+    teamData["6"].matches[0].scoutingPts = 60;
+
+    expect(resolveMatchScores({
+      match: schedule(["1", "2", "3"], ["4", "5", "6"], {
+        result: result("frc-events", 123, 98),
+      }),
+      redTeams: ["1", "2", "3"],
+      blueTeams: ["4", "5", "6"],
+      teamData,
+    })).toMatchObject({
+      actualRed: 123,
+      actualBlue: 98,
+      predictedRed: 60,
+      predictedBlue: 150,
+      scoutingRed: 60,
+      scoutingBlue: 150,
+    });
+  });
+
   it("uses Super Scout result when official result is missing", () => {
     const match = schedule(["1", "2", "3"], ["4", "5", "6"], {
       result: {

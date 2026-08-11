@@ -1,5 +1,5 @@
 import { reliability, type TeamData, type TeamSummary } from "./scouting";
-import type { DataRange } from "./data-range";
+import { matchTypeFromTbaCompLevel, type DataRange } from "./data-range";
 
 export type StatboticsMatch = {
   key?: string;
@@ -84,6 +84,8 @@ export type MatchScores = {
   actualBlue: number | null;
   predictedRed: number | null;
   predictedBlue: number | null;
+  scoutingRed: number | null;
+  scoutingBlue: number | null;
   displayRed: number | null;
   displayBlue: number | null;
   source: MatchScoreSource;
@@ -223,6 +225,8 @@ export function resolveMatchScores({
   const strategy = strategyPrediction(redTeams, blueTeams, teamData);
   const statbotics = statboticsPrediction(match);
   const predicted = strategy ?? statbotics;
+  const scoutingRed = scoutingAllianceScore(match, redTeams, teamData);
+  const scoutingBlue = scoutingAllianceScore(match, blueTeams, teamData);
 
   if (actual) {
     return {
@@ -230,6 +234,8 @@ export function resolveMatchScores({
       actualBlue: actual.blue,
       predictedRed: predicted?.red ?? null,
       predictedBlue: predicted?.blue ?? null,
+      scoutingRed,
+      scoutingBlue,
       displayRed: actual.red ?? predicted?.red ?? null,
       displayBlue: actual.blue ?? predicted?.blue ?? null,
       source: actual.source,
@@ -248,6 +254,8 @@ export function resolveMatchScores({
       actualBlue: null,
       predictedRed: strategy.red,
       predictedBlue: strategy.blue,
+      scoutingRed,
+      scoutingBlue,
       displayRed: strategy.red,
       displayBlue: strategy.blue,
       source: "strategy",
@@ -262,6 +270,8 @@ export function resolveMatchScores({
       actualBlue: null,
       predictedRed: statbotics.red,
       predictedBlue: statbotics.blue,
+      scoutingRed,
+      scoutingBlue,
       displayRed: statbotics.red,
       displayBlue: statbotics.blue,
       source: "statbotics",
@@ -275,12 +285,26 @@ export function resolveMatchScores({
     actualBlue: null,
     predictedRed: null,
     predictedBlue: null,
+    scoutingRed,
+    scoutingBlue,
     displayRed: null,
     displayBlue: null,
     source: "none",
     label: "未开始",
     winner: null,
   };
+}
+
+export function scoutingAllianceScore(match: CombinedMatch, teams: string[], teamData: TeamData): number | null {
+  const matchNumber = match.match_number;
+  const matchType = matchTypeFromTbaCompLevel(match.comp_level);
+  if (!matchNumber || !matchType || teams.length !== 3) return null;
+  const scores = teams.map((team) => teamData[team]?.matches.find((entry) =>
+      entry.match === matchNumber && (entry.matchType ?? "qualification") === matchType
+    )?.scoutingPts);
+  return scores.every((score): score is number => score != null && Number.isFinite(score))
+    ? round1(scores.reduce((sum, score) => sum + score, 0))
+    : null;
 }
 
 export function resolveWinProbability({

@@ -327,6 +327,7 @@ function toScoutingMatch({
   const teleScore = noShow ? 0 : round1(teamScore.teleGamePiecePts + climbPts);
   const transferPieces = noShow ? 0 : predictedTransferPieces(normal, superRecord);
   const totalScore = noShow ? 0 : round1(autoScore + teleScore);
+  const scoutingPts = noShow ? 0 : round1(teamScore.autoPts + predictedGamePieces(normal, superRecord) + climbPts);
   const safeAuto = Math.min(autoScore, totalScore);
   const accuracy = noShow ? null : normalizeAccuracy(superRecord?.accuracy);
   const disabled = noShow;
@@ -335,6 +336,7 @@ function toScoutingMatch({
   return {
     match,
     matchType: normal?.matchType ?? superRecord?.matchType,
+    scoutingPts,
     totalPts: totalScore,
     autoPts: round1(safeAuto),
     telePts: round1(Math.max(0, totalScore - safeAuto)),
