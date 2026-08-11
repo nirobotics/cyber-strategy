@@ -73,6 +73,19 @@ export function reorderPicklistTeam(
   return next;
 }
 
+export function previewPicklistTeam(
+  board: PicklistBoard,
+  validTeams: string[],
+  previousColumn: PicklistColumn,
+  target: PicklistDropTarget,
+) {
+  if (previousColumn !== target.column) {
+    return movePicklistTeam(board, validTeams, target.team, target.column, target.beforeTeam);
+  }
+  if (!target.beforeTeam) return sanitizePicklistBoard(board, validTeams);
+  return reorderPicklistTeam(board, validTeams, target.column, target.team, target.beforeTeam);
+}
+
 export function migrateLegacyPicklist(first: string[], second: string[], crossed: string[], validTeams: string[]) {
   const dnp = new Set(crossed);
   return sanitizePicklistBoard(

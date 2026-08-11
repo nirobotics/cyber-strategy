@@ -26,8 +26,7 @@ import {
   buildPicklistColumns,
   emptyPicklistBoard,
   migrateLegacyPicklist,
-  movePicklistTeam,
-  reorderPicklistTeam,
+  previewPicklistTeam,
   sanitizePicklistBoard,
   type PicklistBoard as PicklistBoardState,
   type PicklistColumn,
@@ -79,9 +78,7 @@ export function PicklistBoard({
     if (!target || target.beforeTeam === target.team) return;
     setPreviewBoard((current) => {
       const base = current ?? board;
-      const next = dragColumn.current === target.column && target.beforeTeam
-        ? reorderPicklistTeam(base, validTeams, target.column, target.team, target.beforeTeam)
-        : movePicklistTeam(base, validTeams, target.team, target.column, target.beforeTeam);
+      const next = previewPicklistTeam(base, validTeams, dragColumn.current ?? target.column, target);
       previewBoardRef.current = next;
       return next;
     });

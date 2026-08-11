@@ -4,6 +4,7 @@ import {
   emptyPicklistBoard,
   migrateLegacyPicklist,
   movePicklistTeam,
+  previewPicklistTeam,
   reorderPicklistTeam,
   sanitizePicklistBoard,
 } from "./picklist";
@@ -30,6 +31,17 @@ describe("picklist board", () => {
       tier3: [],
       dnp: [],
     });
+  });
+
+  it("keeps the visible middle position when a cross-column drag then hits the column container", () => {
+    const board = { tier1: ["1"], tier2: ["2", "3", "4"], tier3: [], dnp: [] };
+    const preview = previewPicklistTeam(board, validTeams, "tier1", {
+      team: "1",
+      column: "tier2",
+      beforeTeam: "3",
+    });
+    expect(preview.tier2).toEqual(["2", "1", "3", "4"]);
+    expect(previewPicklistTeam(preview, validTeams, "tier2", { team: "1", column: "tier2" })).toEqual(preview);
   });
 
   it("reorders within a column and returns teams to the pool", () => {
