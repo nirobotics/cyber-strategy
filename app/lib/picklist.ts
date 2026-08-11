@@ -73,11 +73,6 @@ export function reorderPicklistTeam(
   return next;
 }
 
-export function resolvePicklistDropTarget(current: PicklistDropTarget | null, lastValid: PicklistDropTarget | null) {
-  if (!current) return lastValid;
-  return current.beforeTeam === current.team ? lastValid ?? current : current;
-}
-
 export function migrateLegacyPicklist(first: string[], second: string[], crossed: string[], validTeams: string[]) {
   const dnp = new Set(crossed);
   return sanitizePicklistBoard(

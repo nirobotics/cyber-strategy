@@ -5,7 +5,6 @@ import {
   migrateLegacyPicklist,
   movePicklistTeam,
   reorderPicklistTeam,
-  resolvePicklistDropTarget,
   sanitizePicklistBoard,
 } from "./picklist";
 
@@ -47,14 +46,10 @@ describe("picklist board", () => {
 
   it("reorders upward and downward by the hovered team index", () => {
     const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
-    expect(reorderPicklistTeam(board, validTeams, "tier1", "3", "2").tier1).toEqual(["1", "3", "2"]);
+    const preview = reorderPicklistTeam(board, validTeams, "tier1", "3", "2");
+    expect(preview.tier1).toEqual(["1", "3", "2"]);
+    expect(reorderPicklistTeam(preview, validTeams, "tier1", "3", "3")).toEqual(preview);
     expect(reorderPicklistTeam(board, validTeams, "tier1", "1", "3").tier1).toEqual(["2", "3", "1"]);
-  });
-
-  it("keeps the last valid target when drop collision returns to the dragged team", () => {
-    const lastValid = { team: "3", column: "tier1" as const, beforeTeam: "2" };
-    const current = { team: "3", column: "tier1" as const, beforeTeam: "3" };
-    expect(resolvePicklistDropTarget(current, lastValid)).toEqual(lastValid);
   });
 
   it("filters stale teams and duplicates across all categories", () => {
