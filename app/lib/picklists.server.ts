@@ -3,8 +3,8 @@ import { getClient } from "./supabase.server";
 import {
   canCreateMainPicklist,
   canEditSharedPicklist,
-  canViewSharedPicklist,
   normalizePicklistBoard,
+  visiblePicklistsForEvent,
   type PicklistKind,
   type SharedPicklist,
 } from "./picklist";
@@ -21,21 +21,26 @@ export async function listPicklists(eventKey: string, actorOpenId: string, admin
     .like("key", `picklist:%:${cleanedEventKey}:%`)
     .order("updated_at", { ascending: false });
   if (error) throw new Response("加载 Picklist 失败", { status: 500 });
-  const lists = ((data as PicklistSettingRow[] | null) ?? [])
-    .map(rowToPicklist)
-    .filter((list): list is SharedPicklist => Boolean(list) && canViewSharedPicklist(list!, actorOpenId, admin));
+  const lists = visiblePicklistsForEvent(
+    ((data as PicklistSettingRow[] | null) ?? []).map(rowToPicklist).filter((list): list is SharedPicklist => Boolean(list)),
+    cleanedEventKey,
+    actorOpenId,
+    admin,
+  );
   return hydrateCreatorNames(lists);
 }
 
 export async function createMainPicklist(opts: { eventKey: string; name: string; actorOpenId: string; isAdmin: boolean }) {
   if (!canCreateMainPicklist(opts.isAdmin)) throw new Response("只有管理员可以创建 Main Picklist", { status: 403 });
+  const eventKey = cleanEventKey(opts.eventKey);
+  const name = requireName(opts.name);
   const sb = requireClient();
   const now = new Date().toISOString();
   const list: StoredPicklist = {
     id: crypto.randomUUID(),
     clientId: null,
-    eventKey: cleanEventKey(opts.eventKey),
-    name: cleanName(opts.name, "Main Picklist"),
+    eventKey,
+    name,
     kind: "main",
     board: normalizePicklistBoard(null),
     createdBy: opts.actorOpenId,
@@ -71,21 +76,22 @@ export async function submitPersonalPicklist(opts: {
   board: unknown;
   actorOpenId: string;
 }) {
-  const sb = requireClient();
   const eventKey = cleanEventKey(opts.eventKey);
   const clientId = cleanClientId(opts.clientId);
+  const name = requireName(opts.name);
+  const sb = requireClient();
   const { data: rows, error: readError } = await sb.from("app_settings")
     .select("key,value,updated_by,updated_at")
     .like("key", `picklist:personal:${eventKey}:%`);
   if (readError) throw new Response("提交 Personal Picklist 失败", { status: 500 });
   const existing = ((rows as PicklistSettingRow[] | null) ?? [])
     .map((row) => ({ row, list: rowToPicklist(row) }))
-    .find(({ list }) => list?.createdBy === opts.actorOpenId && list.clientId === clientId);
+    .find(({ list }) => list?.eventKey === eventKey && list.createdBy === opts.actorOpenId && list.clientId === clientId);
   const list: StoredPicklist = {
     id: existing?.list?.id ?? crypto.randomUUID(),
     clientId,
     eventKey,
-    name: cleanName(opts.name, "Personal Picklist"),
+    name,
     kind: "personal",
     board: normalizePicklistBoard(opts.board),
     createdBy: opts.actorOpenId,
@@ -119,12 +125,16 @@ function rowToPicklist(row: PicklistSettingRow): SharedPicklist | null {
   if (!row.value || typeof row.value !== "object") return null;
   const value = row.value as Partial<StoredPicklist>;
   const id = String(value.id ?? "");
-  const kind: PicklistKind = value.kind === "personal" ? "personal" : "main";
+  if (value.kind !== "main" && value.kind !== "personal") return null;
+  const kind: PicklistKind = value.kind;
   const eventKey = String(value.eventKey ?? "");
-  if (!/^[0-9a-f-]{36}$/i.test(id) || !eventKey) return null;
+  const clientId = kind === "personal" ? String(value.clientId ?? "") : "";
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !/^[0-9]{4}[a-z0-9_-]{2,32}$/.test(eventKey)) return null;
+  if (kind === "personal" && !/^[a-zA-Z0-9_-]{1,80}$/.test(clientId)) return null;
+  if (row.key !== `picklist:${kind}:${eventKey}:${id}`) return null;
   return {
     id,
-    clientId: kind === "personal" ? String(value.clientId ?? "") || null : null,
+    clientId: kind === "personal" ? clientId : null,
     eventKey,
     name: cleanName(String(value.name ?? ""), kind === "main" ? "Main Picklist" : "Personal Picklist"),
     kind,
@@ -174,4 +184,10 @@ function cleanClientId(value: string) {
 
 function cleanName(value: string, fallback: string) {
   return value.trim().slice(0, 80) || fallback;
+}
+
+function requireName(value: string) {
+  const name = value.trim().slice(0, 80);
+  if (!name) throw new Response("Picklist 名称不能为空", { status: 400 });
+  return name;
 }

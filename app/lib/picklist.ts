@@ -78,6 +78,10 @@ export function canViewSharedPicklist(
   return list.kind === "main" || list.createdBy === actorOpenId || (isAdmin && Boolean(list.submittedAt));
 }
 
+export function visiblePicklistsForEvent(lists: SharedPicklist[], eventKey: string, actorOpenId: string, isAdmin: boolean) {
+  return lists.filter((list) => list.eventKey === eventKey && canViewSharedPicklist(list, actorOpenId, isAdmin));
+}
+
 export function comparePicklistTier(lists: Array<Pick<SharedPicklist, "id" | "board">>, column: PicklistAssignedColumn) {
   const teams = [...new Set(lists.flatMap((list) => list.board[column]))];
   return teams.map((team) => {

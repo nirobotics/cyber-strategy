@@ -10,4 +10,13 @@ describe("picklist server permissions", () => {
       isAdmin: false,
     })).rejects.toMatchObject({ status: 403 });
   });
+
+  it("requires a name before touching the database", async () => {
+    await expect(createMainPicklist({
+      eventKey: "2026cnsh",
+      name: "   ",
+      actorOpenId: "admin-1",
+      isAdmin: true,
+    })).rejects.toMatchObject({ status: 400 });
+  });
 });

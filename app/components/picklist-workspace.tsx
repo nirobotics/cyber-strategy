@@ -164,13 +164,13 @@ export function PicklistWorkspace({
 
   if (!active) {
     return (
-      <div className="min-h-0 space-y-3 sm:flex sm:flex-1 sm:flex-col sm:overflow-y-auto">
+      <div className="min-h-0 min-w-0 space-y-3 sm:flex sm:flex-1 sm:flex-col sm:overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-ink">选择 Picklist</h2>
           {resource.error ? <Badge className="border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length}>
             {mainLists.map((list) => (
               <ListButton key={list.id} list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} />
@@ -289,7 +289,7 @@ export function PicklistWorkspace({
         datasetId={datasetId}
         storageKey={storageKey}
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
-        preferInitial={isMain && !resource.isAdmin}
+        preferInitial={isMain}
         readOnly={!editable}
         onBoardChange={handleBoardChange}
         teams={teams}
@@ -301,7 +301,7 @@ export function PicklistWorkspace({
 }
 
 function PicklistCollection({ title, icon, count, children }: { title: string; icon: React.ReactNode; count: number; children: React.ReactNode }) {
-  return <Card className="p-0"><div className="flex items-center justify-between border-b border-line p-3"><h3 className="flex items-center gap-2 font-semibold text-ink">{icon}{title}</h3><span className="text-xs text-ink-dim">{count} 个</span></div><div className="space-y-2 p-3">{children}</div></Card>;
+  return <Card className="min-w-0 p-0"><div className="flex items-center justify-between border-b border-line p-3"><h3 className="flex items-center gap-2 font-semibold text-ink">{icon}{title}</h3><span className="text-xs text-ink-dim">{count} 个</span></div><div className="min-w-0 space-y-2 p-3">{children}</div></Card>;
 }
 
 function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick: () => void; readOnly: boolean }) {
@@ -309,7 +309,7 @@ function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean }) {
-  return <div className="flex gap-2"><Input value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onCreate(); }} placeholder={placeholder} maxLength={80} /><Button type="button" variant="primary" className="shrink-0" onClick={onCreate} disabled={!value.trim() || busy}><Plus className="size-4" />创建</Button></div>;
+  return <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className="min-w-0" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onCreate(); }} placeholder={placeholder} maxLength={80} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy}><Plus className="size-4" />创建</Button></div>;
 }
 
 function EmptyCollection({ text }: { text: string }) {

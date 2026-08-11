@@ -12,6 +12,7 @@ import {
   previewPicklistTeam,
   reorderPicklistTeam,
   sanitizePicklistBoard,
+  visiblePicklistsForEvent,
   type SharedPicklist,
 } from "./picklist";
 
@@ -116,6 +117,12 @@ describe("picklist board", () => {
     expect(canViewSharedPicklist(draft, "u2", true)).toBe(false);
     expect(canViewSharedPicklist(submitted, "u2", true)).toBe(true);
     expect(canViewSharedPicklist(submitted, "u2", false)).toBe(false);
+  });
+
+  it("keeps similarly named events isolated before applying visibility", () => {
+    const expected = sharedList({ id: "expected", eventKey: "2026ab_cd" });
+    const wildcardLookalike = sharedList({ id: "other", eventKey: "2026abxcd" });
+    expect(visiblePicklistsForEvent([expected, wildcardLookalike], "2026ab_cd", "u1", false)).toEqual([expected]);
   });
 
   it("compares selected lists within one tier by rank and appearances", () => {
