@@ -54,6 +54,24 @@ export function movePicklistTeam(
   return next;
 }
 
+export function reorderPicklistTeam(
+  board: PicklistBoard,
+  validTeams: string[],
+  column: PicklistColumn,
+  team: string,
+  overTeam: string,
+) {
+  const next = sanitizePicklistBoard(board, validTeams);
+  if (column === "pool" || team === overTeam) return next;
+  const oldIndex = next[column].indexOf(team);
+  const newIndex = next[column].indexOf(overTeam);
+  if (oldIndex < 0 || newIndex < 0) return next;
+  const reordered = [...next[column]];
+  reordered.splice(newIndex, 0, reordered.splice(oldIndex, 1)[0]);
+  next[column] = reordered;
+  return next;
+}
+
 export function migrateLegacyPicklist(first: string[], second: string[], crossed: string[], validTeams: string[]) {
   const dnp = new Set(crossed);
   return sanitizePicklistBoard(

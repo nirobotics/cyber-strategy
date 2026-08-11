@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -25,6 +25,7 @@ import {
   emptyPicklistBoard,
   migrateLegacyPicklist,
   movePicklistTeam,
+  reorderPicklistTeam,
   sanitizePicklistBoard,
   type PicklistBoard as PicklistBoardState,
   type PicklistColumn,
@@ -53,6 +54,7 @@ export function PicklistBoard({
   const [board, setBoard] = useStoredPicklistBoard(datasetId, validTeams);
   const [previewBoard, setPreviewBoard] = useState<PicklistBoardState | null>(null);
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
+  const dragColumn = useRef<PicklistColumn | null>(null);
   const columns = useMemo(() => buildPicklistColumns(teams, previewBoard ?? board), [board, previewBoard, teams]);
   const byTeam = useMemo(() => new Map(teams.map((team) => [team.team, team])), [teams]);
   const sensors = useSensors(
@@ -65,14 +67,20 @@ export function PicklistBoard({
 
   function previewDrag(event: DragOverEvent) {
     const target = readDragTarget(event);
-    if (!target) return;
+    if (!target || dragColumn.current === target.column) return;
     setPreviewBoard((current) => movePicklistTeam(current ?? board, validTeams, target.team, target.column, target.beforeTeam));
+    dragColumn.current = target.column;
   }
 
   function finishDrag(event: DragEndEvent) {
     const target = readDragTarget(event);
     if (target) {
-      setBoard((current) => movePicklistTeam(previewBoard ?? current, validTeams, target.team, target.column, target.beforeTeam));
+      setBoard((current) => {
+        const base = previewBoard ?? current;
+        return dragColumn.current === target.column && target.beforeTeam
+          ? reorderPicklistTeam(base, validTeams, target.column, target.team, target.beforeTeam)
+          : movePicklistTeam(base, validTeams, target.team, target.column, target.beforeTeam);
+      });
     }
     clearDrag();
   }
@@ -80,6 +88,7 @@ export function PicklistBoard({
   function clearDrag() {
     setActiveTeam(null);
     setPreviewBoard(null);
+    dragColumn.current = null;
   }
 
   return (
@@ -102,6 +111,7 @@ export function PicklistBoard({
         onDragStart={(event) => {
           setActiveTeam(event.active.data.current?.team as string | null);
           setPreviewBoard(board);
+          dragColumn.current = event.active.data.current?.column as PicklistColumn | null;
         }}
         onDragOver={previewDrag}
         onDragCancel={clearDrag}

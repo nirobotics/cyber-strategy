@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPicklistColumns, emptyPicklistBoard, migrateLegacyPicklist, movePicklistTeam, sanitizePicklistBoard } from "./picklist";
+import { buildPicklistColumns, emptyPicklistBoard, migrateLegacyPicklist, movePicklistTeam, reorderPicklistTeam, sanitizePicklistBoard } from "./picklist";
 
 describe("picklist board", () => {
   const teams = [
@@ -35,6 +35,12 @@ describe("picklist board", () => {
   it("does not move a team when it is dropped on itself", () => {
     const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
     expect(movePicklistTeam(board, validTeams, "1", "tier1", "1")).toEqual(board);
+  });
+
+  it("reorders upward and downward by the hovered team index", () => {
+    const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
+    expect(reorderPicklistTeam(board, validTeams, "tier1", "3", "2").tier1).toEqual(["1", "3", "2"]);
+    expect(reorderPicklistTeam(board, validTeams, "tier1", "1", "3").tier1).toEqual(["2", "3", "1"]);
   });
 
   it("filters stale teams and duplicates across all categories", () => {
