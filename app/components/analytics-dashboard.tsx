@@ -361,7 +361,7 @@ export function AnalyticsDashboard({
       {visitedTabs.has("match") ? (
         <div hidden={activeTab !== "match"}>
           {demoMode || fetchedMatchSchedule || matchSchedule.length ? (
-            <MatchAnalysis eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} />
+            <MatchAnalysis eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} onOpenTeam={setDetailTeam} />
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}

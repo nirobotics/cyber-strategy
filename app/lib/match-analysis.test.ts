@@ -28,10 +28,26 @@ describe("match analysis calculations", () => {
   });
 
   it("recommends review only for a large alliance difference and a team difference over 100 percent", () => {
-    expect(needsScoutingReview(true, 50, 101)).toBe(true);
+    expect(needsScoutingReview(true, 68.7, 8.7)).toBe(true);
     expect(needsScoutingReview(true, 50, 100)).toBe(false);
-    expect(needsScoutingReview(false, 50, 101)).toBe(false);
+    expect(needsScoutingReview(false, 68.7, 8.7)).toBe(false);
     expect(needsScoutingReview(true, 50, null)).toBe(false);
+  });
+
+  it("matches a team Scouting record by match type as well as match number", () => {
+    const teamData = teams({ 1: 10 });
+    teamData["1"].matches = [
+      { ...teamData["1"].matches[0], match: 3, matchType: "practice", scoutingPts: 130 },
+      { ...teamData["1"].matches[0], match: 3, matchType: "qualification", scoutingPts: 8.7 },
+    ];
+
+    expect(resolveTeamMetric({
+      team: "1",
+      teamData,
+      teamEvents: new Map(),
+      matchNumber: 3,
+      matchType: "qualification",
+    }).scoutMatch?.scoutingPts).toBe(8.7);
   });
 
   it("uses Strategy composite ratings for win probability before Statbotics", () => {

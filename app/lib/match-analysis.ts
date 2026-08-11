@@ -84,7 +84,8 @@ export function hasLargeScoutingDifference(actual: number | null, scouting: numb
 }
 
 export function needsScoutingReview(allianceDifferenceIsLarge: boolean, rating: number | null, scouting: number | null) {
-  return allianceDifferenceIsLarge && rating != null && scouting != null && Math.abs(rating - scouting) > rating;
+  return allianceDifferenceIsLarge && rating != null && scouting != null
+    && Math.max(rating, scouting) > Math.min(rating, scouting) * 2;
 }
 
 export type MatchScores = {
@@ -390,14 +391,18 @@ export function resolveTeamMetric({
   teamData,
   teamEvents,
   matchNumber,
+  matchType,
 }: {
   team: string;
   teamData: TeamData;
   teamEvents: Map<string, TeamEvent>;
   matchNumber: number | null;
+  matchType?: DataRange | null;
 }): TeamMetric {
   const summary = teamData[team];
-  const scoutMatch = matchNumber == null ? null : summary?.matches.find((match) => match.match === matchNumber) ?? null;
+  const scoutMatch = matchNumber == null ? null : summary?.matches.find((match) =>
+    match.match === matchNumber && (!matchType || (match.matchType ?? "qualification") === matchType)
+  ) ?? null;
   if (summary) {
     return {
       team,

@@ -533,7 +533,7 @@ function PeopleTable({ people }: { people: ScoutConfidencePerson[] }) {
         <thead className="sticky top-0 bg-surface-2 text-xs uppercase text-ink-faint">
           <tr>
             <th className="w-8 px-2 py-2">#</th>
-            <th className="w-20 px-2 py-2">Scout</th>
+            <th className="w-1/4 px-2 py-2">Scout</th>
             <th className="px-2 py-2">净信心分</th>
             <th className="px-2 py-2">错误扣分</th>
             <th className="px-2 py-2">已计分</th>
@@ -545,7 +545,7 @@ function PeopleTable({ people }: { people: ScoutConfidencePerson[] }) {
           {people.map((person, index) => (
             <tr key={person.scoutName} className="hover:bg-surface-2/70">
               <td className="px-2 py-2 text-ink-faint">{index + 1}</td>
-              <td className="truncate px-2 py-2 font-semibold text-ink">{person.scoutName}</td>
+              <td className="break-words px-2 py-2 font-semibold text-ink" title={person.scoutName}>{person.scoutName}</td>
               <td className={cn("px-2 py-2 font-semibold tabular-nums", person.netScore >= 0 ? "text-ok" : "text-danger")}>
                 {signed(person.netScore)}
               </td>

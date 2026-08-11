@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, ExternalLink, Gauge, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, Input, cn } from "./ui";
 import {
@@ -27,6 +27,7 @@ import {
   type WinProbability,
 } from "../lib/match-analysis";
 import type { TeamData } from "../lib/scouting";
+import { matchTypeFromTbaCompLevel } from "../lib/data-range";
 
 type LoadState =
   | { status: "idle" | "loading" }
@@ -45,6 +46,7 @@ export function MatchAnalysis({
   scoutingTeamData = teamData,
   enrich = true,
   initialMatchKey = null,
+  onOpenTeam,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
@@ -52,6 +54,7 @@ export function MatchAnalysis({
   scoutingTeamData?: TeamData;
   enrich?: boolean;
   initialMatchKey?: string | null;
+  onOpenTeam?: (team: string) => void;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [state, setState] = useState<LoadState>(() => schedule.length || !enrich
@@ -140,6 +143,7 @@ export function MatchAnalysis({
           scoutingTeamData={scoutingTeamData}
           teamEvents={state.teamEvents}
           onBack={() => setSelectedMatchKey(null)}
+          onOpenTeam={onOpenTeam}
         />
       ) : null}
       {state.status === "ready" && !selectedMatch ? (
@@ -363,6 +367,7 @@ function MatchDetail({
   scoutingTeamData,
   teamEvents,
   onBack,
+  onOpenTeam,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
@@ -370,6 +375,7 @@ function MatchDetail({
   scoutingTeamData: TeamData;
   teamEvents: TeamEvent[];
   onBack: () => void;
+  onOpenTeam?: (team: string) => void;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
@@ -377,8 +383,9 @@ function MatchDetail({
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
   const teamEventMap = useMemo(() => buildTeamEventMap(teamEvents), [teamEvents]);
   const matchNumber = match.match_number ?? null;
-  const redMetrics = redTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber }));
-  const blueMetrics = blueTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber }));
+  const matchType = matchTypeFromTbaCompLevel(match.comp_level);
+  const redMetrics = redTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber, matchType }));
+  const blueMetrics = blueTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber, matchType }));
   const allMetrics = [...redMetrics, ...blueMetrics];
 
   return (
@@ -411,6 +418,7 @@ function MatchDetail({
           predictedScore={score.predictedRed}
           scoutingScore={score.scoutingRed}
           winner={score.winner === "red"}
+          onOpenTeam={onOpenTeam}
         />
         <AllianceDetail
           color="blue"
@@ -421,6 +429,7 @@ function MatchDetail({
           predictedScore={score.predictedBlue}
           scoutingScore={score.scoutingBlue}
           winner={score.winner === "blue"}
+          onOpenTeam={onOpenTeam}
         />
       </div>
 
@@ -430,13 +439,6 @@ function MatchDetail({
             label="联盟 Auto 和 Tele 对比"
             configKey={`match-alliance:${matchIdentity(match)}:${metricKey(allMetrics)}`}
             buildConfig={(palette) => allianceContributionConfig(redMetrics, blueMetrics, palette)}
-          />
-        </ChartCard>
-        <ChartCard title="六队综合分范围" icon={<Gauge className="size-4" />}>
-          <ChartCanvas
-            label="六队综合分范围"
-            configKey={`match-range:${matchIdentity(match)}:${metricKey(allMetrics)}`}
-            buildConfig={(palette) => rangeConfig(allMetrics, palette)}
           />
         </ChartCard>
         <ChartCard title="命中率 / 可靠性" icon={<Target className="size-4" />}>
@@ -502,6 +504,7 @@ function AllianceDetail({
   predictedScore,
   scoutingScore,
   winner,
+  onOpenTeam,
 }: {
   color: "red" | "blue";
   label: string;
@@ -511,6 +514,7 @@ function AllianceDetail({
   predictedScore: number | null;
   scoutingScore: number | null;
   winner: boolean;
+  onOpenTeam?: (team: string) => void;
 }) {
   const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
@@ -532,7 +536,7 @@ function AllianceDetail({
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {metrics.map((metric) => (
-            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} />
+            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} onOpenTeam={onOpenTeam} />
           ))}
           {!teams.length ? <div className="rounded-md border border-line bg-surface p-3 text-sm text-ink-dim">待定</div> : null}
         </div>
@@ -541,7 +545,7 @@ function AllianceDetail({
   );
 }
 
-function TeamMetricCard({ metric, allianceDifferenceIsLarge }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean }) {
+function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean; onOpenTeam?: (team: string) => void }) {
   const scoutingTotal = metric.scoutMatch?.scoutingPts ?? null;
   const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
   const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
@@ -549,13 +553,17 @@ function TeamMetricCard({ metric, allianceDifferenceIsLarge }: { metric: TeamMet
   return (
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-brand">Team {metric.team}</p>
-          <p className="text-[11px] font-semibold uppercase text-ink-faint">{metric.ratingLabel}</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
+        <button
+          type="button"
+          disabled={!onOpenTeam}
+          onClick={() => onOpenTeam?.(metric.team)}
+          className="rounded-sm text-sm font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/50 disabled:cursor-default disabled:no-underline"
+        >
+          Team {metric.team}
+        </button>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           {reviewRecommended ? <span className="badge border-warning/30 bg-warning/10 text-warning">建议重新核查</span> : null}
+          <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs text-ink-dim">
@@ -661,21 +669,6 @@ function allianceContributionConfig(red: TeamMetric[], blue: TeamMetric[], palet
   } as ChartConfiguration;
 }
 
-function rangeConfig(metrics: TeamMetric[], palette: ChartPaletteLike): ChartConfiguration {
-  return {
-    type: "bar",
-    data: {
-      labels: metrics.map((metric) => metric.team),
-      datasets: [
-        { label: "最低", data: metrics.map((metric) => metric.min ?? metric.rating ?? 0), backgroundColor: `${palette.colors[1]}55` },
-        { label: "平均", data: metrics.map((metric) => metric.rating ?? 0), backgroundColor: palette.colors[0] },
-        { label: "最高", data: metrics.map((metric) => metric.max ?? metric.rating ?? 0), backgroundColor: `${palette.colors[2]}77` },
-      ],
-    },
-    options: chartOptions(palette),
-  } as ChartConfiguration;
-}
-
 function healthConfig(metrics: TeamMetric[], palette: ChartPaletteLike): ChartConfiguration {
   return {
     type: "bar",
@@ -704,6 +697,7 @@ function autoTeleConfig(metrics: TeamMetric[], palette: ChartPaletteLike): Chart
       datasets: [
         { label: "Auto", data: metrics.map((metric) => metric.auto ?? 0), backgroundColor: palette.colors[0] },
         { label: "Tele", data: metrics.map((metric) => metric.tele ?? 0), backgroundColor: palette.colors[2] },
+        { label: "平均综合分", data: metrics.map((metric) => metric.rating ?? 0), backgroundColor: palette.colors[1] },
       ],
     },
     options: chartOptions(palette),
