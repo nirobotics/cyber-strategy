@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildPicklistColumns, emptyPicklistBoard, migrateLegacyPicklist, movePicklistTeam, reorderPicklistTeam, sanitizePicklistBoard } from "./picklist";
+import {
+  buildPicklistColumns,
+  emptyPicklistBoard,
+  migrateLegacyPicklist,
+  movePicklistTeam,
+  reorderPicklistTeam,
+  resolvePicklistDropTarget,
+  sanitizePicklistBoard,
+} from "./picklist";
 
 describe("picklist board", () => {
   const teams = [
@@ -41,6 +49,12 @@ describe("picklist board", () => {
     const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
     expect(reorderPicklistTeam(board, validTeams, "tier1", "3", "2").tier1).toEqual(["1", "3", "2"]);
     expect(reorderPicklistTeam(board, validTeams, "tier1", "1", "3").tier1).toEqual(["2", "3", "1"]);
+  });
+
+  it("keeps the last valid target when drop collision returns to the dragged team", () => {
+    const lastValid = { team: "3", column: "tier1" as const, beforeTeam: "2" };
+    const current = { team: "3", column: "tier1" as const, beforeTeam: "3" };
+    expect(resolvePicklistDropTarget(current, lastValid)).toEqual(lastValid);
   });
 
   it("filters stale teams and duplicates across all categories", () => {

@@ -26,9 +26,11 @@ import {
   migrateLegacyPicklist,
   movePicklistTeam,
   reorderPicklistTeam,
+  resolvePicklistDropTarget,
   sanitizePicklistBoard,
   type PicklistBoard as PicklistBoardState,
   type PicklistColumn,
+  type PicklistDropTarget,
 } from "../lib/picklist";
 
 const COLUMN_LABELS: Record<PicklistColumn, string> = {
@@ -55,6 +57,7 @@ export function PicklistBoard({
   const [previewBoard, setPreviewBoard] = useState<PicklistBoardState | null>(null);
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
   const dragColumn = useRef<PicklistColumn | null>(null);
+  const lastValidTarget = useRef<PicklistDropTarget | null>(null);
   const columns = useMemo(() => buildPicklistColumns(teams, previewBoard ?? board), [board, previewBoard, teams]);
   const byTeam = useMemo(() => new Map(teams.map((team) => [team.team, team])), [teams]);
   const sensors = useSensors(
@@ -67,13 +70,16 @@ export function PicklistBoard({
 
   function previewDrag(event: DragOverEvent) {
     const target = readDragTarget(event);
-    if (!target || dragColumn.current === target.column) return;
+    if (!target) return;
+    if (target.beforeTeam && target.beforeTeam !== target.team) lastValidTarget.current = target;
+    if (!target.beforeTeam && dragColumn.current !== target.column) lastValidTarget.current = target;
+    if (dragColumn.current === target.column) return;
     setPreviewBoard((current) => movePicklistTeam(current ?? board, validTeams, target.team, target.column, target.beforeTeam));
     dragColumn.current = target.column;
   }
 
   function finishDrag(event: DragEndEvent) {
-    const target = readDragTarget(event);
+    const target = resolvePicklistDropTarget(readDragTarget(event), lastValidTarget.current);
     if (target) {
       setBoard((current) => {
         const base = previewBoard ?? current;
@@ -89,6 +95,7 @@ export function PicklistBoard({
     setActiveTeam(null);
     setPreviewBoard(null);
     dragColumn.current = null;
+    lastValidTarget.current = null;
   }
 
   return (
@@ -112,6 +119,7 @@ export function PicklistBoard({
           setActiveTeam(event.active.data.current?.team as string | null);
           setPreviewBoard(board);
           dragColumn.current = event.active.data.current?.column as PicklistColumn | null;
+          lastValidTarget.current = null;
         }}
         onDragOver={previewDrag}
         onDragCancel={clearDrag}
@@ -272,7 +280,7 @@ function PicklistStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function readDragTarget(event: DragOverEvent | DragEndEvent) {
+function readDragTarget(event: DragOverEvent | DragEndEvent): PicklistDropTarget | null {
   const team = event.active.data.current?.team as string | undefined;
   const column = event.over?.data.current?.column as PicklistColumn | undefined;
   const beforeTeam = event.over?.data.current?.team as string | undefined;

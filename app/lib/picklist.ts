@@ -4,6 +4,7 @@ export const PICKLIST_COLUMNS = [...PICKLIST_ASSIGNED_COLUMNS, "pool"] as const;
 export type PicklistAssignedColumn = (typeof PICKLIST_ASSIGNED_COLUMNS)[number];
 export type PicklistColumn = (typeof PICKLIST_COLUMNS)[number];
 export type PicklistBoard = Record<PicklistAssignedColumn, string[]>;
+export type PicklistDropTarget = { team: string; column: PicklistColumn; beforeTeam?: string };
 
 export function emptyPicklistBoard(): PicklistBoard {
   return { tier1: [], tier2: [], tier3: [], dnp: [] };
@@ -70,6 +71,11 @@ export function reorderPicklistTeam(
   reordered.splice(newIndex, 0, reordered.splice(oldIndex, 1)[0]);
   next[column] = reordered;
   return next;
+}
+
+export function resolvePicklistDropTarget(current: PicklistDropTarget | null, lastValid: PicklistDropTarget | null) {
+  if (!current) return lastValid;
+  return current.beforeTeam === current.team ? lastValid ?? current : current;
 }
 
 export function migrateLegacyPicklist(first: string[], second: string[], crossed: string[], validTeams: string[]) {
