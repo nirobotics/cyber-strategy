@@ -353,10 +353,8 @@ export function AnalyticsDashboard({
       {teams.length && activeTab === "picklist" ? (
         <PicklistBoard
           datasetId={dataset.id}
-          eventKey={dataset.eventKey}
           teams={teams}
           tierByTeam={tierByTeam}
-          rankByTeam={rankByTeam}
           onOpenTeam={setDetailTeam}
         />
       ) : null}
