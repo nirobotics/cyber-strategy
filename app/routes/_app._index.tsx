@@ -16,7 +16,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
   const datasetRequest = admin ? request : new Request(new URL(request.url).origin + new URL(request.url).pathname, request);
   const data = await getStrategyDatasetForRequest(datasetRequest, { includedMatchTypes: dataRange });
-  const { matches: _matches, ...strategyData } = data;
+  const { matches: matchSchedule, ...strategyData } = data;
   const selectedEventKey = data.selectedEventKey ?? data.dataset.eventKey;
 
   return {
@@ -26,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     tierPercentages,
     dataRange,
     user,
-    matchSchedule: [],
+    matchSchedule,
     strategyProposal: {
       proposals: [],
       proposalError: null,

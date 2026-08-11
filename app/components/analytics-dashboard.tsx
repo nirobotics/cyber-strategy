@@ -360,8 +360,8 @@ export function AnalyticsDashboard({
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
       {visitedTabs.has("match") ? (
         <div hidden={activeTab !== "match"}>
-          {demoMode || fetchedMatchSchedule ? (
-            <MatchAnalysis eventKey={dataset.eventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
+          {demoMode || fetchedMatchSchedule || matchSchedule.length ? (
+            <MatchAnalysis eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}
