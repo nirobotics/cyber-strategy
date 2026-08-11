@@ -396,7 +396,11 @@ export function AnalyticsDashboard({
       ) : null}
       {visitedTabs.has("lead") ? (
         <div className="min-h-0 flex-1" hidden={activeTab !== "lead"}>
-          {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
+          {activeTab === "lead" ? (
+            resolvedScoutingLead
+              ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} />
+              : <TabLoading label="正在加载 Scouting Lead" />
+          ) : null}
         </div>
       ) : null}
       {visitedTabs.has("settings") ? (
