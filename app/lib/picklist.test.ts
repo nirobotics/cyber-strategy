@@ -1,47 +1,61 @@
 import { describe, expect, it } from "vitest";
-import { addPickListTeam, insertPickListTeam, orderPickPool, pickListAutoScrollDelta, sanitizePickList } from "./picklist";
+import { buildPicklistColumns, emptyPicklistBoard, migrateLegacyPicklist, movePicklistTeam, sanitizePicklistBoard } from "./picklist";
 
-describe("picklist helpers", () => {
+describe("picklist board", () => {
   const teams = [
-    { team: "1", avgTotal: 100 },
-    { team: "2", avgTotal: 80 },
-    { team: "3", avgTotal: 0 },
-    { team: "4", avgTotal: 60 },
+    { team: "1", avgTotal: 80 },
+    { team: "2", avgTotal: 100 },
+    { team: "3", avgTotal: 60 },
+    { team: "4", avgTotal: 0 },
   ];
+  const validTeams = teams.map((team) => team.team);
 
-  it("keeps crossed teams at the bottom while ranked teams stay sorted", () => {
-    expect(orderPickPool(teams, ["2"]).map((team) => team.team)).toEqual(["1", "4", "3", "2"]);
+  it("keeps every team in exactly one column and ranks the unassigned pool", () => {
+    const columns = buildPicklistColumns(teams, { tier1: ["1"], tier2: ["2"], tier3: [], dnp: [] });
+    expect(columns).toEqual({ tier1: ["1"], tier2: ["2"], tier3: [], dnp: [], pool: ["3", "4"] });
   });
 
-  it("builds independent pools from each pick list while sharing crossed teams", () => {
-    expect(orderPickPool(teams, ["2"], ["1"]).map((team) => team.team)).toEqual(["4", "3", "2"]);
-    expect(orderPickPool(teams, ["2"], ["4"]).map((team) => team.team)).toEqual(["1", "3", "2"]);
+  it("moves a team across columns without duplication", () => {
+    const board = { tier1: ["1", "2"], tier2: ["3"], tier3: [], dnp: [] };
+    expect(movePicklistTeam(board, validTeams, "2", "tier2", "3")).toEqual({
+      tier1: ["1"],
+      tier2: ["2", "3"],
+      tier3: [],
+      dnp: [],
+    });
   });
 
-  it("does not duplicate teams in one pick list", () => {
-    expect(addPickListTeam(["1", "2"], "2")).toEqual(["1", "2"]);
-    expect(addPickListTeam(["1", "2"], "3")).toEqual(["1", "2", "3"]);
+  it("reorders within a column and returns teams to the pool", () => {
+    const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
+    const reordered = movePicklistTeam(board, validTeams, "3", "tier1", "1");
+    expect(reordered.tier1).toEqual(["3", "1", "2"]);
+    expect(movePicklistTeam(reordered, validTeams, "1", "pool").tier1).toEqual(["3", "2"]);
   });
 
-  it("lets the same team live in separate pick lists", () => {
-    const first = addPickListTeam([], "6328");
-    const second = addPickListTeam([], "6328");
-    expect(first).toEqual(["6328"]);
-    expect(second).toEqual(["6328"]);
+  it("does not move a team when it is dropped on itself", () => {
+    const board = { tier1: ["1", "2", "3"], tier2: [], tier3: [], dnp: [] };
+    expect(movePicklistTeam(board, validTeams, "1", "tier1", "1")).toEqual(board);
   });
 
-  it("reorders teams by inserting before a target", () => {
-    expect(insertPickListTeam(["1", "2", "3"], "3", "1")).toEqual(["3", "1", "2"]);
-    expect(insertPickListTeam(["1", "2", "3"], "1")).toEqual(["2", "3", "1"]);
+  it("filters stale teams and duplicates across all categories", () => {
+    expect(sanitizePicklistBoard({ tier1: ["1", "9", "1"], tier2: ["1", "2"], dnp: ["3"] }, validTeams)).toEqual({
+      tier1: ["1"],
+      tier2: ["2"],
+      tier3: [],
+      dnp: ["3"],
+    });
   });
 
-  it("filters stale and duplicate teams", () => {
-    expect(sanitizePickList(["1", "9", "2", "1"], ["1", "2"])).toEqual(["1", "2"]);
+  it("migrates the former first, second and crossed lists", () => {
+    expect(migrateLegacyPicklist(["1", "3"], ["2"], ["3", "9"], validTeams)).toEqual({
+      tier1: ["1"],
+      tier2: ["2"],
+      tier3: [],
+      dnp: ["3"],
+    });
   });
 
-  it("scrolls toward the nearest drag edge and stays still in the middle", () => {
-    expect(pickListAutoScrollDelta(10, 0, 600)).toBeLessThan(0);
-    expect(pickListAutoScrollDelta(300, 0, 600)).toBe(0);
-    expect(pickListAutoScrollDelta(590, 0, 600)).toBeGreaterThan(0);
+  it("starts with an empty board", () => {
+    expect(emptyPicklistBoard()).toEqual({ tier1: [], tier2: [], tier3: [], dnp: [] });
   });
 });

@@ -1,54 +1,70 @@
-export type PickListId = "first" | "second";
+export const PICKLIST_ASSIGNED_COLUMNS = ["tier1", "tier2", "tier3", "dnp"] as const;
+export const PICKLIST_COLUMNS = [...PICKLIST_ASSIGNED_COLUMNS, "pool"] as const;
 
-export function orderPickPool<T extends { team: string; avgTotal: number }>(
-  teams: T[],
-  crossedTeams: string[],
-  pickedTeams: string[] = [],
-) {
-  const crossed = new Set(crossedTeams);
-  const picked = new Set(pickedTeams);
-  return teams.filter((team) => !picked.has(team.team)).sort((a, b) => {
-    const aCrossed = crossed.has(a.team) ? 1 : 0;
-    const bCrossed = crossed.has(b.team) ? 1 : 0;
-    if (aCrossed !== bCrossed) return aCrossed - bCrossed;
-    return b.avgTotal - a.avgTotal || teamNumber(a.team) - teamNumber(b.team);
-  });
+export type PicklistAssignedColumn = (typeof PICKLIST_ASSIGNED_COLUMNS)[number];
+export type PicklistColumn = (typeof PICKLIST_COLUMNS)[number];
+export type PicklistBoard = Record<PicklistAssignedColumn, string[]>;
+
+export function emptyPicklistBoard(): PicklistBoard {
+  return { tier1: [], tier2: [], tier3: [], dnp: [] };
 }
 
-export function addPickListTeam(list: string[], team: string) {
-  if (!team || list.includes(team)) return list;
-  return [...list, team];
-}
-
-export function insertPickListTeam(list: string[], team: string, beforeTeam?: string) {
-  if (!team) return list;
-  if (team === beforeTeam) return list;
-  const next = list.filter((item) => item !== team);
-  const targetIndex = beforeTeam ? next.indexOf(beforeTeam) : -1;
-  if (targetIndex < 0) return [...next, team];
-  return [...next.slice(0, targetIndex), team, ...next.slice(targetIndex)];
-}
-
-export function removePickListTeam(list: string[], team: string) {
-  return list.filter((item) => item !== team);
-}
-
-export function sanitizePickList(list: string[], validTeams: string[]) {
+export function sanitizePicklistBoard(board: Partial<PicklistBoard> | null | undefined, validTeams: string[]): PicklistBoard {
   const valid = new Set(validTeams);
   const seen = new Set<string>();
-  return list.filter((team) => {
-    if (!valid.has(team) || seen.has(team)) return false;
-    seen.add(team);
-    return true;
-  });
+  const sanitized = emptyPicklistBoard();
+
+  for (const column of PICKLIST_ASSIGNED_COLUMNS) {
+    for (const team of board?.[column] ?? []) {
+      if (!valid.has(team) || seen.has(team)) continue;
+      sanitized[column].push(team);
+      seen.add(team);
+    }
+  }
+  return sanitized;
 }
 
-export function pickListAutoScrollDelta(pointerY: number, start: number, end: number) {
-  const edge = Math.min(96, Math.max(0, (end - start) / 3));
-  if (!edge) return 0;
-  if (pointerY < start + edge) return -Math.min(18, Math.max(4, Math.ceil((start + edge - pointerY) / 5)));
-  if (pointerY > end - edge) return Math.min(18, Math.max(4, Math.ceil((pointerY - (end - edge)) / 5)));
-  return 0;
+export function buildPicklistColumns<T extends { team: string; avgTotal: number }>(teams: T[], board: PicklistBoard) {
+  const validTeams = teams.map((team) => team.team);
+  const sanitized = sanitizePicklistBoard(board, validTeams);
+  const assigned = new Set(PICKLIST_ASSIGNED_COLUMNS.flatMap((column) => sanitized[column]));
+  const pool = teams
+    .filter((team) => !assigned.has(team.team))
+    .sort((a, b) => b.avgTotal - a.avgTotal || teamNumber(a.team) - teamNumber(b.team))
+    .map((team) => team.team);
+  return { ...sanitized, pool } satisfies Record<PicklistColumn, string[]>;
+}
+
+export function movePicklistTeam(
+  board: PicklistBoard,
+  validTeams: string[],
+  team: string,
+  targetColumn: PicklistColumn,
+  beforeTeam?: string,
+) {
+  if (!validTeams.includes(team)) return sanitizePicklistBoard(board, validTeams);
+  const next = sanitizePicklistBoard(board, validTeams);
+  if (beforeTeam === team) return next;
+  for (const column of PICKLIST_ASSIGNED_COLUMNS) next[column] = next[column].filter((item) => item !== team);
+  if (targetColumn === "pool") return next;
+
+  const target = next[targetColumn];
+  const index = beforeTeam ? target.indexOf(beforeTeam) : -1;
+  next[targetColumn] = index < 0 ? [...target, team] : [...target.slice(0, index), team, ...target.slice(index)];
+  return next;
+}
+
+export function migrateLegacyPicklist(first: string[], second: string[], crossed: string[], validTeams: string[]) {
+  const dnp = new Set(crossed);
+  return sanitizePicklistBoard(
+    {
+      tier1: first.filter((team) => !dnp.has(team)),
+      tier2: second.filter((team) => !dnp.has(team)),
+      tier3: [],
+      dnp: crossed,
+    },
+    validTeams,
+  );
 }
 
 function teamNumber(team: string) {
