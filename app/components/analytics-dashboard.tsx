@@ -694,6 +694,7 @@ export function TeamDetail({
 function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   const defaults = [teams[0]?.team ?? "", teams[1]?.team ?? "", teams[2]?.team ?? ""];
   const [selected, setSelected] = useState<string[]>(defaults);
+  const [activeTeamSlot, setActiveTeamSlot] = useState<number | null>(null);
   const teamSet = useMemo(() => new Set(teams.map((team) => team.team)), [teams]);
   const selectedTeams = [0, 1, 2].map((index) => {
     const team = selected[index];
@@ -716,21 +717,16 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
       <Card className="p-3">
         <div className="grid gap-3 md:grid-cols-3 md:items-end">
           {[0, 1, 2].map((index) => (
-            <label key={index} className="grid gap-1 text-sm">
-              <span className="font-medium text-ink-dim">Team {index + 1}</span>
-              <select
-                value={selectedTeams[index] ?? ""}
-                onChange={(event) => setTeam(index, event.target.value)}
-                className="input h-10 font-sans"
-              >
-                <option value="">无</option>
-                {teams.map((team) => (
-                  <option key={team.team} value={team.team}>
-                    Team {team.team}（{team.avgTotal} 综合均分）
-                  </option>
-                ))}
-              </select>
-            </label>
+            <TeamSearchSelect
+              key={`${index}:${selectedTeams[index] ?? ""}`}
+              index={index}
+              teams={teams}
+              selectedTeam={selectedTeams[index] ?? ""}
+              open={activeTeamSlot === index}
+              onOpen={() => setActiveTeamSlot(index)}
+              onClose={() => setActiveTeamSlot(null)}
+              onChange={(team) => setTeam(index, team)}
+            />
           ))}
         </div>
       </Card>
@@ -780,6 +776,113 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
       </div>
     </div>
   );
+}
+
+function TeamSearchSelect({
+  index,
+  teams,
+  selectedTeam,
+  open,
+  onOpen,
+  onClose,
+  onChange,
+}: {
+  index: number;
+  teams: TeamSummary[];
+  selectedTeam: string;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  onChange: (team: string) => void;
+}) {
+  const selected = teams.find((team) => team.team === selectedTeam);
+  const selectedLabel = selected ? `Team ${selected.team}（${selected.avgTotal} 综合均分）` : "";
+  const [query, setQuery] = useState(selectedLabel);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const visibleTeams = useMemo(() => filterCompareTeams(teams, query), [query, teams]);
+
+  function choose(team: TeamSummary) {
+    onChange(team.team);
+    setQuery(`Team ${team.team}（${team.avgTotal} 综合均分）`);
+    onClose();
+  }
+
+  return (
+    <div
+      className="relative grid gap-1 text-sm"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setQuery(selectedLabel);
+          onClose();
+        }
+      }}
+    >
+      <label htmlFor={`compare-team-${index}`} className="font-medium text-ink-dim">Team {index + 1}</label>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          id={`compare-team-${index}`}
+          className="input h-10 pr-9 font-sans"
+          value={query}
+          placeholder="输入队号查找 / 选择队伍"
+          autoComplete="off"
+          onFocus={() => {
+            onOpen();
+            if (selected) setQuery("");
+          }}
+          onClick={onOpen}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onOpen();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              onClose();
+              setQuery(selectedLabel);
+            } else if (event.key === "Enter" && visibleTeams[0]) {
+              event.preventDefault();
+              choose(visibleTeams[0]);
+            }
+          }}
+        />
+        {selected ? (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-ink-faint transition hover:bg-surface-2 hover:text-ink"
+            aria-label={`清空 Team ${index + 1}`}
+            onClick={() => {
+              onChange("");
+              setQuery("");
+              onOpen();
+              inputRef.current?.focus();
+            }}
+          >
+            <X className="size-4" />
+          </button>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="absolute inset-x-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-xl">
+          {visibleTeams.length ? visibleTeams.map((team) => (
+            <button
+              key={team.team}
+              type="button"
+              className="flex h-9 w-full items-center justify-between gap-3 rounded px-2 text-left hover:bg-surface-2"
+              onClick={() => choose(team)}
+            >
+              <span className="font-semibold">Team {team.team}</span>
+              <span className="truncate text-xs text-ink-dim">{team.avgTotal} 综合均分</span>
+            </button>
+          )) : <div className="px-2 py-3 text-center text-xs text-ink-faint">未找到队伍</div>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function filterCompareTeams(teams: TeamSummary[], query: string) {
+  const teamNumber = query.trim().replace(/^team\s*/i, "").split(/\s|（/)[0];
+  return teamNumber ? teams.filter((team) => team.team.includes(teamNumber)) : teams;
 }
 
 function PicklistBoard({
