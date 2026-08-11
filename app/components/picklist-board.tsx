@@ -99,8 +99,8 @@ export function PicklistBoard({
   }
 
   return (
-    <div className="min-h-0">
-      <div className="mb-3 flex justify-end">
+    <div className="min-h-0 sm:flex sm:flex-1 sm:flex-col sm:overflow-hidden">
+      <div className="mb-3 flex shrink-0 justify-end">
         <Button
           type="button"
           className="shrink-0"
@@ -125,7 +125,7 @@ export function PicklistBoard({
         onDragCancel={clearDrag}
         onDragEnd={finishDrag}
       >
-        <div className="grid grid-cols-1 items-start gap-3 landscape:grid-cols-5 sm:grid-cols-5">
+        <div className="grid grid-cols-1 items-start gap-3 landscape:grid-cols-5 sm:min-h-0 sm:flex-1 sm:grid-cols-5 sm:items-stretch">
           {PICKLIST_COLUMNS.map((column) => (
             <PicklistColumnView
               key={column}
@@ -168,13 +168,13 @@ function PicklistColumnView({
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `column:${column}`, data: { column } });
   return (
-    <section className={cn("min-w-0 overflow-hidden rounded-md border bg-surface transition", isOver ? "border-brand ring-2 ring-brand/20" : "border-line")}>
+    <section className={cn("min-w-0 overflow-hidden rounded-md border bg-surface transition sm:flex sm:h-full sm:min-h-0 sm:flex-col", isOver ? "border-brand ring-2 ring-brand/20" : "border-line")}>
       <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
         <h2 className="font-semibold text-ink">{COLUMN_LABELS[column]}</h2>
         <span className="text-xs tabular-nums text-ink-dim">{teamIds.length} 支</span>
       </header>
       <SortableContext items={teamIds.map(teamDragId)} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="min-h-28 space-y-2 p-2 xl:max-h-[68dvh] xl:overflow-y-auto">
+        <div ref={setNodeRef} className="min-h-28 space-y-2 p-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
           {teamIds.map((teamNumber) => {
             const team = byTeam.get(teamNumber);
             return team ? (
