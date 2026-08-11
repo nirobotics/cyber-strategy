@@ -1517,7 +1517,7 @@ function StatePill({ match }: { match: ScoutingMatch }) {
           ? "border-danger/40 bg-danger/10 text-danger"
           : "border-ok/40 bg-ok/10 text-ok";
   return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold", className)}>
+    <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold", className)}>
       {botStateLabel(match)}
       {match.disabled ? <span className="text-danger">已禁用</span> : null}
     </span>
