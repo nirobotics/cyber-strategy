@@ -43,8 +43,10 @@ export function PicklistWorkspace({
   const commandFetcher = useFetcher<PicklistActionData>();
   const saveFetcher = useFetcher<PicklistActionData>();
   const personalKey = personalListsKey(datasetId, resource.userOpenId);
+  const demoMainKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists`;
   const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, datasetId);
   const [sharedLists, setSharedLists] = useState(resource.lists);
+  const [demoMainLoaded, setDemoMainLoaded] = useState(false);
   const [active, setActive] = useState<ActiveList | null>(null);
   const [activeBoard, setActiveBoard] = useState<PicklistBoardState | null>(null);
   const [personalName, setPersonalName] = useState("");
@@ -65,11 +67,33 @@ export function PicklistWorkspace({
     .map((list) => [list.clientId!, list]));
   const selectedMergeMain = mainLists.find((list) => list.id === mergeMainId) ?? null;
   const selectedMergePersonal = submittedPersonal.filter((list) => mergePersonalIds.includes(list.id));
-  const handleBoardChange = useCallback((board: PicklistBoardState) => setActiveBoard(board), []);
+  const handleBoardChange = useCallback((board: PicklistBoardState) => {
+    setActiveBoard(board);
+    if (demoMode && active?.kind === "main") {
+      setSharedLists((current) => current.map((list) => list.id === active.remote.id ? { ...list, board, updatedAt: new Date().toISOString() } : list));
+    }
+  }, [active, demoMode]);
 
   useEffect(() => {
+    if (demoMode) return;
     queueMicrotask(() => setSharedLists(resource.lists));
-  }, [resource.lists]);
+  }, [demoMode, resource.lists]);
+
+  useEffect(() => {
+    if (!demoMode) return;
+    queueMicrotask(() => {
+      try {
+        setSharedLists(normalizeDemoMainLists(JSON.parse(localStorage.getItem(demoMainKey) ?? "[]"), eventKey));
+      } catch {
+        setSharedLists([]);
+      }
+      setDemoMainLoaded(true);
+    });
+  }, [demoMainKey, demoMode, eventKey]);
+
+  useEffect(() => {
+    if (demoMode && demoMainLoaded) localStorage.setItem(demoMainKey, JSON.stringify(sharedLists));
+  }, [demoMainKey, demoMainLoaded, demoMode, sharedLists]);
 
   useEffect(() => {
     const imports = resource.lists.filter((list) =>
@@ -127,7 +151,26 @@ export function PicklistWorkspace({
 
   function createMain() {
     const name = mainName.trim();
-    if (!name || !resource.isAdmin || demoMode) return;
+    if (!name || !resource.isAdmin) return;
+    if (demoMode) {
+      const now = new Date().toISOString();
+      const list: SharedPicklist = {
+        id: `demo-main-${crypto.randomUUID()}`,
+        clientId: null,
+        eventKey,
+        name: name.slice(0, 80),
+        kind: "main",
+        board: emptyPicklistBoard(),
+        createdBy: resource.userOpenId,
+        createdByName: "Demo Admin",
+        submittedAt: null,
+        updatedAt: now,
+      };
+      setSharedLists((current) => [list, ...current]);
+      setMainName("");
+      setActive({ kind: "main", remote: list });
+      return;
+    }
     setPendingCommand("create-main");
     commandFetcher.submit({ intent: "create-main", eventKey, name }, { method: "post", action: "/picklists" });
   }
@@ -176,8 +219,8 @@ export function PicklistWorkspace({
               <ListButton key={list.id} list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} />
             ))}
             {!mainLists.length ? <EmptyCollection text="暂无 Main Picklist" /> : null}
-            {resource.isAdmin && !demoMode ? (
-              <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={commandFetcher.state !== "idle"} />
+            {resource.isAdmin ? (
+              <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} />
             ) : null}
           </PicklistCollection>
 
@@ -309,7 +352,7 @@ function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean }) {
-  return <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className="min-w-0" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onCreate(); }} placeholder={placeholder} maxLength={80} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy}><Plus className="size-4" />创建</Button></div>;
+  return <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className="min-w-0 font-sans" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onCreate(); }} placeholder={placeholder} maxLength={80} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy}><Plus className="size-4" />创建</Button></div>;
 }
 
 function EmptyCollection({ text }: { text: string }) {
@@ -361,6 +404,13 @@ function normalizeLocalLists(value: unknown): LocalPersonalList[] {
     seen.add(id);
     return [{ id, name, createdAt: String(source.createdAt ?? "") || new Date().toISOString() }];
   });
+}
+
+function normalizeDemoMainLists(value: unknown, eventKey: string): SharedPicklist[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((list): list is SharedPicklist => Boolean(
+    list && typeof list === "object" && list.kind === "main" && list.eventKey === eventKey && typeof list.id === "string" && typeof list.name === "string",
+  ));
 }
 
 function toggleId(values: string[], id: string) {
