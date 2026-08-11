@@ -117,7 +117,7 @@ export function PicklistBoard({
         onDragCancel={clearDrag}
         onDragEnd={finishDrag}
       >
-        <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-1 items-start gap-3 landscape:grid-cols-5 sm:grid-cols-5">
           {PICKLIST_COLUMNS.map((column) => (
             <PicklistColumnView
               key={column}
