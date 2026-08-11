@@ -16,6 +16,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Download, GripVertical } from "lucide-react";
 import { Button, cn } from "./ui";
 import { reliability, type TeamSummary } from "../lib/scouting";
+import { tierDisplayLabel, type TierInfo } from "../lib/tier-settings";
 import {
   PICKLIST_COLUMNS,
   buildPicklistColumns,
@@ -27,24 +28,26 @@ import {
   type PicklistColumn,
 } from "../lib/picklist";
 
-const COLUMN_META: Record<PicklistColumn, { label: string; className: string }> = {
-  tier1: { label: "Tier 1", className: "border-yellow-500/45 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" },
-  tier2: { label: "Tier 2", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" },
-  tier3: { label: "Tier 3", className: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300" },
-  dnp: { label: "DNP", className: "border-danger/40 bg-danger/10 text-danger" },
-  pool: { label: "队伍列表", className: "border-line bg-surface-2 text-ink-dim" },
+const COLUMN_LABELS: Record<PicklistColumn, string> = {
+  tier1: "Tier 1",
+  tier2: "Tier 2",
+  tier3: "Tier 3",
+  dnp: "DNP",
+  pool: "队伍列表",
 };
 
 export function PicklistBoard({
   datasetId,
   eventKey,
   teams,
+  tierByTeam,
   rankByTeam,
   onOpenTeam,
 }: {
   datasetId: string;
   eventKey: string;
   teams: TeamSummary[];
+  tierByTeam: Map<string, TierInfo>;
   rankByTeam: Map<string, number>;
   onOpenTeam: (team: string) => void;
 }) {
@@ -82,8 +85,7 @@ export function PicklistBoard({
 
   return (
     <div className="min-h-0">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-ink">赛事 Picklist</h2>
+      <div className="mb-3 flex justify-end">
         <Button
           type="button"
           className="shrink-0"
@@ -109,6 +111,7 @@ export function PicklistBoard({
               column={column}
               teamIds={columns[column]}
               byTeam={byTeam}
+              tierByTeam={tierByTeam}
               rankByTeam={rankByTeam}
               onOpenTeam={onOpenTeam}
             />
@@ -119,6 +122,7 @@ export function PicklistBoard({
             <TeamCard
               team={byTeam.get(activeTeam)!}
               column={findTeamColumn(columns, activeTeam)}
+              tier={tierByTeam.get(activeTeam)}
               rank={rankByTeam.get(activeTeam)}
               onOpenTeam={onOpenTeam}
               overlay
@@ -135,21 +139,22 @@ function PicklistColumnView({
   column,
   teamIds,
   byTeam,
+  tierByTeam,
   rankByTeam,
   onOpenTeam,
 }: {
   column: PicklistColumn;
   teamIds: string[];
   byTeam: Map<string, TeamSummary>;
+  tierByTeam: Map<string, TierInfo>;
   rankByTeam: Map<string, number>;
   onOpenTeam: (team: string) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `column:${column}`, data: { column } });
-  const meta = COLUMN_META[column];
   return (
     <section className={cn("min-w-0 overflow-hidden rounded-md border bg-surface transition", isOver ? "border-brand ring-2 ring-brand/20" : "border-line")}>
       <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
-        <h2 className="font-semibold text-ink">{meta.label}</h2>
+        <h2 className="font-semibold text-ink">{COLUMN_LABELS[column]}</h2>
         <span className="text-xs tabular-nums text-ink-dim">{teamIds.length} 支</span>
       </header>
       <SortableContext items={teamIds.map(teamDragId)} strategy={verticalListSortingStrategy}>
@@ -161,6 +166,7 @@ function PicklistColumnView({
                 key={teamNumber}
                 team={team}
                 column={column}
+                tier={tierByTeam.get(teamNumber)}
                 rank={rankByTeam.get(teamNumber)}
                 onOpenTeam={onOpenTeam}
               />
@@ -195,7 +201,7 @@ function SortableTeamCard(props: Omit<Parameters<typeof TeamCard>[0], "dragHandl
 
 function TeamCard({
   team,
-  column,
+  tier,
   rank,
   onOpenTeam,
   cardRef,
@@ -206,6 +212,7 @@ function TeamCard({
 }: {
   team: TeamSummary;
   column: PicklistColumn;
+  tier?: TierInfo;
   rank?: number;
   onOpenTeam: (team: string) => void;
   cardRef?: (node: HTMLElement | null) => void;
@@ -214,7 +221,6 @@ function TeamCard({
   style?: React.CSSProperties;
   overlay?: boolean;
 }) {
-  const meta = COLUMN_META[column];
   return (
     <article
       ref={cardRef}
@@ -250,7 +256,11 @@ function TeamCard({
       </div>
       <div className="mt-2 flex items-center justify-between gap-2">
         <span className="text-[10px] text-ink-faint">所属类别</span>
-        <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", meta.className)}>{meta.label}</span>
+        {tier ? (
+          <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", tier.className)}>
+            {tierDisplayLabel(tier.label)}
+          </span>
+        ) : <span className="text-[10px] text-ink-faint">-</span>}
       </div>
     </article>
   );
@@ -289,7 +299,7 @@ function PicklistPrintDocument({
         <div className="picklist-print-lists">
           {PICKLIST_COLUMNS.filter((column) => column !== "pool").map((column) => (
             <section key={column}>
-              <h2>{COLUMN_META[column].label}</h2>
+              <h2>{COLUMN_LABELS[column]}</h2>
               {!board[column].length ? <p className="picklist-print-empty">暂无队伍</p> : null}
               {board[column].map((teamNumber, index) => {
                 const team = byTeam.get(teamNumber);

@@ -355,6 +355,7 @@ export function AnalyticsDashboard({
           datasetId={dataset.id}
           eventKey={dataset.eventKey}
           teams={teams}
+          tierByTeam={tierByTeam}
           rankByTeam={rankByTeam}
           onOpenTeam={setDetailTeam}
         />
