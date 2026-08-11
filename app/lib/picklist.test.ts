@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPicklistColumns,
+  canCreateMainPicklist,
+  canEditSharedPicklist,
+  canViewSharedPicklist,
+  comparePicklistTier,
   emptyPicklistBoard,
   migrateLegacyPicklist,
   movePicklistTeam,
+  normalizePicklistBoard,
   previewPicklistTeam,
   reorderPicklistTeam,
   sanitizePicklistBoard,
+  type SharedPicklist,
 } from "./picklist";
 
 describe("picklist board", () => {
@@ -85,4 +91,58 @@ describe("picklist board", () => {
   it("starts with an empty board", () => {
     expect(emptyPicklistBoard()).toEqual({ tier1: [], tier2: [], tier3: [], dnp: [] });
   });
+
+  it("normalizes stored boards and removes invalid or duplicate teams", () => {
+    expect(normalizePicklistBoard({
+      tier1: ["frc1", "2", "bad"],
+      tier2: [2, "3"],
+      tier3: null,
+      dnp: ["4"],
+    })).toEqual({ tier1: ["1", "2"], tier2: ["3"], tier3: [], dnp: ["4"] });
+  });
+
+  it("enforces Main and Personal visibility and edit permissions", () => {
+    const main = sharedList({ kind: "main", createdBy: "admin" });
+    const draft = sharedList({ id: "draft", kind: "personal", createdBy: "u1", submittedAt: null });
+    const submitted = sharedList({ id: "submitted", kind: "personal", createdBy: "u1", submittedAt: "2026-08-11T00:00:00Z" });
+
+    expect(canCreateMainPicklist(false)).toBe(false);
+    expect(canCreateMainPicklist(true)).toBe(true);
+    expect(canEditSharedPicklist(main, "u1", false)).toBe(false);
+    expect(canEditSharedPicklist(main, "admin", true)).toBe(true);
+    expect(canEditSharedPicklist(draft, "u1", false)).toBe(true);
+    expect(canEditSharedPicklist(draft, "u2", true)).toBe(false);
+    expect(canViewSharedPicklist(main, "u2", false)).toBe(true);
+    expect(canViewSharedPicklist(draft, "u2", true)).toBe(false);
+    expect(canViewSharedPicklist(submitted, "u2", true)).toBe(true);
+    expect(canViewSharedPicklist(submitted, "u2", false)).toBe(false);
+  });
+
+  it("compares selected lists within one tier by rank and appearances", () => {
+    const main = sharedList({ id: "main", board: { tier1: ["1", "2"], tier2: [], tier3: [], dnp: [] } });
+    const personalA = sharedList({ id: "a", kind: "personal", board: { tier1: ["2", "1", "3"], tier2: [], tier3: [], dnp: [] } });
+    const personalB = sharedList({ id: "b", kind: "personal", board: { tier1: ["2", "3"], tier2: [], tier3: [], dnp: [] } });
+
+    expect(comparePicklistTier([main, personalA, personalB], "tier1")).toEqual([
+      { team: "2", ranks: { main: 2, a: 1, b: 1 }, averageRank: 4 / 3, appearances: 3 },
+      { team: "1", ranks: { main: 1, a: 2, b: null }, averageRank: 1.5, appearances: 2 },
+      { team: "3", ranks: { main: null, a: 3, b: 2 }, averageRank: 2.5, appearances: 2 },
+    ]);
+  });
 });
+
+function sharedList(overrides: Partial<SharedPicklist> = {}): SharedPicklist {
+  return {
+    id: "main",
+    clientId: null,
+    eventKey: "2026cnsh",
+    name: "List",
+    kind: "main",
+    board: emptyPicklistBoard(),
+    createdBy: "admin",
+    createdByName: "Admin",
+    submittedAt: null,
+    updatedAt: "2026-08-11T00:00:00Z",
+    ...overrides,
+  };
+}

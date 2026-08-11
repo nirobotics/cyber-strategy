@@ -5,6 +5,27 @@ export type PicklistAssignedColumn = (typeof PICKLIST_ASSIGNED_COLUMNS)[number];
 export type PicklistColumn = (typeof PICKLIST_COLUMNS)[number];
 export type PicklistBoard = Record<PicklistAssignedColumn, string[]>;
 export type PicklistDropTarget = { team: string; column: PicklistColumn; beforeTeam?: string };
+export type PicklistKind = "main" | "personal";
+export type SharedPicklist = {
+  id: string;
+  clientId: string | null;
+  eventKey: string;
+  name: string;
+  kind: PicklistKind;
+  board: PicklistBoard;
+  createdBy: string | null;
+  createdByName: string;
+  submittedAt: string | null;
+  updatedAt: string;
+};
+
+export type PicklistResource = {
+  selectedEventKey: string;
+  isAdmin: boolean;
+  userOpenId: string;
+  lists: SharedPicklist[];
+  error: string | null;
+};
 
 export function emptyPicklistBoard(): PicklistBoard {
   return { tier1: [], tier2: [], tier3: [], dnp: [] };
@@ -23,6 +44,55 @@ export function sanitizePicklistBoard(board: Partial<PicklistBoard> | null | und
     }
   }
   return sanitized;
+}
+
+export function normalizePicklistBoard(value: unknown): PicklistBoard {
+  const source = value && typeof value === "object" ? value as Partial<Record<PicklistAssignedColumn, unknown>> : {};
+  const seen = new Set<string>();
+  const board = emptyPicklistBoard();
+  for (const column of PICKLIST_ASSIGNED_COLUMNS) {
+    const teams = Array.isArray(source[column]) ? source[column] : [];
+    for (const value of teams) {
+      const team = String(value ?? "").replace(/^frc/i, "").trim();
+      if (!/^\d{1,6}$/.test(team) || seen.has(team)) continue;
+      board[column].push(team);
+      seen.add(team);
+    }
+  }
+  return board;
+}
+
+export function canCreateMainPicklist(isAdmin: boolean) {
+  return isAdmin;
+}
+
+export function canEditSharedPicklist(list: Pick<SharedPicklist, "kind" | "createdBy">, actorOpenId: string, isAdmin: boolean) {
+  return list.kind === "main" ? isAdmin : list.createdBy === actorOpenId;
+}
+
+export function canViewSharedPicklist(
+  list: Pick<SharedPicklist, "kind" | "createdBy" | "submittedAt">,
+  actorOpenId: string,
+  isAdmin: boolean,
+) {
+  return list.kind === "main" || list.createdBy === actorOpenId || (isAdmin && Boolean(list.submittedAt));
+}
+
+export function comparePicklistTier(lists: Array<Pick<SharedPicklist, "id" | "board">>, column: PicklistAssignedColumn) {
+  const teams = [...new Set(lists.flatMap((list) => list.board[column]))];
+  return teams.map((team) => {
+    const ranks = Object.fromEntries(lists.map((list) => {
+      const index = list.board[column].indexOf(team);
+      return [list.id, index < 0 ? null : index + 1];
+    }));
+    const presentRanks = Object.values(ranks).filter((rank): rank is number => rank !== null);
+    return {
+      team,
+      ranks,
+      averageRank: presentRanks.reduce((sum, rank) => sum + rank, 0) / presentRanks.length,
+      appearances: presentRanks.length,
+    };
+  }).sort((a, b) => b.appearances - a.appearances || a.averageRank - b.averageRank || teamNumber(a.team) - teamNumber(b.team));
 }
 
 export function buildPicklistColumns<T extends { team: string; avgTotal: number }>(teams: T[], board: PicklistBoard) {

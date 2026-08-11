@@ -48,17 +48,28 @@ const COLUMN_LABELS: Record<PicklistColumn, string> = {
 
 export function PicklistBoard({
   datasetId,
+  storageKey,
+  initialBoard,
+  readOnly = false,
+  preferInitial = false,
+  onBoardChange,
   teams,
   tierByTeam,
   onOpenTeam,
 }: {
   datasetId: string;
+  storageKey?: string;
+  initialBoard?: PicklistBoardState;
+  readOnly?: boolean;
+  preferInitial?: boolean;
+  onBoardChange?: (board: PicklistBoardState) => void;
   teams: TeamSummary[];
   tierByTeam: Map<string, TierInfo>;
   onOpenTeam: (team: string) => void;
 }) {
   const validTeams = useMemo(() => teams.map((team) => team.team), [teams]);
-  const [board, setBoard] = useStoredPicklistBoard(datasetId, validTeams);
+  const resolvedStorageKey = storageKey ?? `cyber-strategy:picklist:${datasetId}:board`;
+  const [board, setBoard] = useStoredPicklistBoard(resolvedStorageKey, datasetId, validTeams, initialBoard, preferInitial, onBoardChange);
   const [previewBoard, setPreviewBoard] = useState<PicklistBoardState | null>(null);
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
   const dragColumn = useRef<PicklistColumn | null>(null);
@@ -97,7 +108,7 @@ export function PicklistBoard({
 
   return (
     <div className="min-h-0 sm:flex sm:flex-1 sm:flex-col sm:overflow-hidden">
-      <div className="mb-3 flex shrink-0 justify-end">
+      {!readOnly ? <div className="mb-3 flex shrink-0 justify-end">
         <Button
           type="button"
           className="shrink-0"
@@ -108,11 +119,12 @@ export function PicklistBoard({
           <RotateCcw className="size-4" />
           重置
         </Button>
-      </div>
+      </div> : null}
       <DndContext
         sensors={sensors}
         collisionDetection={picklistCollisionDetection}
         onDragStart={(event) => {
+          if (readOnly) return;
           setActiveTeam(event.active.data.current?.team as string | null);
           setPreviewBoard(board);
           previewBoardRef.current = board;
@@ -131,6 +143,7 @@ export function PicklistBoard({
               byTeam={byTeam}
               tierByTeam={tierByTeam}
               onOpenTeam={onOpenTeam}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -156,12 +169,14 @@ function PicklistColumnView({
   byTeam,
   tierByTeam,
   onOpenTeam,
+  readOnly,
 }: {
   column: PicklistColumn;
   teamIds: string[];
   byTeam: Map<string, TeamSummary>;
   tierByTeam: Map<string, TierInfo>;
   onOpenTeam: (team: string) => void;
+  readOnly: boolean;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `column:${column}`, data: { column } });
   return (
@@ -181,6 +196,7 @@ function PicklistColumnView({
                 column={column}
                 tier={tierByTeam.get(teamNumber)}
                 onOpenTeam={onOpenTeam}
+                readOnly={readOnly}
               />
             ) : null;
           })}
@@ -199,6 +215,7 @@ function SortableTeamCard(props: Omit<Parameters<typeof TeamCard>[0], "dragProps
   const { attributes, listeners, isDragging, isOver, setNodeRef, transform, transition } = useSortable({
     id: teamDragId(props.team.team),
     data: { type: "team", team: props.team.team, column: props.column },
+    disabled: props.readOnly,
   });
   return (
     <TeamCard
@@ -220,6 +237,7 @@ function TeamCard({
   className,
   style,
   overlay = false,
+  readOnly = false,
 }: {
   team: TeamSummary;
   column: PicklistColumn;
@@ -230,6 +248,7 @@ function TeamCard({
   className?: string;
   style?: React.CSSProperties;
   overlay?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <article
@@ -237,7 +256,8 @@ function TeamCard({
       style={style}
       {...dragProps}
       className={cn(
-        "cursor-grab select-none rounded-md border border-line bg-surface-2 p-2.5 shadow-sm transition-colors hover:border-brand/45 active:cursor-grabbing",
+        "select-none rounded-md border border-line bg-surface-2 p-2.5 shadow-sm transition-colors hover:border-brand/45",
+        readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing",
         overlay && "w-60 rotate-1 border-brand shadow-lg",
         className,
       )}
@@ -284,11 +304,18 @@ function readDragTarget(event: DragOverEvent | DragEndEvent): PicklistDropTarget
   return team && column ? { team, column, beforeTeam } : null;
 }
 
-function useStoredPicklistBoard(datasetId: string, validTeams: string[]) {
-  const key = `cyber-strategy:picklist:${datasetId}:board`;
+function useStoredPicklistBoard(
+  key: string,
+  datasetId: string,
+  validTeams: string[],
+  initialBoard: PicklistBoardState | undefined,
+  preferInitial: boolean,
+  onBoardChange: ((board: PicklistBoardState) => void) | undefined,
+) {
   const [board, setBoard] = useState<PicklistBoardState>(emptyPicklistBoard);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const validSignature = validTeams.join(",");
+  const initialSignature = JSON.stringify(initialBoard ?? emptyPicklistBoard());
 
   useEffect(() => {
     let cancelled = false;
@@ -296,9 +323,13 @@ function useStoredPicklistBoard(datasetId: string, validTeams: string[]) {
       if (cancelled) return;
       try {
         const raw = window.localStorage.getItem(key);
-        const next = raw
+        const next = preferInitial
+          ? sanitizePicklistBoard(initialBoard, validTeams)
+          : raw
           ? sanitizePicklistBoard(JSON.parse(raw) as PicklistBoardState, validTeams)
-          : migrateLegacyPicklist(
+          : initialBoard
+            ? sanitizePicklistBoard(initialBoard, validTeams)
+            : migrateLegacyPicklist(
               readStoredList(`cyber-strategy:picklist:${datasetId}:first`),
               readStoredList(`cyber-strategy:picklist:${datasetId}:second`),
               readStoredList(`cyber-strategy:picklist:${datasetId}:crossed`),
@@ -313,12 +344,14 @@ function useStoredPicklistBoard(datasetId: string, validTeams: string[]) {
     return () => {
       cancelled = true;
     };
-  }, [datasetId, key, validSignature, validTeams]);
+  }, [datasetId, initialBoard, initialSignature, key, preferInitial, validSignature, validTeams]);
 
   useEffect(() => {
     if (loadedKey !== key) return;
-    window.localStorage.setItem(key, JSON.stringify(sanitizePicklistBoard(board, validTeams)));
-  }, [board, key, loadedKey, validSignature, validTeams]);
+    const sanitized = sanitizePicklistBoard(board, validTeams);
+    window.localStorage.setItem(key, JSON.stringify(sanitized));
+    onBoardChange?.(sanitized);
+  }, [board, key, loadedKey, onBoardChange, validSignature, validTeams]);
 
   return [board, setBoard] as const;
 }

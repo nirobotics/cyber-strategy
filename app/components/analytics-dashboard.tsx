@@ -21,7 +21,6 @@ import {
 import { useFetcher, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
-import { PicklistBoard } from "./picklist-board";
 import type { ScoutingLeadPanelData } from "./scouting-lead-panel";
 import type { StrategyProposalPanelData } from "./strategy-proposal-panel";
 import type { SessionUser } from "../lib/auth-types";
@@ -41,6 +40,7 @@ import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } 
 import type { CombinedMatch } from "../lib/match-analysis";
 import type { DataRange } from "../lib/data-range";
 import { dashboardResourcePath } from "../lib/dashboard-performance";
+import type { PicklistResource } from "../lib/picklist";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
@@ -49,10 +49,12 @@ const loadMatchAnalysis = () => import("./match-analysis").then((module) => ({ d
 const loadScoutingLeadPanel = () => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel }));
 const loadStrategyProposalPanel = () => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel }));
 const loadStrategySettingsPanel = () => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel }));
+const loadPicklistWorkspace = () => import("./picklist-workspace").then((module) => ({ default: module.PicklistWorkspace }));
 const MatchAnalysis = lazy(loadMatchAnalysis);
 const ScoutingLeadPanel = lazy(loadScoutingLeadPanel);
 const StrategyProposalPanel = lazy(loadStrategyProposalPanel);
 const StrategySettingsPanel = lazy(loadStrategySettingsPanel);
+const PicklistWorkspace = lazy(loadPicklistWorkspace);
 
 type MatchScheduleResource = { eventKey: string | null; matches: CombinedMatch[] };
 type StrategyProposalResource = Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { selectedEventKey: string };
@@ -96,6 +98,7 @@ export function AnalyticsDashboard({
   const matchScheduleFetcher = useFetcher<MatchScheduleResource>();
   const strategyProposalFetcher = useFetcher<StrategyProposalResource>();
   const scoutingLeadFetcher = useFetcher<ScoutingLeadPanelData>();
+  const picklistFetcher = useFetcher<PicklistResource>();
 
   const analysisTeamData = useMemo(() => applyIgnoredMatchesToTeamData(dataset.teamData, ignoredMatches), [dataset.teamData, ignoredMatches]);
   const analysisDataset = useMemo(() => ({ ...dataset, teamData: analysisTeamData }), [dataset, analysisTeamData]);
@@ -123,12 +126,16 @@ export function AnalyticsDashboard({
   const resolvedScoutingLead = demoMode
     ? scoutingLead
     : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
+  const resolvedPicklists: PicklistResource | null = demoMode
+    ? { selectedEventKey: resolvedEventKey, isAdmin: false, userOpenId: user.feishuOpenId, lists: [], error: null }
+    : picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
 
   const prepareTab = useCallback((next: Tab) => {
     if (next === "match") void loadMatchAnalysis();
     if (next === "proposal") void loadStrategyProposalPanel();
     if (next === "lead") void loadScoutingLeadPanel();
     if (next === "settings") void loadStrategySettingsPanel();
+    if (next === "picklist") void loadPicklistWorkspace();
     if (demoMode) return;
 
     if (next === "match" && matchScheduleFetcher.state === "idle" && matchScheduleFetcher.data?.eventKey !== resolvedEventKey) {
@@ -140,10 +147,14 @@ export function AnalyticsDashboard({
     if (next === "lead" && isAdmin && scoutingLeadFetcher.state === "idle" && scoutingLeadFetcher.data?.selectedEventKey !== resolvedEventKey) {
       scoutingLeadFetcher.load(dashboardResourcePath("lead", resolvedEventKey));
     }
+    if (next === "picklist" && picklistFetcher.state === "idle" && picklistFetcher.data?.selectedEventKey !== resolvedEventKey) {
+      picklistFetcher.load(dashboardResourcePath("picklist", resolvedEventKey));
+    }
   }, [
     demoMode,
     isAdmin,
     matchScheduleFetcher,
+    picklistFetcher,
     resolvedEventKey,
     scoutingLeadFetcher,
     strategyProposalFetcher,
@@ -363,13 +374,21 @@ export function AnalyticsDashboard({
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}
-      {teams.length && activeTab === "picklist" ? (
-        <PicklistBoard
-          datasetId={dataset.id}
-          teams={teams}
-          tierByTeam={tierByTeam}
-          onOpenTeam={setDetailTeam}
-        />
+      {visitedTabs.has("picklist") ? (
+        <div className="min-h-0 flex-1" hidden={activeTab !== "picklist"}>
+          {teams.length && resolvedPicklists ? (
+            <PicklistWorkspace
+              key={`${dataset.id}:${resolvedEventKey}:${resolvedPicklists.userOpenId}`}
+              datasetId={dataset.id}
+              eventKey={resolvedEventKey}
+              teams={teams}
+              tierByTeam={tierByTeam}
+              onOpenTeam={setDetailTeam}
+              resource={resolvedPicklists}
+              demoMode={demoMode}
+            />
+          ) : <TabLoading label="正在加载 Picklist" />}
+        </div>
       ) : null}
       {visitedTabs.has("proposal") ? (
         <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "proposal"}>
