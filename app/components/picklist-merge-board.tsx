@@ -80,8 +80,13 @@ export function PicklistMergeBoard({
 
   function previewDrag(event: DragOverEvent) {
     const team = event.active.data.current?.team as string | undefined;
+    const targetSource = event.over?.data.current?.source as string | undefined;
     const targetColumn = event.over?.data.current?.column as PicklistColumn | undefined;
     const beforeTeam = event.over?.data.current?.team as string | undefined;
+    if (activeSource.current !== "main" && targetSource === "personal") {
+      setPendingDrop(null);
+      return;
+    }
     if (!team || !targetColumn || beforeTeam === team) {
       if (activeSource.current !== "main") setPendingDrop(null);
       return;
@@ -106,7 +111,8 @@ export function PicklistMergeBoard({
 
   function finishDrag(event: DragEndEvent) {
     const team = event.active.data.current?.team as string | undefined;
-    if (event.over && activeSource.current !== "main" && team && pendingDrop) {
+    const targetColumn = event.over?.data.current?.column as PicklistColumn | undefined;
+    if (event.over && activeSource.current !== "main" && team && pendingDrop && targetColumn === pendingDrop.column) {
       onChange(previewPicklistTeam(board, validTeams, "pool", { team, ...pendingDrop }));
     } else if (event.over && previewRef.current) {
       onChange(previewRef.current);
@@ -156,7 +162,7 @@ export function PicklistMergeBoard({
 
         <div className="flex min-h-0 min-w-0 gap-3 overflow-x-auto overflow-y-hidden">
           {personalLists.map((list) => (
-            <ReadOnlyColumn key={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
+            <ReadOnlyColumn key={list.id} id={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
               {list.board[column].map((team) => {
                 const mainTier = findPicklistTeamTier(team, [visibleBoard]);
                 return <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" mainAssignment={mainTier ? `Main · ${TIER_LABELS[mainTier]}` : undefined} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />;
@@ -188,9 +194,10 @@ function MergeColumn({ title, count, column, children }: { title: string; count:
   );
 }
 
-function ReadOnlyColumn({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function ReadOnlyColumn({ id, title, count, children }: { id: string; title: string; count: number; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: `personal-column:${id}`, data: { source: "personal" } });
   return (
-    <section className="flex min-h-0 min-w-60 flex-1 basis-0 flex-col overflow-hidden rounded-md border border-line bg-surface">
+    <section ref={setNodeRef} className="flex min-h-0 min-w-60 flex-1 basis-0 flex-col overflow-hidden rounded-md border border-line bg-surface">
       <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-2.5">
         <h3 className="min-w-0 truncate font-semibold text-ink">{title}</h3>
         <span className="flex shrink-0 items-center gap-1 text-xs text-ink-dim"><LockKeyhole className="size-3.5" />{count} 支</span>
