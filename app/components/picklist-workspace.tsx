@@ -43,7 +43,7 @@ export function PicklistWorkspace({
   const commandFetcher = useFetcher<PicklistActionData>();
   const saveFetcher = useFetcher<PicklistActionData>();
   const personalKey = personalListsKey(datasetId, resource.userOpenId);
-  const demoMainKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists`;
+  const demoListsKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists`;
   const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, datasetId);
   const [sharedLists, setSharedLists] = useState(resource.lists);
   const [demoMainLoaded, setDemoMainLoaded] = useState(false);
@@ -83,17 +83,17 @@ export function PicklistWorkspace({
     if (!demoMode) return;
     queueMicrotask(() => {
       try {
-        setSharedLists(normalizeDemoMainLists(JSON.parse(localStorage.getItem(demoMainKey) ?? "[]"), eventKey));
+        setSharedLists(normalizeDemoLists(JSON.parse(localStorage.getItem(demoListsKey) ?? "[]"), eventKey));
       } catch {
         setSharedLists([]);
       }
       setDemoMainLoaded(true);
     });
-  }, [demoMainKey, demoMode, eventKey]);
+  }, [demoListsKey, demoMode, eventKey]);
 
   useEffect(() => {
-    if (demoMode && demoMainLoaded) localStorage.setItem(demoMainKey, JSON.stringify(sharedLists));
-  }, [demoMainKey, demoMainLoaded, demoMode, sharedLists]);
+    if (demoMode && demoMainLoaded) localStorage.setItem(demoListsKey, JSON.stringify(sharedLists));
+  }, [demoListsKey, demoMainLoaded, demoMode, sharedLists]);
 
   useEffect(() => {
     const imports = resource.lists.filter((list) =>
@@ -177,7 +177,24 @@ export function PicklistWorkspace({
 
   function submitPersonal() {
     if (active?.kind !== "personal" || !activeBoard) return;
-    if (demoMode) return;
+    if (demoMode) {
+      const now = new Date().toISOString();
+      const submission: SharedPicklist = {
+        id: `demo-personal-${active.local.id}`,
+        clientId: active.local.id,
+        eventKey,
+        name: active.local.name,
+        kind: "personal",
+        board: activeBoard,
+        createdBy: resource.userOpenId,
+        createdByName: "Demo Admin",
+        submittedAt: now,
+        updatedAt: now,
+      };
+      setSharedLists((current) => [submission, ...current.filter((list) => list.id !== submission.id)]);
+      setActive({ kind: "personal", local: active.local, remote: submission });
+      return;
+    }
     setPendingCommand("submit-personal");
     commandFetcher.submit({
       intent: "submit-personal",
@@ -236,7 +253,7 @@ export function PicklistWorkspace({
           </PicklistCollection>
         </div>
 
-        {resource.isAdmin && !demoMode ? (
+        {resource.isAdmin ? (
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="font-semibold text-ink">Merge</h3>
@@ -298,7 +315,7 @@ export function PicklistWorkspace({
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
         </div>
         {!isMain ? (
-          <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || commandFetcher.state !== "idle" || demoMode}>
+          <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || (!demoMode && commandFetcher.state !== "idle")}>
             <Send className="size-4" />提交
           </Button>
         ) : null}
@@ -406,10 +423,10 @@ function normalizeLocalLists(value: unknown): LocalPersonalList[] {
   });
 }
 
-function normalizeDemoMainLists(value: unknown, eventKey: string): SharedPicklist[] {
+function normalizeDemoLists(value: unknown, eventKey: string): SharedPicklist[] {
   if (!Array.isArray(value)) return [];
   return value.filter((list): list is SharedPicklist => Boolean(
-    list && typeof list === "object" && list.kind === "main" && list.eventKey === eventKey && typeof list.id === "string" && typeof list.name === "string",
+    list && typeof list === "object" && (list.kind === "main" || list.kind === "personal") && list.eventKey === eventKey && typeof list.id === "string" && typeof list.name === "string",
   ));
 }
 
