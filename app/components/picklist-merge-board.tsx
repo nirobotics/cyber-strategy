@@ -140,7 +140,7 @@ export function PicklistMergeBoard({
       onDragEnd={finishDrag}
       onDragCancel={clearDrag}
     >
-      <div ref={boardRef} className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden">
+      <div ref={boardRef} className="grid min-h-0 flex-1 grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)_minmax(15rem,1fr)] gap-3 overflow-hidden">
         <MergeColumn title="Main" count={mainTeams.length} column={column}>
           <SortableContext items={mainTeams.map(mainDragId)} strategy={verticalListSortingStrategy}>
             {mainTeams.map((team) => (
@@ -154,15 +154,17 @@ export function PicklistMergeBoard({
           {!mainTeams.length ? <Empty text="拖拽到这里" /> : null}
         </MergeColumn>
 
-        {personalLists.map((list) => (
-          <ReadOnlyColumn key={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
-            {list.board[column].map((team) => {
-              const mainTier = findPicklistTeamTier(team, [visibleBoard]);
-              return <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" mainAssignment={mainTier ? `Main · ${TIER_LABELS[mainTier]}` : undefined} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />;
-            })}
-            {!list.board[column].length ? <Empty text="该 Tier 暂无队伍" /> : null}
-          </ReadOnlyColumn>
-        ))}
+        <div className="flex min-h-0 min-w-0 gap-3 overflow-x-auto overflow-y-hidden">
+          {personalLists.map((list) => (
+            <ReadOnlyColumn key={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
+              {list.board[column].map((team) => {
+                const mainTier = findPicklistTeamTier(team, [visibleBoard]);
+                return <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" mainAssignment={mainTier ? `Main · ${TIER_LABELS[mainTier]}` : undefined} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />;
+              })}
+              {!list.board[column].length ? <Empty text="该 Tier 暂无队伍" /> : null}
+            </ReadOnlyColumn>
+          ))}
+        </div>
 
         <MergeColumn title="队伍列表" count={columns.pool.length} column="pool">
           {columns.pool.map((team) => <SourceTeam key={team} id={`pool:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="pool" highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />)}
