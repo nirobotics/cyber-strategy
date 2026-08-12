@@ -61,6 +61,7 @@ export function PicklistMergeBoard({
   const columns = useMemo(() => buildPicklistColumns(teams, board), [board, teams]);
   const [preview, setPreview] = useState<PicklistBoard | null>(null);
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<{ column: PicklistAssignedColumn; beforeTeam?: string } | null>(null);
   const previewRef = useRef<PicklistBoard | null>(null);
   const previousColumn = useRef<PicklistColumn>("pool");
   const activeSource = useRef<"main" | "personal" | "pool">("pool");
@@ -81,8 +82,18 @@ export function PicklistMergeBoard({
     const team = event.active.data.current?.team as string | undefined;
     const targetColumn = event.over?.data.current?.column as PicklistColumn | undefined;
     const beforeTeam = event.over?.data.current?.team as string | undefined;
-    if (!team || !targetColumn || beforeTeam === team) return;
-    if (activeSource.current !== "main" && targetColumn === "pool") return;
+    if (!team || !targetColumn || beforeTeam === team) {
+      if (activeSource.current !== "main") setPendingDrop(null);
+      return;
+    }
+    if (activeSource.current !== "main") {
+      if (targetColumn === "pool") {
+        setPendingDrop(null);
+        return;
+      }
+      setPendingDrop({ column: targetColumn, beforeTeam });
+      return;
+    }
     const next = previewPicklistTeam(previewRef.current ?? board, validTeams, previousColumn.current, {
       team,
       column: targetColumn,
@@ -94,13 +105,19 @@ export function PicklistMergeBoard({
   }
 
   function finishDrag(event: DragEndEvent) {
-    if (event.over && previewRef.current) onChange(previewRef.current);
+    const team = event.active.data.current?.team as string | undefined;
+    if (event.over && activeSource.current !== "main" && team && pendingDrop) {
+      onChange(previewPicklistTeam(board, validTeams, "pool", { team, ...pendingDrop }));
+    } else if (event.over && previewRef.current) {
+      onChange(previewRef.current);
+    }
     clearDrag();
   }
 
   function clearDrag() {
     setActiveTeam(null);
     setPreview(null);
+    setPendingDrop(null);
     previewRef.current = null;
     previousColumn.current = "pool";
     activeSource.current = "pool";
@@ -126,8 +143,14 @@ export function PicklistMergeBoard({
       <div ref={boardRef} className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden">
         <MergeColumn title="Main" count={mainTeams.length} column={column}>
           <SortableContext items={mainTeams.map(mainDragId)} strategy={verticalListSortingStrategy}>
-            {mainTeams.map((team) => <MainTeam key={team} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} column={column} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />)}
+            {mainTeams.map((team) => (
+              <div key={team}>
+                {pendingDrop?.column === column && pendingDrop.beforeTeam === team ? <DropIndicator /> : null}
+                <MainTeam team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} column={column} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />
+              </div>
+            ))}
           </SortableContext>
+          {pendingDrop?.column === column && !pendingDrop.beforeTeam ? <DropIndicator /> : null}
           {!mainTeams.length ? <Empty text="拖拽到这里" /> : null}
         </MergeColumn>
 
@@ -213,6 +236,10 @@ function MergeStat({ label, value }: { label: string; value: string }) {
 
 function Empty({ text }: { text: string }) {
   return <div className="grid min-h-20 place-items-center rounded-md border border-dashed border-line px-3 text-center text-xs text-ink-faint">{text}</div>;
+}
+
+function DropIndicator() {
+  return <div className="my-1 h-1 rounded-full bg-brand/45 ring-1 ring-brand/30" aria-hidden="true" />;
 }
 
 function mainDragId(team: string) {
