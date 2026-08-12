@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareRangeConfig, compareTeamDetailMatches, filterCompareTeams, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
+import { averageRadarMetrics, compareRangeConfig, compareTeamDetailMatches, filterCompareTeams, formatChartNumber, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
 import type { ScoutingMatch, TeamSummary } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
@@ -68,6 +68,11 @@ describe("analytics dashboard UI helpers", () => {
 
     expect(config.data.datasets[0].data).toEqual([[40, 110]]);
     expect(config.options?.interaction).toMatchObject({ mode: "index", axis: "x", intersect: false });
+  });
+
+  it("limits chart tooltip values to one decimal place", () => {
+    expect(formatChartNumber(341.59999999999997)).toBe(341.6);
+    expect(formatChartNumber(110)).toBe(110);
   });
 
   it("filters comparison teams by an entered team number", () => {

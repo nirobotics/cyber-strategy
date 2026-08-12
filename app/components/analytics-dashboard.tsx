@@ -1575,7 +1575,12 @@ export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLi
           callbacks: {
             label: (context: { dataIndex: number }) => {
               const team = teams[context.dataIndex];
-              return [`最高 ${team.maxPts}`, `平均 ${team.avgTotal}`, `最低 ${team.minPts}`, `范围 ${team.maxPts - team.minPts}`];
+              return [
+                `最高 ${formatChartNumber(team.maxPts)}`,
+                `平均 ${formatChartNumber(team.avgTotal)}`,
+                `最低 ${formatChartNumber(team.minPts)}`,
+                `范围 ${formatChartNumber(team.maxPts - team.minPts)}`,
+              ];
             },
           },
         },
@@ -1586,6 +1591,10 @@ export function compareRangeConfig(teams: TeamSummary[], palette: ChartPaletteLi
       },
     },
   } as unknown as ChartConfiguration;
+}
+
+export function formatChartNumber(value: number) {
+  return Number(value.toFixed(1));
 }
 
 type ChartPaletteLike = {
