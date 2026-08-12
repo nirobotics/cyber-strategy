@@ -78,6 +78,7 @@ export function PicklistWorkspace({
   ), [resource.userOpenId, stalePersonalIds, submittedPersonal]);
   const selectedMergeMain = mainLists.find((list) => list.id === mergeMainId) ?? null;
   const selectedMergePersonal = mergeablePersonal.filter((list) => mergePersonalIds.includes(list.id));
+  const personalNameExists = personalLists.some((list) => normalizePicklistName(list.name) === normalizePicklistName(personalName));
   const handleBoardChange = useCallback((board: PicklistBoardState) => {
     setActiveBoard(board);
     if (demoMode && active?.kind === "main") {
@@ -202,7 +203,7 @@ export function PicklistWorkspace({
 
   function createPersonal() {
     const name = personalName.trim();
-    if (!name) return;
+    if (!name || personalLists.some((list) => normalizePicklistName(list.name) === normalizePicklistName(name))) return;
     const local = { id: crypto.randomUUID(), name: name.slice(0, 80), createdAt: new Date().toISOString() };
     setPersonalLists((current) => [local, ...current]);
     setPersonalName("");
@@ -323,7 +324,7 @@ export function PicklistWorkspace({
               </div>
             ))}
             {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
-            <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} />
+            <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />
           </PicklistCollection>
         </div>
 
@@ -516,8 +517,8 @@ function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick
   return <button type="button" onClick={onClick} className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface-2 p-3 text-left hover:border-brand"><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span><span className="flex shrink-0 items-center gap-2 text-xs text-ink-dim">{readOnly ? <LockKeyhole className="size-3" /> : null}{list.createdByName}</span></button>;
 }
 
-function CreateRow({ value, onChange, onCreate, placeholder, busy }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean }) {
-  return <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className="min-w-0 font-sans" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") onCreate(); }} placeholder={placeholder} maxLength={80} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy}><Plus className="size-4" />创建</Button></div>;
+function CreateRow({ value, onChange, onCreate, placeholder, busy, error }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean; error?: string }) {
+  return <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className={cn("min-w-0 font-sans", error && "border-danger")} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !error) onCreate(); }} placeholder={placeholder} maxLength={80} aria-invalid={Boolean(error)} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy || Boolean(error)}><Plus className="size-4" />创建</Button>{error ? <p className="text-xs text-danger sm:col-span-2">{error}</p> : null}</div>;
 }
 
 function EmptyCollection({ text }: { text: string }) {
@@ -526,6 +527,10 @@ function EmptyCollection({ text }: { text: string }) {
 
 function personalListsKey(datasetId: string, userOpenId: string) {
   return `cyber-strategy:picklist:${datasetId}:personal-lists:${encodeURIComponent(userOpenId)}`;
+}
+
+function normalizePicklistName(name: string) {
+  return name.trim().toLocaleLowerCase();
 }
 
 function personalBoardKey(datasetId: string, id: string) {
