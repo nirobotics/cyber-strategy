@@ -146,7 +146,7 @@
 
   body {
     margin: 0;
-    background: rgb(var(--surface));
+    background: var(--background);
     color: var(--foreground);
     font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;

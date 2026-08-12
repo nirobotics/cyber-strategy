@@ -46,7 +46,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function CyberPitEmbed({ loaderData }: Route.ComponentProps) {
   const { payload, dataset, dataRange, schedule, tier } = loaderData;
   return (
-    <main className="min-h-dvh bg-surface p-3 text-ink md:p-4">
+    <main className="min-h-dvh bg-bg p-3 text-ink md:p-4">
       {payload.kind === "team" ? (
         <EmbedTeamDetail
           teamProps={{
