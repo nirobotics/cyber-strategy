@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, UserRound, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, UserRound, Users, X } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
 import { PicklistMergeBoard } from "./picklist-merge-board";
@@ -55,6 +55,7 @@ export function PicklistWorkspace({
   const [mainName, setMainName] = useState("");
   const [pendingCommand, setPendingCommand] = useState<"create-main" | "submit-personal" | "delete-personal" | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LocalPersonalList | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LocalPersonalList | null>(null);
   const [mergeMainId, setMergeMainId] = useState("");
   const [mergePersonalIds, setMergePersonalIds] = useState<string[]>([]);
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
@@ -245,7 +246,6 @@ export function PicklistWorkspace({
   }
 
   function deletePersonal(local: LocalPersonalList) {
-    if (!window.confirm(`删除 Personal Picklist「${local.name}」？`)) return;
     const remote = ownSubmissions.get(local.id);
     if (demoMode || !remote) {
       removeLocalPersonal(local, remote?.id);
@@ -294,7 +294,7 @@ export function PicklistWorkspace({
                   <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
                   {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
                 </button>
-                <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => deletePersonal(list)} disabled={pendingCommand === "delete-personal"} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}>
+                <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => setDeleteTarget(list)} disabled={pendingCommand === "delete-personal"} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}>
                   <Trash2 className="size-4" />
                 </Button>
               </div>
@@ -334,6 +334,18 @@ export function PicklistWorkspace({
               </div>
             </div>
           </Card>
+        ) : null}
+        {deleteTarget ? (
+          <DeletePicklistDialog
+            list={deleteTarget}
+            busy={pendingCommand === "delete-personal"}
+            onCancel={() => setDeleteTarget(null)}
+            onConfirm={() => {
+              const target = deleteTarget;
+              setDeleteTarget(null);
+              deletePersonal(target);
+            }}
+          />
         ) : null}
       </div>
     );
@@ -430,6 +442,43 @@ export function PicklistWorkspace({
         tierByTeam={tierByTeam}
         onOpenTeam={onOpenTeam}
       />}
+    </div>
+  );
+}
+
+function DeletePicklistDialog({ list, busy, onCancel, onConfirm }: { list: LocalPersonalList; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) onCancel();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-3" role="dialog" aria-modal="true" aria-labelledby="delete-picklist-title" onMouseDown={() => { if (!busy) onCancel(); }}>
+      <Card className="w-full max-w-md overflow-hidden p-0 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-line p-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-md border border-danger/40 bg-danger/10 text-danger"><AlertTriangle className="size-5" /></span>
+            <div className="min-w-0">
+              <p className="section-label text-danger">危险操作</p>
+              <h2 id="delete-picklist-title" className="mt-1 text-lg font-semibold text-ink">删除 Personal Picklist</h2>
+            </div>
+          </div>
+          <Button type="button" className="shrink-0 px-2" onClick={onCancel} disabled={busy} title="关闭"><X className="size-4" /></Button>
+        </div>
+        <div className="space-y-3 p-4">
+          <p className="text-sm text-ink-dim">确定删除 <strong className="font-semibold text-ink">{list.name}</strong>？</p>
+          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">本机草稿和已提交版本都会被删除，此操作无法撤销。</p>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line bg-surface-2 p-3">
+          <Button type="button" onClick={onCancel} disabled={busy}>取消</Button>
+          <Button type="button" className="border-danger bg-danger text-white hover:border-danger hover:bg-danger hover:text-white hover:brightness-110" onClick={onConfirm} disabled={busy}>
+            <Trash2 className="size-4" />{busy ? "删除中" : "删除 Picklist"}
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
