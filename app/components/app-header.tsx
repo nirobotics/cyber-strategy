@@ -28,13 +28,13 @@ export function AppHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-[var(--border)] bg-[var(--panel)]">
-      <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-3 sm:px-4">
+      <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-2 sm:px-4">
         <div className="relative flex min-w-0 items-center gap-3">
           <NavLink
             to="/"
             className="flex w-fit shrink-0 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
           >
-            <div className="grid size-10 shrink-0 place-items-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
+            <div className="grid size-9 shrink-0 place-items-center rounded-md bg-[var(--accent)] text-[var(--accent-foreground)]">
               <Icon className="size-5" aria-hidden />
             </div>
             <div className="min-w-0">

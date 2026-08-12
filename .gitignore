@@ -2,6 +2,7 @@ node_modules/
 build/
 .react-router/
 .vercel/
+supabase/.temp/
 .env
 .env.local
 .env.*.local

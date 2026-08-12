@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { ChartConfiguration } from "chart.js";
 import {
@@ -6,21 +6,16 @@ import {
   Bot,
   ChevronLeft,
   ChevronRight,
-  Download,
   Eye,
   EyeOff,
   FileText,
-  GripVertical,
   LineChart,
   ListChecks,
   Map as MapIcon,
-  Plus,
-  RotateCcw,
   Search,
   Settings,
   ShieldCheck,
   Table2,
-  Trash2,
   X,
 } from "lucide-react";
 import { useFetcher, useNavigate, useSearchParams } from "react-router";
@@ -40,34 +35,26 @@ import {
   type TeamPitInfo,
   type TeamSummary,
 } from "../lib/scouting";
-import {
-  addPickListTeam,
-  insertPickListTeam,
-  orderPickPool,
-  pickListAutoScrollDelta,
-  removePickListTeam,
-  sanitizePickList,
-  type PickListId,
-} from "../lib/picklist";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
 import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
 import type { CombinedMatch } from "../lib/match-analysis";
 import type { DataRange } from "../lib/data-range";
 import { dashboardResourcePath } from "../lib/dashboard-performance";
+import type { PicklistResource } from "../lib/picklist";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
 const EVENT_STORAGE_KEY = "cyber-strategy:selected-event";
-const PICK_DRAG_TEAM_TYPE = "application/x-cyber-strategy-team";
-const PICK_DRAG_SOURCE_TYPE = "application/x-cyber-strategy-source";
 const loadMatchAnalysis = () => import("./match-analysis").then((module) => ({ default: module.MatchAnalysis }));
 const loadScoutingLeadPanel = () => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel }));
 const loadStrategyProposalPanel = () => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel }));
 const loadStrategySettingsPanel = () => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel }));
+const loadPicklistWorkspace = () => import("./picklist-workspace").then((module) => ({ default: module.PicklistWorkspace }));
 const MatchAnalysis = lazy(loadMatchAnalysis);
 const ScoutingLeadPanel = lazy(loadScoutingLeadPanel);
 const StrategyProposalPanel = lazy(loadStrategyProposalPanel);
 const StrategySettingsPanel = lazy(loadStrategySettingsPanel);
+const PicklistWorkspace = lazy(loadPicklistWorkspace);
 
 type MatchScheduleResource = { eventKey: string | null; matches: CombinedMatch[] };
 type StrategyProposalResource = Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { selectedEventKey: string };
@@ -111,6 +98,7 @@ export function AnalyticsDashboard({
   const matchScheduleFetcher = useFetcher<MatchScheduleResource>();
   const strategyProposalFetcher = useFetcher<StrategyProposalResource>();
   const scoutingLeadFetcher = useFetcher<ScoutingLeadPanelData>();
+  const picklistFetcher = useFetcher<PicklistResource>();
 
   const analysisTeamData = useMemo(() => applyIgnoredMatchesToTeamData(dataset.teamData, ignoredMatches), [dataset.teamData, ignoredMatches]);
   const analysisDataset = useMemo(() => ({ ...dataset, teamData: analysisTeamData }), [dataset, analysisTeamData]);
@@ -138,12 +126,16 @@ export function AnalyticsDashboard({
   const resolvedScoutingLead = demoMode
     ? scoutingLead
     : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
+  const resolvedPicklists: PicklistResource | null = demoMode
+    ? { selectedEventKey: resolvedEventKey, isAdmin: true, userOpenId: user.feishuOpenId, lists: [], error: null }
+    : picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
 
   const prepareTab = useCallback((next: Tab) => {
     if (next === "match") void loadMatchAnalysis();
     if (next === "proposal") void loadStrategyProposalPanel();
     if (next === "lead") void loadScoutingLeadPanel();
     if (next === "settings") void loadStrategySettingsPanel();
+    if (next === "picklist") void loadPicklistWorkspace();
     if (demoMode) return;
 
     if (next === "match" && matchScheduleFetcher.state === "idle" && matchScheduleFetcher.data?.eventKey !== resolvedEventKey) {
@@ -155,10 +147,14 @@ export function AnalyticsDashboard({
     if (next === "lead" && isAdmin && scoutingLeadFetcher.state === "idle" && scoutingLeadFetcher.data?.selectedEventKey !== resolvedEventKey) {
       scoutingLeadFetcher.load(dashboardResourcePath("lead", resolvedEventKey));
     }
+    if (next === "picklist" && picklistFetcher.state === "idle" && picklistFetcher.data?.selectedEventKey !== resolvedEventKey) {
+      picklistFetcher.load(dashboardResourcePath("picklist", resolvedEventKey));
+    }
   }, [
     demoMode,
     isAdmin,
     matchScheduleFetcher,
+    picklistFetcher,
     resolvedEventKey,
     scoutingLeadFetcher,
     strategyProposalFetcher,
@@ -239,8 +235,15 @@ export function AnalyticsDashboard({
 
   return (
     <div
-      className={cn("flex w-full flex-col", activeTab === "browser" && "lg:h-full lg:min-h-0", activeTab === "proposal" && "xl:h-full xl:min-h-0", activeTab === "lead" && "h-full min-h-0")}
+      className={cn(
+        "flex w-full flex-col",
+        activeTab === "browser" && "lg:h-full lg:min-h-0",
+        activeTab === "picklist" && "sm:h-full sm:min-h-0",
+        activeTab === "proposal" && "xl:h-full xl:min-h-0",
+        activeTab === "lead" && "h-full min-h-0",
+      )}
       data-fixed-browser={activeTab === "browser" ? "" : undefined}
+      data-fixed-picklist={activeTab === "picklist" ? "" : undefined}
       data-fixed-desktop={activeTab === "proposal" ? "" : undefined}
     >
       {headerNavTarget ? createPortal(
@@ -273,7 +276,13 @@ export function AnalyticsDashboard({
           </nav>
       , headerNavTarget) : null}
 
-      <div className={cn("mx-auto flex w-full max-w-[1500px] flex-col gap-3", activeTab === "browser" && "lg:min-h-0 lg:flex-1", activeTab === "proposal" && "xl:min-h-0 xl:flex-1", activeTab === "lead" && "min-h-0 flex-1")}>
+      <div className={cn(
+        "mx-auto flex w-full max-w-[1500px] flex-col gap-3",
+        activeTab === "browser" && "lg:min-h-0 lg:flex-1",
+        activeTab === "picklist" && "sm:min-h-0 sm:flex-1",
+        activeTab === "proposal" && "xl:min-h-0 xl:flex-1",
+        activeTab === "lead" && "min-h-0 flex-1",
+      )}>
       <Suspense fallback={<Card className="p-6 text-sm text-ink-dim">正在加载…</Card>}>
       {!teams.length ? (
         <Card className="p-6 text-sm text-ink-dim">
@@ -365,15 +374,21 @@ export function AnalyticsDashboard({
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}
-      {teams.length && activeTab === "picklist" ? (
-        <PicklistBoard
-          datasetId={dataset.id}
-          eventKey={dataset.eventKey}
-          teams={teams}
-          tierByTeam={tierByTeam}
-          rankByTeam={rankByTeam}
-          onOpenTeam={setDetailTeam}
-        />
+      {visitedTabs.has("picklist") ? (
+        <div className="min-h-0 flex-1 flex-col" hidden={activeTab !== "picklist"} style={activeTab === "picklist" ? { display: "flex" } : undefined}>
+          {teams.length && resolvedPicklists ? (
+            <PicklistWorkspace
+              key={`${dataset.id}:${resolvedEventKey}:${resolvedPicklists.userOpenId}`}
+              datasetId={dataset.id}
+              eventKey={resolvedEventKey}
+              teams={teams}
+              tierByTeam={tierByTeam}
+              onOpenTeam={setDetailTeam}
+              resource={resolvedPicklists}
+              demoMode={demoMode}
+            />
+          ) : <TabLoading label="正在加载 Picklist" />}
+        </div>
       ) : null}
       {visitedTabs.has("proposal") ? (
         <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "proposal"}>
@@ -782,523 +797,6 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   );
 }
 
-function TeamSearchSelect({
-  index,
-  teams,
-  selectedTeam,
-  open,
-  onOpen,
-  onClose,
-  onChange,
-}: {
-  index: number;
-  teams: TeamSummary[];
-  selectedTeam: string;
-  open: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  onChange: (team: string) => void;
-}) {
-  const selected = teams.find((team) => team.team === selectedTeam);
-  const selectedLabel = selected ? `Team ${selected.team}（${selected.avgTotal} 综合均分）` : "";
-  const [query, setQuery] = useState(selectedLabel);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const visibleTeams = useMemo(() => filterCompareTeams(teams, query), [query, teams]);
-
-  function choose(team: TeamSummary) {
-    onChange(team.team);
-    setQuery(`Team ${team.team}（${team.avgTotal} 综合均分）`);
-    onClose();
-  }
-
-  return (
-    <div
-      className="relative grid gap-1 text-sm"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setQuery(selectedLabel);
-          onClose();
-        }
-      }}
-    >
-      <label htmlFor={`compare-team-${index}`} className="font-medium text-ink-dim">Team {index + 1}</label>
-      <div className="relative">
-        <input
-          ref={inputRef}
-          id={`compare-team-${index}`}
-          className="input h-10 pr-9 font-sans"
-          value={query}
-          placeholder="输入队号查找 / 选择队伍"
-          autoComplete="off"
-          onFocus={() => {
-            onOpen();
-            if (selected) setQuery("");
-          }}
-          onClick={onOpen}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            onOpen();
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              onClose();
-              setQuery(selectedLabel);
-            } else if (event.key === "Enter" && visibleTeams[0]) {
-              event.preventDefault();
-              choose(visibleTeams[0]);
-            }
-          }}
-        />
-        {selected ? (
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded text-ink-faint transition hover:bg-surface-2 hover:text-ink"
-            aria-label={`清空 Team ${index + 1}`}
-            onClick={() => {
-              onChange("");
-              setQuery("");
-              onOpen();
-              inputRef.current?.focus();
-            }}
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
-      </div>
-      {open ? (
-        <div className="absolute inset-x-0 top-full z-30 mt-1 max-h-56 overflow-y-auto rounded-md border border-line bg-surface p-1 shadow-xl">
-          {visibleTeams.length ? visibleTeams.map((team) => (
-            <button
-              key={team.team}
-              type="button"
-              className="flex h-9 w-full items-center justify-between gap-3 rounded px-2 text-left hover:bg-surface-2"
-              onClick={() => choose(team)}
-            >
-              <span className="font-semibold">Team {team.team}</span>
-              <span className="truncate text-xs text-ink-dim">{team.avgTotal} 综合均分</span>
-            </button>
-          )) : <div className="px-2 py-3 text-center text-xs text-ink-faint">未找到队伍</div>}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-export function filterCompareTeams(teams: TeamSummary[], query: string) {
-  const teamNumber = query.trim().replace(/^team\s*/i, "").split(/\s|（/)[0];
-  return teamNumber ? teams.filter((team) => team.team.includes(teamNumber)) : teams;
-}
-
-function PicklistBoard({
-  datasetId,
-  eventKey,
-  teams,
-  tierByTeam,
-  rankByTeam,
-  onOpenTeam,
-}: {
-  datasetId: string;
-  eventKey: string;
-  teams: TeamSummary[];
-  tierByTeam: Map<string, TierInfo>;
-  rankByTeam: Map<string, number>;
-  onOpenTeam: (team: string) => void;
-}) {
-  const [activePick, setActivePick] = useState<PickListId>("first");
-  const [crossedTeams, setCrossedTeams] = useStoredList(`cyber-strategy:picklist:${datasetId}:crossed`);
-  const [firstPick, setFirstPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:first`);
-  const [secondPick, setSecondPick] = useStoredList(`cyber-strategy:picklist:${datasetId}:second`);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const [printing, setPrinting] = useState(false);
-  const dragging = useRef(false);
-  const autoScrollFrame = useRef<number | null>(null);
-  const autoScrollTarget = useRef<HTMLElement | Window | null>(null);
-  const autoScrollSpeed = useRef(0);
-  const validTeamIds = useMemo(() => teams.map((team) => team.team), [teams]);
-  const crossedSet = useMemo(() => new Set(sanitizePickList(crossedTeams, validTeamIds)), [crossedTeams, validTeamIds]);
-  const firstPickTeams = useMemo(() => sanitizePickList(firstPick, validTeamIds), [firstPick, validTeamIds]);
-  const secondPickTeams = useMemo(() => sanitizePickList(secondPick, validTeamIds), [secondPick, validTeamIds]);
-  const pickTeams = useMemo(
-    () => activePick === "first" ? firstPickTeams : secondPickTeams,
-    [activePick, firstPickTeams, secondPickTeams],
-  );
-  const poolTeams = useMemo(() => orderPickPool(teams, crossedTeams, pickTeams), [teams, crossedTeams, pickTeams]);
-  const pickTitle = activePick === "first" ? "1st Pick List" : "2nd Pick List";
-
-  useEffect(() => {
-    function stopAutoScroll() {
-      dragging.current = false;
-      autoScrollSpeed.current = 0;
-      autoScrollTarget.current = null;
-      if (autoScrollFrame.current !== null) window.cancelAnimationFrame(autoScrollFrame.current);
-      autoScrollFrame.current = null;
-    }
-
-    function scrollFrame() {
-      const target = autoScrollTarget.current;
-      const speed = autoScrollSpeed.current;
-      if (!target || !speed) {
-        autoScrollFrame.current = null;
-        return;
-      }
-      target.scrollBy({ top: speed, behavior: "auto" });
-      autoScrollFrame.current = window.requestAnimationFrame(scrollFrame);
-    }
-
-    function startAutoScroll(target: HTMLElement | Window, speed: number) {
-      autoScrollTarget.current = speed ? target : null;
-      autoScrollSpeed.current = speed;
-      if (speed && autoScrollFrame.current === null) autoScrollFrame.current = window.requestAnimationFrame(scrollFrame);
-    }
-
-    function handleDragOver(event: globalThis.DragEvent) {
-      if (!dragging.current) return;
-      const element = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-picklist-scroll]") : null;
-      if (element) {
-        const rect = element.getBoundingClientRect();
-        const speed = pickListAutoScrollDelta(event.clientY, rect.top, rect.bottom);
-        const canScroll = speed < 0 ? element.scrollTop > 0 : speed > 0 && element.scrollTop + element.clientHeight < element.scrollHeight;
-        if (speed && canScroll) {
-          startAutoScroll(element, speed);
-          return;
-        }
-      }
-      startAutoScroll(window, pickListAutoScrollDelta(event.clientY, 0, window.innerHeight));
-    }
-
-    window.addEventListener("dragover", handleDragOver);
-    window.addEventListener("dragend", stopAutoScroll);
-    window.addEventListener("drop", stopAutoScroll);
-    return () => {
-      window.removeEventListener("dragover", handleDragOver);
-      window.removeEventListener("dragend", stopAutoScroll);
-      window.removeEventListener("drop", stopAutoScroll);
-      stopAutoScroll();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!printing) return;
-    const timeout = window.setTimeout(() => window.print(), 250);
-    const clear = () => setPrinting(false);
-    window.addEventListener("afterprint", clear, { once: true });
-    return () => {
-      window.clearTimeout(timeout);
-      window.removeEventListener("afterprint", clear);
-    };
-  }, [printing]);
-
-  function updateCurrentPick(updater: (current: string[]) => string[]) {
-    const apply = (current: string[]) => sanitizePickList(updater(current), validTeamIds);
-    if (activePick === "first") setFirstPick(apply);
-    else setSecondPick(apply);
-  }
-
-  function toggleCrossed(team: string) {
-    setCrossedTeams((current) => toggleValue(current, team));
-  }
-
-  function startDrag(event: DragEvent<HTMLElement>, team: string, source: "pool" | "pick") {
-    dragging.current = true;
-    event.dataTransfer.setData(PICK_DRAG_TEAM_TYPE, team);
-    event.dataTransfer.setData(PICK_DRAG_SOURCE_TYPE, source);
-    event.dataTransfer.setData("text/plain", team);
-    event.dataTransfer.effectAllowed = source === "pick" ? "move" : "copy";
-  }
-
-  function readDraggedTeam(event: DragEvent<HTMLElement>) {
-    return event.dataTransfer.getData(PICK_DRAG_TEAM_TYPE) || event.dataTransfer.getData("text/plain");
-  }
-
-  function dropTeam(event: DragEvent<HTMLElement>, beforeTeam?: string) {
-    event.preventDefault();
-    event.stopPropagation();
-    const team = readDraggedTeam(event);
-    const source = event.dataTransfer.getData(PICK_DRAG_SOURCE_TYPE);
-    if (!team || !validTeamIds.includes(team)) {
-      setDropTarget(null);
-      return;
-    }
-    updateCurrentPick((current) => {
-      if (beforeTeam) return insertPickListTeam(current, team, beforeTeam);
-      return source === "pick" ? insertPickListTeam(current, team) : addPickListTeam(current, team);
-    });
-    setDropTarget(null);
-  }
-
-  return (
-    <div className="grid min-h-0 gap-3 min-[700px]:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
-      <Card className="overflow-hidden p-0">
-        <div data-picklist-scroll className="max-h-[68dvh] overflow-y-auto p-2">
-          {poolTeams.map((team) => {
-            const crossed = crossedSet.has(team.team);
-            return (
-              <div
-                key={team.team}
-                draggable
-                onDragStart={(event) => startDrag(event, team.team, "pool")}
-                className={cn(
-                  "mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50",
-                  crossed && "opacity-45",
-                )}
-              >
-                <GripVertical className="size-4 text-ink-faint" />
-                <span className="w-8 text-right text-xs tabular-nums text-ink-faint">{rankByTeam.get(team.team)}</span>
-                <button
-                  type="button"
-                  onClick={() => onOpenTeam(team.team)}
-                  className={cn(
-                    "w-fit shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
-                    crossed && "line-through",
-                  )}
-                >
-                  Team {team.team}
-                </button>
-                <div className="min-w-40 flex-1">
-                  <p className={cn("truncate text-xs text-ink-dim", crossed && "line-through")}>
-                    {team.matchCount} 场 · 可靠性 {reliability(team)}% · {trendLabel(team.trend)}
-                  </p>
-                </div>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  {team.avgTotal} 综合均分
-                </span>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  Drive score {team.avgDriver.toFixed(1)}
-                </span>
-                <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                  Defence score {defenceScore(team).toFixed(1)}
-                </span>
-                <TierBadge tier={tierByTeam.get(team.team)} />
-                <div className="ml-auto flex justify-end gap-1">
-                  <Button
-                    type="button"
-                    title={`加入 ${pickTitle}`}
-                    aria-label={`加入 ${pickTitle}`}
-                    className="h-8 px-2"
-                    onClick={() => updateCurrentPick((current) => addPickListTeam(current, team.team))}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    title={crossed ? "恢复队伍" : "划掉队伍"}
-                    aria-label={crossed ? "恢复队伍" : "划掉队伍"}
-                    className="h-8 px-2"
-                    onClick={() => toggleCrossed(team.team)}
-                  >
-                    {crossed ? <RotateCcw className="size-4" /> : <X className="size-4" />}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card className="overflow-hidden p-0">
-        <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap border-b border-line p-3">
-          <div className="flex shrink-0 gap-2">
-            <Button type="button" variant={activePick === "first" ? "active" : "default"} onClick={() => setActivePick("first")}>
-              1st Pick List
-            </Button>
-            <Button type="button" variant={activePick === "second" ? "active" : "default"} onClick={() => setActivePick("second")}>
-              2nd Pick List
-            </Button>
-          </div>
-          <span className="ml-auto shrink-0 text-sm text-ink-dim">{pickTeams.length} 支</span>
-          <Button
-            type="button"
-            className="shrink-0"
-            onClick={() => setPrinting(true)}
-            disabled={!firstPickTeams.length && !secondPickTeams.length}
-            title="导出 Picklist PDF"
-          >
-            <Download className="size-4" />
-            导出 PDF
-          </Button>
-        </div>
-        <div
-          data-picklist-scroll
-          className="min-h-80 max-h-[68dvh] overflow-y-auto p-2"
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDropTarget("end");
-          }}
-          onDragEnter={() => setDropTarget("end")}
-          onDragLeave={() => setDropTarget(null)}
-          onDrop={(event) => dropTeam(event)}
-        >
-          {!pickTeams.length ? (
-            <div className="grid min-h-64 place-items-center rounded-md border border-dashed border-line bg-surface-2 px-4 text-center text-sm text-ink-dim">
-              从左侧拖入队伍，或点击加号加入当前列表。
-            </div>
-          ) : null}
-          {pickTeams.map((teamNumber, index) => {
-            const team = teams.find((item) => item.team === teamNumber);
-            if (!team) return null;
-            return (
-              <div key={team.team}>
-                <DropLine active={dropTarget === team.team} />
-                <div
-                  draggable
-                  onDragStart={(event) => startDrag(event, team.team, "pick")}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setDropTarget(team.team);
-                  }}
-                  onDragEnter={(event) => {
-                    event.stopPropagation();
-                    setDropTarget(team.team);
-                  }}
-                  onDrop={(event) => dropTeam(event, team.team)}
-                  className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-surface-2 px-2.5 py-2 text-sm transition hover:border-brand/50"
-                >
-                  <GripVertical className="size-4 text-ink-faint" />
-                  <span className="w-8 text-right text-xs font-semibold tabular-nums text-ink-faint">{index + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => onOpenTeam(team.team)}
-                    className="w-fit min-w-max shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
-                  >
-                    Team {team.team}
-                  </button>
-                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                    {team.avgTotal} 综合均分
-                  </span>
-                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                    Drive score {team.avgDriver.toFixed(1)}
-                  </span>
-                  <span className="whitespace-nowrap rounded-full bg-surface px-2 py-0.5 text-xs tabular-nums text-ink-dim">
-                    Defence score {defenceScore(team).toFixed(1)}
-                  </span>
-                  <Button
-                    type="button"
-                    title="移出当前列表"
-                    aria-label="移出当前列表"
-                    className="h-8 px-2"
-                    onClick={() => updateCurrentPick((current) => removePickListTeam(current, team.team))}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-          {pickTeams.length ? <DropLine active={dropTarget === "end"} /> : null}
-        </div>
-      </Card>
-      {printing ? (
-        <PicklistPrintDocument
-          eventKey={eventKey}
-          teams={teams}
-          tierByTeam={tierByTeam}
-          rankByTeam={rankByTeam}
-          firstPick={firstPickTeams}
-          secondPick={secondPickTeams}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function PicklistPrintDocument({
-  eventKey,
-  teams,
-  tierByTeam,
-  rankByTeam,
-  firstPick,
-  secondPick,
-}: {
-  eventKey: string;
-  teams: TeamSummary[];
-  tierByTeam: Map<string, TierInfo>;
-  rankByTeam: Map<string, number>;
-  firstPick: string[];
-  secondPick: string[];
-}) {
-  const byTeam = new Map(teams.map((team) => [team.team, team]));
-  const exportedAt = new Date().toLocaleString("zh-CN", { hour12: false });
-  return (
-    <div className="picklist-print-root" aria-hidden="true">
-      <style>{PICKLIST_PRINT_CSS}</style>
-      <article className="picklist-print-page">
-        <header className="picklist-print-header">
-          <div>
-            <p>NI Robotics · Cyber Strategy</p>
-            <h1>Picklist</h1>
-          </div>
-          <div><span>{eventKey}</span><span>{exportedAt}</span></div>
-        </header>
-        <div className="picklist-print-lists">
-          {([["1st Pick List", firstPick], ["2nd Pick List", secondPick]] as const).map(([title, list]) => (
-            <section key={title}>
-              <h2>{title}</h2>
-              {!list.length ? <p className="picklist-print-empty">暂无队伍</p> : null}
-              {list.map((teamNumber, index) => {
-                const team = byTeam.get(teamNumber);
-                if (!team) return null;
-                const tier = tierByTeam.get(teamNumber);
-                return (
-                  <div className="picklist-print-row" key={teamNumber}>
-                    <strong>{index + 1}</strong>
-                    <div><h3>Team {teamNumber}</h3><p>数据排名 #{rankByTeam.get(teamNumber) ?? "-"} · {team.matchCount} 场 · 可靠性 {reliability(team)}%</p></div>
-                    <div className="picklist-print-stats">
-                      <span>综合 <b>{team.avgTotal}</b></span>
-                      <span>Drive <b>{team.avgDriver.toFixed(1)}</b></span>
-                      <span>Defence <b>{defenceScore(team).toFixed(1)}</b></span>
-                      {tier ? <span>分层 <b>{tierDisplayLabel(tier.label)}</b></span> : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </section>
-          ))}
-        </div>
-        <footer>NI Robotics · Cyber Strategy · Picklist</footer>
-      </article>
-    </div>
-  );
-}
-
-const PICKLIST_PRINT_CSS = `
-.picklist-print-root { position: fixed; left: -10000px; top: 0; width: 210mm; height: 1px; overflow: hidden; background: #fff; color: #111827; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-.picklist-print-root * { box-sizing: border-box; }
-@page { size: A4 landscape; margin: 12mm; }
-@media print {
-  html, body { background: #fff !important; }
-  body * { visibility: hidden !important; }
-  .picklist-print-root, .picklist-print-root * { visibility: visible !important; }
-  .picklist-print-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; height: auto !important; overflow: visible !important; }
-  .picklist-print-page { min-height: 180mm; color: #111827; background: #fff; }
-  .picklist-print-header { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid #d1d5db; }
-  .picklist-print-header p, .picklist-print-header h1 { margin: 0; }
-  .picklist-print-header p { color: #6b7280; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-  .picklist-print-header h1 { margin-top: 2px; font-size: 22px; }
-  .picklist-print-header > div:last-child { display: grid; gap: 2px; color: #6b7280; font-size: 9px; text-align: right; }
-  .picklist-print-lists { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10mm; margin-top: 7mm; }
-  .picklist-print-lists section { min-width: 0; }
-  .picklist-print-lists h2 { margin: 0 0 3mm; font-size: 15px; }
-  .picklist-print-row { display: grid; grid-template-columns: 7mm minmax(0, 1fr); gap: 3mm; break-inside: avoid; margin-bottom: 2mm; border: 1px solid #e5e7eb; border-radius: 5px; padding: 2.5mm; }
-  .picklist-print-row > strong { display: grid; place-items: center; border-radius: 4px; background: #f3f4f6; font-size: 12px; }
-  .picklist-print-row h3, .picklist-print-row p { margin: 0; }
-  .picklist-print-row h3 { font-size: 11px; }
-  .picklist-print-row p { margin-top: 1px; color: #6b7280; font-size: 8px; }
-  .picklist-print-stats { grid-column: 2; display: flex; flex-wrap: wrap; gap: 2mm 4mm; color: #6b7280; font-size: 8px; }
-  .picklist-print-stats b { color: #111827; }
-  .picklist-print-empty { color: #6b7280; font-size: 10px; }
-  .picklist-print-page footer { position: fixed; right: 12mm; bottom: 5mm; left: 12mm; color: #6b7280; font-size: 8px; text-align: center; }
-}
-`;
-
-function DropLine({ active }: { active: boolean }) {
-  return (
-    <div className="h-2">
-      {active ? <div className="mx-2 h-0.5 rounded-full bg-brand shadow-[0_0_0_1px_var(--accent)]" /> : null}
-    </div>
-  );
-}
-
 export function TeamDetailModal({
   team,
   tier,
@@ -1341,7 +839,6 @@ export function TeamDetailModal({
         <div className="flex items-center justify-between gap-3 border-b border-line bg-surface px-4 py-3">
           <div className="min-w-0">
             <p className="section-label">队伍详情</p>
-            <h2 className="truncate text-lg font-semibold text-ink">Team {team.team}</h2>
           </div>
           <Button type="button" onClick={onClose} className="h-9 px-2" title="关闭">
             <X className="size-4" />
@@ -1652,10 +1149,6 @@ function botStateLabel(match: ScoutingMatch) {
 
 function isShortIncap(match: ScoutingMatch) {
   return match.botStateText.trim().toLowerCase() === "incap" && (match.downtimeMs ?? 0) <= INCAP_DISPLAY_THRESHOLD_MS;
-}
-
-function trendLabel(trend: TeamSummary["trend"]) {
-  return trend === "up" ? "上升" : trend === "down" ? "下降" : "稳定";
 }
 
 function useStoredList(key: string) {

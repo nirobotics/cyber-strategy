@@ -50,7 +50,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="1.0.127"
+      version="2026.1.43"
       user={null}
       authLoading={false}
       allowGuest
@@ -64,7 +64,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           dataset={loaderData.demo.dataset}
           events={[{ eventKey: DEMO_EVENT_KEY, name: DEMO_EVENT_NAME, isActive: true, updatedAt: loaderData.demo.dataset.updatedAt }]}
           selectedEventKey={DEMO_EVENT_KEY}
-          isAdmin={false}
+          isAdmin
           tierPercentages={DEFAULT_TIER_PERCENTAGES}
           dataRange={["qualification"]}
           user={DEMO_USER}
