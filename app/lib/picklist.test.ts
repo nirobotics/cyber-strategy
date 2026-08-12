@@ -41,6 +41,14 @@ describe("picklist board", () => {
     });
   });
 
+  it("copies a personal team into Main without changing the personal snapshot", () => {
+    const main = emptyPicklistBoard();
+    const personal = { tier1: ["2", "1"], tier2: [], tier3: [], dnp: [] };
+    const next = movePicklistTeam(main, validTeams, personal.tier1[0], "tier1");
+    expect(next.tier1).toEqual(["2"]);
+    expect(personal.tier1).toEqual(["2", "1"]);
+  });
+
   it("keeps the visible middle position when a cross-column drag then hits the column container", () => {
     const board = { tier1: ["1"], tier2: ["2", "3", "4"], tier3: [], dnp: [] };
     const preview = previewPicklistTeam(board, validTeams, "tier1", {

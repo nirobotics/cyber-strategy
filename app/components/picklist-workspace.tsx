@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, UserRound, Users } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
+import { PicklistMergeBoard } from "./picklist-merge-board";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import type { PicklistActionData } from "../routes/_app.picklists";
 import type { TeamSummary } from "../lib/scouting";
 import type { TierInfo } from "../lib/tier-settings";
 import {
   PICKLIST_ASSIGNED_COLUMNS,
-  comparePicklistTier,
   emptyPicklistBoard,
   samePicklistBoard,
   type PicklistAssignedColumn,
@@ -229,7 +229,7 @@ export function PicklistWorkspace({
 
   function startMerge() {
     if (!selectedMergeMain || !selectedMergePersonal.length) return;
-    setActiveBoard(null);
+    setActiveBoard(selectedMergeMain.board);
     setActive({ kind: "main", remote: selectedMergeMain });
     setMergeMode(true);
   }
@@ -308,10 +308,6 @@ export function PicklistWorkspace({
   const storageKey = isMain
     ? `cyber-strategy:picklist:${datasetId}:main:${active.remote.id}:board`
     : personalBoardKey(datasetId, active.local.id);
-  const comparisonLists = mergeMode && selectedMergeMain
-    ? [{ ...selectedMergeMain, board: activeBoard ?? selectedMergeMain.board }, ...selectedMergePersonal]
-    : [];
-  const comparison = comparePicklistTier(comparisonLists, mergeTier);
   const searchedTeam = teams.some((team) => team.team === teamSearch.replace(/^frc/i, "").trim())
     ? teamSearch.replace(/^frc/i, "").trim()
     : null;
@@ -357,28 +353,17 @@ export function PicklistWorkspace({
       {commandFetcher.data?.error ? <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{commandFetcher.data.error}</div> : null}
       {saveFetcher.data?.error ? <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{saveFetcher.data.error}</div> : null}
 
-      {mergeMode ? (
-        <Card className="mb-3 flex max-h-72 shrink-0 flex-col overflow-hidden p-0">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line p-2">
+      {mergeMode && activeBoard ? (
+        <div className="min-h-0 flex flex-1 flex-col gap-3 overflow-hidden">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-line bg-surface p-2">
             {PICKLIST_ASSIGNED_COLUMNS.map((column) => (
               <Button key={column} type="button" variant={mergeTier === column ? "active" : "default"} onClick={() => setMergeTier(column)}>{TIER_LABELS[column]}</Button>
             ))}
+            <span className="ml-auto text-xs text-ink-dim">正在修改 Main：{listName}</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="sticky top-0 z-10 bg-surface-2 text-xs text-ink-faint">
-                <tr><th className="px-3 py-2">Team</th>{comparisonLists.map((list) => <th key={list.id} className="px-3 py-2">{list.name}{list.kind === "personal" ? ` · ${list.createdByName}` : ""}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {comparison.map((row) => <tr key={row.team}><td className="px-3 py-2 font-semibold text-ink">Team {row.team}</td>{comparisonLists.map((list) => <td key={list.id} className="px-3 py-2 tabular-nums text-ink-dim">{row.ranks[list.id] ?? "-"}</td>)}</tr>)}
-                {!comparison.length ? <tr><td colSpan={comparisonLists.length + 1} className="px-3 py-6 text-center text-ink-faint">该 Tier 暂无队伍</td></tr> : null}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      ) : null}
-
-      <PicklistBoard
+          <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
+        </div>
+      ) : <PicklistBoard
         datasetId={datasetId}
         storageKey={storageKey}
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
@@ -390,7 +375,7 @@ export function PicklistWorkspace({
         teams={teams}
         tierByTeam={tierByTeam}
         onOpenTeam={onOpenTeam}
-      />
+      />}
     </div>
   );
 }
