@@ -300,7 +300,7 @@ export function AnalyticsDashboard({
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="搜索队伍"
                 inputMode="numeric"
-                className="h-9"
+                className="h-9 font-sans"
               />
             </div>
             <div className="max-h-[460px] overflow-y-auto lg:min-h-0 lg:max-h-none lg:flex-1">
