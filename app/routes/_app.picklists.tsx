@@ -3,10 +3,10 @@ import type { Route } from "./+types/_app.picklists";
 import { requireUser } from "../lib/auth.server";
 import { isAdmin } from "../lib/profiles.server";
 import { cleanTbaEventKey } from "../lib/tba.server";
-import { createMainPicklist, listPicklists, saveMainPicklist, submitPersonalPicklist } from "../lib/picklists.server";
+import { createMainPicklist, deletePersonalPicklist, listPicklists, saveMainPicklist, submitPersonalPicklist } from "../lib/picklists.server";
 import type { SharedPicklist } from "../lib/picklist";
 
-export type PicklistActionData = { error?: string; ok?: boolean; picklist?: SharedPicklist };
+export type PicklistActionData = { error?: string; ok?: boolean; picklist?: SharedPicklist; deletedId?: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = requireUser(request, { redirectToLogin: true });
@@ -60,6 +60,12 @@ export async function action({ request }: Route.ActionArgs): Promise<PicklistAct
         clientId: String(formData.get("clientId") || ""),
         name: String(formData.get("name") || ""),
         board: parseBoard(formData.get("board")),
+        actorOpenId: user.feishuOpenId,
+      }) };
+    }
+    if (intent === "delete-personal") {
+      return { ok: true, deletedId: await deletePersonalPicklist({
+        id: String(formData.get("id") || ""),
         actorOpenId: user.feishuOpenId,
       }) };
     }

@@ -107,6 +107,16 @@ export async function submitPersonalPicklist(opts: {
   return rowToPicklist(data as PicklistSettingRow)!;
 }
 
+export async function deletePersonalPicklist(opts: { id: string; actorOpenId: string }) {
+  const stored = await getPicklist(opts.id);
+  if (!stored) throw new Response("Personal Picklist 不存在", { status: 404 });
+  if (stored.list.kind !== "personal" || stored.list.createdBy !== opts.actorOpenId) throw new Response("无权删除 Personal Picklist", { status: 403 });
+  const { error } = await requireClient().from("app_settings").delete().eq("key", stored.row.key);
+  if (error) throw new Response("删除 Personal Picklist 失败", { status: 500 });
+  await appendAudit("picklist.personal.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
+  return stored.list.id;
+}
+
 async function getPicklist(id: string): Promise<{ row: PicklistSettingRow; list: SharedPicklist } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const sb = getClient();

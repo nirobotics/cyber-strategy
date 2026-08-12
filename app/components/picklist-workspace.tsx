@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, UserRound, Users } from "lucide-react";
+import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, UserRound, Users } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
 import { PicklistMergeBoard } from "./picklist-merge-board";
@@ -53,7 +53,8 @@ export function PicklistWorkspace({
   const [activeBoard, setActiveBoard] = useState<PicklistBoardState | null>(null);
   const [personalName, setPersonalName] = useState("");
   const [mainName, setMainName] = useState("");
-  const [pendingCommand, setPendingCommand] = useState<"create-main" | "submit-personal" | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<"create-main" | "submit-personal" | "delete-personal" | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<LocalPersonalList | null>(null);
   const [mergeMainId, setMergeMainId] = useState("");
   const [mergePersonalIds, setMergePersonalIds] = useState<string[]>([]);
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
@@ -81,6 +82,13 @@ export function PicklistWorkspace({
       setStalePersonalIds((current) => updateSet(current, active.local.id, !samePicklistBoard(board, active.remote!.board)));
     }
   }, [active, demoMode]);
+  const removeLocalPersonal = useCallback((local: LocalPersonalList, remoteId?: string) => {
+    setPersonalLists((current) => current.filter((list) => list.id !== local.id));
+    localStorage.removeItem(personalBoardKey(datasetId, local.id));
+    setSharedLists((current) => current.filter((list) => list.id !== remoteId && list.clientId !== local.id));
+    setMergePersonalIds((current) => current.filter((id) => id !== remoteId));
+    setStalePersonalIds((current) => updateSet(current, local.id, false));
+  }, [datasetId, setPersonalLists]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -116,22 +124,35 @@ export function PicklistWorkspace({
 
   useEffect(() => {
     const result = commandFetcher.data;
-    if (!result?.ok || !result.picklist || handledCommand.current === result) return;
+    if (!result || handledCommand.current === result) return;
     handledCommand.current = result;
-    const list = result.picklist;
+    if (!result.ok) {
+      queueMicrotask(() => {
+        setPendingCommand(null);
+        setPendingDelete(null);
+      });
+      return;
+    }
     queueMicrotask(() => {
-      setSharedLists((current) => [list, ...current.filter((item) => item.id !== list.id)]);
-      if (pendingCommand === "create-main") {
-        setActive({ kind: "main", remote: list });
-        setMainName("");
+      if (result.picklist) {
+        const list = result.picklist;
+        setSharedLists((current) => [list, ...current.filter((item) => item.id !== list.id)]);
+        if (pendingCommand === "create-main") {
+          setActive({ kind: "main", remote: list });
+          setMainName("");
+        }
+        if (pendingCommand === "submit-personal" && list.clientId) {
+          setStalePersonalIds((current) => updateSet(current, list.clientId!, false));
+          setActive((current) => current?.kind === "personal" && current.local.id === list.clientId ? { ...current, remote: list } : current);
+        }
       }
-      if (pendingCommand === "submit-personal" && list.clientId) {
-        setStalePersonalIds((current) => updateSet(current, list.clientId!, false));
-        setActive((current) => current?.kind === "personal" && current.local.id === list.clientId ? { ...current, remote: list } : current);
+      if (pendingCommand === "delete-personal" && pendingDelete && result.deletedId) {
+        removeLocalPersonal(pendingDelete, result.deletedId);
       }
       setPendingCommand(null);
+      setPendingDelete(null);
     });
-  }, [commandFetcher.data, pendingCommand]);
+  }, [commandFetcher.data, pendingCommand, pendingDelete, removeLocalPersonal]);
 
   useEffect(() => {
     const list = saveFetcher.data?.picklist;
@@ -223,6 +244,18 @@ export function PicklistWorkspace({
     setActive({ kind: "personal", local, remote: ownSubmissions.get(local.id) ?? null });
   }
 
+  function deletePersonal(local: LocalPersonalList) {
+    if (!window.confirm(`删除 Personal Picklist「${local.name}」？`)) return;
+    const remote = ownSubmissions.get(local.id);
+    if (demoMode || !remote) {
+      removeLocalPersonal(local, remote?.id);
+      return;
+    }
+    setPendingDelete(local);
+    setPendingCommand("delete-personal");
+    commandFetcher.submit({ intent: "delete-personal", id: remote.id }, { method: "post", action: "/picklists" });
+  }
+
   function openMain(remote: SharedPicklist) {
     setActiveBoard(null);
     setActive({ kind: "main", remote });
@@ -256,10 +289,15 @@ export function PicklistWorkspace({
 
           <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length}>
             {personalLists.map((list) => (
-              <button key={list.id} type="button" onClick={() => openPersonal(list)} className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface-2 p-3 text-left hover:border-brand">
-                <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
-                {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
-              </button>
+              <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
+                <button type="button" onClick={() => openPersonal(list)} className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 text-left">
+                  <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
+                  {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
+                </button>
+                <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => deletePersonal(list)} disabled={pendingCommand === "delete-personal"} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </div>
             ))}
             {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
             <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} />
@@ -274,8 +312,8 @@ export function PicklistWorkspace({
                 <GitMerge className="size-4" />Merge
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-1.5 text-sm text-ink-dim">
+            <div className="grid items-start gap-3 md:grid-cols-2">
+              <label className="grid content-start gap-1.5 text-sm text-ink-dim">
                 Main Picklist
                 <select className="input h-10" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
                   <option value="">选择 Main</option>
