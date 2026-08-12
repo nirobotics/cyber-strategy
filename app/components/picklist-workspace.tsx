@@ -297,10 +297,7 @@ export function PicklistWorkspace({
   if (!active) {
     return (
       <div className="min-h-0 min-w-0 space-y-3 sm:flex sm:flex-1 sm:flex-col sm:overflow-y-auto">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-ink">选择 Picklist</h2>
-          {resource.error ? <Badge className="border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
-        </div>
+        {resource.error ? <Badge className="w-fit border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
 
         <div className="grid min-w-0 gap-3 lg:grid-cols-2">
           <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length}>
