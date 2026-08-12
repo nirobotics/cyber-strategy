@@ -10,6 +10,7 @@ import {
   PICKLIST_ASSIGNED_COLUMNS,
   comparePicklistTier,
   emptyPicklistBoard,
+  samePicklistBoard,
   type PicklistAssignedColumn,
   type PicklistBoard as PicklistBoardState,
   type PicklistResource,
@@ -58,6 +59,7 @@ export function PicklistWorkspace({
   const [mergeMode, setMergeMode] = useState(false);
   const [resetToken, setResetToken] = useState(0);
   const [teamSearch, setTeamSearch] = useState("");
+  const [stalePersonalIds, setStalePersonalIds] = useState<Set<string>>(new Set());
   const handledCommand = useRef<PicklistActionData | undefined>(undefined);
   const handledSave = useRef<PicklistActionData | undefined>(undefined);
   const submitMain = saveFetcher.submit;
@@ -73,6 +75,9 @@ export function PicklistWorkspace({
     setActiveBoard(board);
     if (demoMode && active?.kind === "main") {
       setSharedLists((current) => current.map((list) => list.id === active.remote.id ? { ...list, board, updatedAt: new Date().toISOString() } : list));
+    }
+    if (active?.kind === "personal" && active.remote) {
+      setStalePersonalIds((current) => updateSet(current, active.local.id, !samePicklistBoard(board, active.remote!.board)));
     }
   }, [active, demoMode]);
 
@@ -118,6 +123,10 @@ export function PicklistWorkspace({
       if (pendingCommand === "create-main") {
         setActive({ kind: "main", remote: list });
         setMainName("");
+      }
+      if (pendingCommand === "submit-personal" && list.clientId) {
+        setStalePersonalIds((current) => updateSet(current, list.clientId!, false));
+        setActive((current) => current?.kind === "personal" && current.local.id === list.clientId ? { ...current, remote: list } : current);
       }
       setPendingCommand(null);
     });
@@ -195,6 +204,7 @@ export function PicklistWorkspace({
       };
       setSharedLists((current) => [submission, ...current.filter((list) => list.id !== submission.id)]);
       setActive({ kind: "personal", local: active.local, remote: submission });
+      setStalePersonalIds((current) => updateSet(current, active.local.id, false));
       return;
     }
     setPendingCommand("submit-personal");
@@ -247,7 +257,7 @@ export function PicklistWorkspace({
             {personalLists.map((list) => (
               <button key={list.id} type="button" onClick={() => openPersonal(list)} className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface-2 p-3 text-left hover:border-brand">
                 <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
-                {ownSubmissions.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
+                {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
               </button>
             ))}
             {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
@@ -263,10 +273,10 @@ export function PicklistWorkspace({
                 <GitMerge className="size-4" />Merge
               </Button>
             </div>
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+            <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-1.5 text-sm text-ink-dim">
                 Main Picklist
-                <select className="input" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
+                <select className="input h-10" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
                   <option value="">选择 Main</option>
                   {mainLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}
                 </select>
@@ -275,7 +285,7 @@ export function PicklistWorkspace({
                 已提交 Personal Picklist
                 <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {submittedPersonal.map((list) => (
-                    <label key={list.id} className={cn("flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
+                    <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
                       <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
                     </label>
@@ -293,7 +303,7 @@ export function PicklistWorkspace({
   const isMain = active.kind === "main";
   const editable = !isMain || resource.isAdmin;
   const listName = isMain ? active.remote.name : active.local.name;
-  const personalSubmission = !isMain ? ownSubmissions.get(active.local.id) : null;
+  const personalSubmission = !isMain && !stalePersonalIds.has(active.local.id) ? ownSubmissions.get(active.local.id) : null;
   const remoteBoard = isMain ? active.remote.board : active.remote?.board;
   const storageKey = isMain
     ? `cyber-strategy:picklist:${datasetId}:main:${active.remote.id}:board`
@@ -457,4 +467,11 @@ function normalizeDemoLists(value: unknown, eventKey: string): SharedPicklist[] 
 
 function toggleId(values: string[], id: string) {
   return values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
+}
+
+function updateSet(values: Set<string>, id: string, present: boolean) {
+  const next = new Set(values);
+  if (present) next.add(id);
+  else next.delete(id);
+  return next;
 }

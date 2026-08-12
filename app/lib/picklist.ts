@@ -31,6 +31,10 @@ export function emptyPicklistBoard(): PicklistBoard {
   return { tier1: [], tier2: [], tier3: [], dnp: [] };
 }
 
+export function samePicklistBoard(left: PicklistBoard, right: PicklistBoard) {
+  return PICKLIST_ASSIGNED_COLUMNS.every((column) => left[column].join(",") === right[column].join(","));
+}
+
 export function sanitizePicklistBoard(board: Partial<PicklistBoard> | null | undefined, validTeams: string[]): PicklistBoard {
   const valid = new Set(validTeams);
   const seen = new Set<string>();

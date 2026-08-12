@@ -12,6 +12,7 @@ import {
   previewPicklistTeam,
   reorderPicklistTeam,
   sanitizePicklistBoard,
+  samePicklistBoard,
   visiblePicklistsForEvent,
   type SharedPicklist,
 } from "./picklist";
@@ -91,6 +92,12 @@ describe("picklist board", () => {
 
   it("starts with an empty board", () => {
     expect(emptyPicklistBoard()).toEqual({ tier1: [], tier2: [], tier3: [], dnp: [] });
+  });
+
+  it("detects changes made after a personal picklist submission", () => {
+    const submitted = { tier1: ["1"], tier2: ["2"], tier3: [], dnp: [] };
+    expect(samePicklistBoard(submitted, { ...submitted, tier1: ["1"] })).toBe(true);
+    expect(samePicklistBoard(submitted, { ...submitted, tier1: ["1", "3"] })).toBe(false);
   });
 
   it("normalizes stored boards and removes invalid or duplicate teams", () => {

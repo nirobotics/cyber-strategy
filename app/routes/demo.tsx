@@ -50,7 +50,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="Demo"
-      version="2026.1.20"
+      version="2026.1.21"
       user={null}
       authLoading={false}
       allowGuest
