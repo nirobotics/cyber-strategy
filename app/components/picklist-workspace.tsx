@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, UserRound, Users, X } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
@@ -11,6 +11,7 @@ import {
   PICKLIST_ASSIGNED_COLUMNS,
   emptyPicklistBoard,
   findPicklistTeamTier,
+  normalizePicklistBoard,
   samePicklistBoard,
   type PicklistAssignedColumn,
   type PicklistBoard as PicklistBoardState,
@@ -67,13 +68,16 @@ export function PicklistWorkspace({
   const handledSave = useRef<PicklistActionData | undefined>(undefined);
   const submitMain = saveFetcher.submit;
 
-  const mainLists = sharedLists.filter((list) => list.kind === "main");
-  const submittedPersonal = sharedLists.filter((list) => list.kind === "personal" && list.submittedAt);
-  const ownSubmissions = new Map(submittedPersonal
+  const mainLists = useMemo(() => sharedLists.filter((list) => list.kind === "main"), [sharedLists]);
+  const submittedPersonal = useMemo(() => sharedLists.filter((list) => list.kind === "personal" && list.submittedAt), [sharedLists]);
+  const ownSubmissions = useMemo(() => new Map(submittedPersonal
     .filter((list) => list.createdBy === resource.userOpenId && list.clientId)
-    .map((list) => [list.clientId!, list]));
+    .map((list) => [list.clientId!, list])), [resource.userOpenId, submittedPersonal]);
+  const mergeablePersonal = useMemo(() => submittedPersonal.filter((list) =>
+    list.createdBy !== resource.userOpenId || !list.clientId || !stalePersonalIds.has(list.clientId)
+  ), [resource.userOpenId, stalePersonalIds, submittedPersonal]);
   const selectedMergeMain = mainLists.find((list) => list.id === mergeMainId) ?? null;
-  const selectedMergePersonal = submittedPersonal.filter((list) => mergePersonalIds.includes(list.id));
+  const selectedMergePersonal = mergeablePersonal.filter((list) => mergePersonalIds.includes(list.id));
   const handleBoardChange = useCallback((board: PicklistBoardState) => {
     setActiveBoard(board);
     if (demoMode && active?.kind === "main") {
@@ -111,6 +115,28 @@ export function PicklistWorkspace({
   useEffect(() => {
     if (demoMode && demoMainLoaded) localStorage.setItem(demoListsKey, JSON.stringify(sharedLists));
   }, [demoListsKey, demoMainLoaded, demoMode, sharedLists]);
+
+  useEffect(() => {
+    const stale = new Set<string>();
+    for (const local of personalLists) {
+      const submitted = submittedPersonal.find((list) => list.createdBy === resource.userOpenId && list.clientId === local.id);
+      const stored = localStorage.getItem(personalBoardKey(datasetId, local.id));
+      if (!submitted || !stored) continue;
+      try {
+        if (!samePicklistBoard(normalizePicklistBoard(JSON.parse(stored)), submitted.board)) stale.add(local.id);
+      } catch {
+        stale.add(local.id);
+      }
+    }
+    queueMicrotask(() => setStalePersonalIds(stale));
+  }, [datasetId, personalLists, resource.userOpenId, submittedPersonal]);
+
+  useEffect(() => {
+    queueMicrotask(() => setMergePersonalIds((current) => {
+        const next = current.filter((id) => mergeablePersonal.some((list) => list.id === id));
+        return next.length === current.length ? current : next;
+      }));
+  }, [mergeablePersonal]);
 
   useEffect(() => {
     const imports = resource.lists.filter((list) =>
@@ -328,13 +354,13 @@ export function PicklistWorkspace({
               <div className="grid gap-1.5 text-sm text-ink-dim">
                 已提交 Personal Picklist
                 <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
-                  {submittedPersonal.map((list) => (
+                  {mergeablePersonal.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
                       <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
                     </label>
                   ))}
-                  {!submittedPersonal.length ? <div className="px-3 py-2 text-ink-faint">暂无提交</div> : null}
+                  {!mergeablePersonal.length ? <div className="px-3 py-2 text-ink-faint">暂无提交</div> : null}
                 </div>
               </div>
             </div>
