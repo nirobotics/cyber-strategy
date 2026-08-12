@@ -330,6 +330,8 @@ function useStoredPicklistBoard(
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const validSignature = validTeams.join(",");
   const initialSignature = JSON.stringify(initialBoard ?? emptyPicklistBoard());
+  const stableInitialBoard = useMemo(() => JSON.parse(initialSignature) as PicklistBoardState, [initialSignature]);
+  const hasInitialBoard = Boolean(initialBoard);
 
   useEffect(() => {
     let cancelled = false;
@@ -338,11 +340,11 @@ function useStoredPicklistBoard(
       try {
         const raw = window.localStorage.getItem(key);
         const next = preferInitial
-          ? sanitizePicklistBoard(initialBoard, validTeams)
+          ? sanitizePicklistBoard(stableInitialBoard, validTeams)
           : raw
           ? sanitizePicklistBoard(JSON.parse(raw) as PicklistBoardState, validTeams)
-          : initialBoard
-            ? sanitizePicklistBoard(initialBoard, validTeams)
+          : hasInitialBoard
+            ? sanitizePicklistBoard(stableInitialBoard, validTeams)
             : migrateLegacyPicklist(
               readStoredList(`cyber-strategy:picklist:${datasetId}:first`),
               readStoredList(`cyber-strategy:picklist:${datasetId}:second`),
@@ -358,7 +360,7 @@ function useStoredPicklistBoard(
     return () => {
       cancelled = true;
     };
-  }, [datasetId, initialBoard, initialSignature, key, preferInitial, validSignature, validTeams]);
+  }, [datasetId, hasInitialBoard, key, preferInitial, stableInitialBoard, validSignature, validTeams]);
 
   useEffect(() => {
     if (loadedKey !== key) return;
