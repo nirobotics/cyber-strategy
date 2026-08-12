@@ -313,13 +313,18 @@ export function PicklistWorkspace({
               </Button>
             </div>
             <div className="grid items-start gap-3 md:grid-cols-2">
-              <label className="grid content-start gap-1.5 text-sm text-ink-dim">
+              <div className="grid content-start gap-1.5 text-sm text-ink-dim">
                 Main Picklist
-                <select className="input h-10 font-sans" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
-                  <option value="">选择 Main</option>
-                  {mainLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}
-                </select>
-              </label>
+                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
+                  {mainLists.map((list) => (
+                    <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergeMainId === list.id && "bg-brand/10 text-brand")}>
+                      <input className="accent-brand" type="checkbox" checked={mergeMainId === list.id} onChange={() => setMergeMainId((current) => current === list.id ? "" : list.id)} />
+                      <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
+                    </label>
+                  ))}
+                  {!mainLists.length ? <div className="px-3 py-2 text-ink-faint">暂无 Main Picklist</div> : null}
+                </div>
+              </div>
               <div className="grid gap-1.5 text-sm text-ink-dim">
                 已提交 Personal Picklist
                 <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
