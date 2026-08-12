@@ -53,6 +53,7 @@ export function PicklistBoard({
   readOnly = false,
   preferInitial = false,
   resetToken = 0,
+  highlightedTeam = null,
   onBoardChange,
   teams,
   tierByTeam,
@@ -64,6 +65,7 @@ export function PicklistBoard({
   readOnly?: boolean;
   preferInitial?: boolean;
   resetToken?: number;
+  highlightedTeam?: string | null;
   onBoardChange?: (board: PicklistBoardState) => void;
   teams: TeamSummary[];
   tierByTeam: Map<string, TierInfo>;
@@ -141,6 +143,7 @@ export function PicklistBoard({
               tierByTeam={tierByTeam}
               onOpenTeam={onOpenTeam}
               readOnly={readOnly}
+              highlightedTeam={highlightedTeam}
             />
           ))}
         </div>
@@ -167,6 +170,7 @@ function PicklistColumnView({
   tierByTeam,
   onOpenTeam,
   readOnly,
+  highlightedTeam,
 }: {
   column: PicklistColumn;
   teamIds: string[];
@@ -174,8 +178,16 @@ function PicklistColumnView({
   tierByTeam: Map<string, TierInfo>;
   onOpenTeam: (team: string) => void;
   readOnly: boolean;
+  highlightedTeam: string | null;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: `column:${column}`, data: { column } });
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!highlightedTeam || !teamIds.includes(highlightedTeam)) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-team="${highlightedTeam}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [highlightedTeam, teamIds]);
+
   return (
     <section className={cn("min-w-0 overflow-hidden rounded-md border bg-surface transition sm:flex sm:h-full sm:min-h-0 sm:flex-col", isOver ? "border-brand ring-2 ring-brand/20" : "border-line")}>
       <header className="flex items-center justify-between border-b border-line px-3 py-2.5">
@@ -183,7 +195,7 @@ function PicklistColumnView({
         <span className="text-xs tabular-nums text-ink-dim">{teamIds.length} 支</span>
       </header>
       <SortableContext items={teamIds.map(teamDragId)} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="min-h-28 space-y-2 p-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
+        <div ref={(node) => { listRef.current = node; setNodeRef(node); }} className="min-h-28 space-y-2 p-2 sm:min-h-0 sm:flex-1 sm:overflow-y-auto">
           {teamIds.map((teamNumber) => {
             const team = byTeam.get(teamNumber);
             return team ? (
@@ -194,6 +206,7 @@ function PicklistColumnView({
                 tier={tierByTeam.get(teamNumber)}
                 onOpenTeam={onOpenTeam}
                 readOnly={readOnly}
+                highlighted={teamNumber === highlightedTeam}
               />
             ) : null;
           })}
@@ -235,6 +248,7 @@ function TeamCard({
   style,
   overlay = false,
   readOnly = false,
+  highlighted = false,
 }: {
   team: TeamSummary;
   column: PicklistColumn;
@@ -246,16 +260,19 @@ function TeamCard({
   style?: React.CSSProperties;
   overlay?: boolean;
   readOnly?: boolean;
+  highlighted?: boolean;
 }) {
   return (
     <article
       ref={cardRef}
       style={style}
       {...dragProps}
+      data-team={team.team}
       className={cn(
         "select-none rounded-md border border-line bg-surface-2 p-2.5 shadow-sm transition-colors hover:border-brand/45",
         readOnly ? "cursor-default" : "cursor-grab active:cursor-grabbing",
         overlay && "w-60 rotate-1 border-brand shadow-lg",
+        highlighted && "border-brand bg-brand/10 ring-2 ring-brand/40",
         className,
       )}
     >

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Send, UserRound, Users } from "lucide-react";
+import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, UserRound, Users } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
 import { Badge, Button, Card, Input } from "./ui";
@@ -57,6 +57,7 @@ export function PicklistWorkspace({
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
   const [mergeMode, setMergeMode] = useState(false);
   const [resetToken, setResetToken] = useState(0);
+  const [teamSearch, setTeamSearch] = useState("");
   const handledCommand = useRef<PicklistActionData | undefined>(undefined);
   const handledSave = useRef<PicklistActionData | undefined>(undefined);
   const submitMain = saveFetcher.submit;
@@ -301,6 +302,9 @@ export function PicklistWorkspace({
     ? [{ ...selectedMergeMain, board: activeBoard ?? selectedMergeMain.board }, ...selectedMergePersonal]
     : [];
   const comparison = comparePicklistTier(comparisonLists, mergeTier);
+  const searchedTeam = teams.some((team) => team.team === teamSearch.replace(/^frc/i, "").trim())
+    ? teamSearch.replace(/^frc/i, "").trim()
+    : null;
 
   return (
     <div className="min-h-0 sm:flex sm:flex-1 sm:flex-col sm:overflow-hidden">
@@ -316,6 +320,17 @@ export function PicklistWorkspace({
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
         </div>
         <div className="flex items-center gap-2">
+          <label className="relative block w-36 sm:w-44">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
+            <Input
+              className="h-9 pl-8 font-sans"
+              value={teamSearch}
+              onChange={(event) => setTeamSearch(event.target.value.replace(/[^\dFRCfrc]/g, ""))}
+              placeholder="查找队伍"
+              inputMode="numeric"
+              aria-label="查找队伍"
+            />
+          </label>
           {editable ? (
             <Button type="button" className="shrink-0" onClick={() => setResetToken((value) => value + 1)} disabled={!activeBoard || !PICKLIST_ASSIGNED_COLUMNS.some((column) => activeBoard[column].length)} title="重置 Picklist">
               <RotateCcw className="size-4" />重置
@@ -359,6 +374,7 @@ export function PicklistWorkspace({
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
         preferInitial={isMain}
         resetToken={resetToken}
+        highlightedTeam={searchedTeam}
         readOnly={!editable}
         onBoardChange={handleBoardChange}
         teams={teams}
