@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, UserRound, Users } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
-import { Badge, Button, Card, Input } from "./ui";
+import { Badge, Button, Card, Input, cn } from "./ui";
 import type { PicklistActionData } from "../routes/_app.picklists";
 import type { TeamSummary } from "../lib/scouting";
 import type { TierInfo } from "../lib/tier-settings";
@@ -273,14 +273,14 @@ export function PicklistWorkspace({
               </label>
               <div className="grid gap-1.5 text-sm text-ink-dim">
                 已提交 Personal Picklist
-                <div className="flex min-h-10 flex-wrap gap-2 rounded-md border border-line bg-surface-2 p-2">
+                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {submittedPersonal.map((list) => (
-                    <label key={list.id} className="flex items-center gap-2 rounded-md border border-line bg-surface px-2 py-1 text-ink">
-                      <input type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
-                      {list.name} · {list.createdByName}
+                    <label key={list.id} className={cn("flex cursor-pointer items-center gap-2 border-b border-line px-3 py-2 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
+                      <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
+                      <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
                     </label>
                   ))}
-                  {!submittedPersonal.length ? <span className="text-ink-faint">暂无提交</span> : null}
+                  {!submittedPersonal.length ? <div className="px-3 py-2 text-ink-faint">暂无提交</div> : null}
                 </div>
               </div>
             </div>
