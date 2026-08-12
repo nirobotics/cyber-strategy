@@ -325,7 +325,12 @@ export function PicklistWorkspace({
           {!editable ? <LockKeyhole className="size-4 text-ink-faint" aria-label="只读" /> : null}
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {mergeMode ? PICKLIST_ASSIGNED_COLUMNS.map((column) => (
+            <Button key={column} type="button" variant={mergeTier === column ? "active" : "default"} onClick={() => setMergeTier(column)}>
+              {TIER_LABELS[column]}
+            </Button>
+          )) : null}
           <label className="relative block w-36 sm:w-44">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
             <Input
@@ -354,13 +359,7 @@ export function PicklistWorkspace({
       {saveFetcher.data?.error ? <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{saveFetcher.data.error}</div> : null}
 
       {mergeMode && activeBoard ? (
-        <div className="min-h-0 flex flex-1 flex-col gap-3 overflow-hidden">
-          <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-line bg-surface p-2">
-            {PICKLIST_ASSIGNED_COLUMNS.map((column) => (
-              <Button key={column} type="button" variant={mergeTier === column ? "active" : "default"} onClick={() => setMergeTier(column)}>{TIER_LABELS[column]}</Button>
-            ))}
-            <span className="ml-auto text-xs text-ink-dim">正在修改 Main：{listName}</span>
-          </div>
+        <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
           <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
         </div>
       ) : <PicklistBoard
