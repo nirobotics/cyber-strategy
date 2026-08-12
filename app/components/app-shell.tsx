@@ -32,7 +32,7 @@ export function AppShell({
   demoHref?: string;
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)] has-[[data-fixed-page]]:h-dvh has-[[data-fixed-page]]:overflow-hidden has-[[data-fixed-browser]]:lg:h-dvh has-[[data-fixed-browser]]:lg:overflow-hidden has-[[data-fixed-desktop]]:xl:h-dvh has-[[data-fixed-desktop]]:xl:overflow-hidden">
+    <div className="flex min-h-dvh flex-col bg-surface text-[var(--foreground)] has-[[data-fixed-page]]:h-dvh has-[[data-fixed-page]]:overflow-hidden has-[[data-fixed-browser]]:lg:h-dvh has-[[data-fixed-browser]]:lg:overflow-hidden has-[[data-fixed-desktop]]:xl:h-dvh has-[[data-fixed-desktop]]:xl:overflow-hidden">
       <TopProgressBar active={busy} />
       <AppHeader
         appName={appName}
