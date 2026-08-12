@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMainPicklist, deletePersonalPicklist } from "./picklists.server";
+import { createMainPicklist, deleteMainPicklist, deletePersonalPicklist } from "./picklists.server";
 
 describe("picklist server permissions", () => {
   it("rejects Main creation before touching the database for a non-admin", async () => {
@@ -22,5 +22,9 @@ describe("picklist server permissions", () => {
 
   it("rejects an invalid Personal id before touching the database", async () => {
     await expect(deletePersonalPicklist({ id: "invalid", actorOpenId: "user-1" })).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("rejects Main deletion before touching the database for a non-admin", async () => {
+    await expect(deleteMainPicklist({ id: crypto.randomUUID(), actorOpenId: "user-1", isAdmin: false })).rejects.toMatchObject({ status: 403 });
   });
 });

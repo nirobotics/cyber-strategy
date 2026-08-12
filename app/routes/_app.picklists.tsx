@@ -3,7 +3,7 @@ import type { Route } from "./+types/_app.picklists";
 import { requireUser } from "../lib/auth.server";
 import { isAdmin } from "../lib/profiles.server";
 import { cleanTbaEventKey } from "../lib/tba.server";
-import { createMainPicklist, deletePersonalPicklist, listPicklists, saveMainPicklist, submitPersonalPicklist } from "../lib/picklists.server";
+import { createMainPicklist, deleteMainPicklist, deletePersonalPicklist, listPicklists, saveMainPicklist, submitPersonalPicklist } from "../lib/picklists.server";
 import type { SharedPicklist } from "../lib/picklist";
 
 export type PicklistActionData = { error?: string; ok?: boolean; picklist?: SharedPicklist; deletedId?: string };
@@ -67,6 +67,13 @@ export async function action({ request }: Route.ActionArgs): Promise<PicklistAct
       return { ok: true, deletedId: await deletePersonalPicklist({
         id: String(formData.get("id") || ""),
         actorOpenId: user.feishuOpenId,
+      }) };
+    }
+    if (intent === "delete-main") {
+      return { ok: true, deletedId: await deleteMainPicklist({
+        id: String(formData.get("id") || ""),
+        actorOpenId: user.feishuOpenId,
+        isAdmin: admin,
       }) };
     }
     return { error: "未知操作" };

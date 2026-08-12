@@ -117,6 +117,17 @@ export async function deletePersonalPicklist(opts: { id: string; actorOpenId: st
   return stored.list.id;
 }
 
+export async function deleteMainPicklist(opts: { id: string; actorOpenId: string; isAdmin: boolean }) {
+  if (!opts.isAdmin) throw new Response("只有管理员可以删除 Main Picklist", { status: 403 });
+  const stored = await getPicklist(opts.id);
+  if (!stored) throw new Response("Main Picklist 不存在", { status: 404 });
+  if (stored.list.kind !== "main") throw new Response("无权删除 Main Picklist", { status: 403 });
+  const { error } = await requireClient().from("app_settings").delete().eq("key", stored.row.key);
+  if (error) throw new Response("删除 Main Picklist 失败", { status: 500 });
+  await appendAudit("picklist.main.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
+  return stored.list.id;
+}
+
 async function getPicklist(id: string): Promise<{ row: PicklistSettingRow; list: SharedPicklist } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const sb = getClient();

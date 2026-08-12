@@ -54,9 +54,10 @@ export function PicklistWorkspace({
   const [activeBoard, setActiveBoard] = useState<PicklistBoardState | null>(null);
   const [personalName, setPersonalName] = useState("");
   const [mainName, setMainName] = useState("");
-  const [pendingCommand, setPendingCommand] = useState<"create-main" | "submit-personal" | "delete-personal" | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<"create-main" | "submit-personal" | "delete-personal" | "delete-main" | null>(null);
   const [pendingDelete, setPendingDelete] = useState<LocalPersonalList | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LocalPersonalList | null>(null);
+  const [mainDeleteTarget, setMainDeleteTarget] = useState<SharedPicklist | null>(null);
   const [mergeMainId, setMergeMainId] = useState("");
   const [mergePersonalIds, setMergePersonalIds] = useState<string[]>([]);
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
@@ -196,10 +197,15 @@ export function PicklistWorkspace({
       if (pendingCommand === "delete-personal" && pendingDelete && result.deletedId) {
         removeLocalPersonal(pendingDelete, result.deletedId);
       }
+      if (pendingCommand === "delete-main" && result.deletedId) {
+        localStorage.removeItem(`cyber-strategy:picklist:${datasetId}:main:${result.deletedId}:board`);
+        setSharedLists((current) => current.filter((list) => list.id !== result.deletedId));
+        setMergeMainId((current) => current === result.deletedId ? "" : current);
+      }
       setPendingCommand(null);
       setPendingDelete(null);
     });
-  }, [commandFetcher.data, pendingCommand, pendingDelete, removeLocalPersonal]);
+  }, [commandFetcher.data, datasetId, pendingCommand, pendingDelete, removeLocalPersonal]);
 
   useEffect(() => {
     const list = saveFetcher.data?.picklist;
@@ -305,6 +311,18 @@ export function PicklistWorkspace({
     commandFetcher.submit({ intent: "delete-personal", id: remote.id }, { method: "post", action: "/picklists" });
   }
 
+  function deleteMain(list: SharedPicklist) {
+    if (!resource.isAdmin) return;
+    if (demoMode) {
+      localStorage.removeItem(`cyber-strategy:picklist:${datasetId}:main:${list.id}:board`);
+      setSharedLists((current) => current.filter((item) => item.id !== list.id));
+      setMergeMainId((current) => current === list.id ? "" : current);
+      return;
+    }
+    setPendingCommand("delete-main");
+    commandFetcher.submit({ intent: "delete-main", id: list.id }, { method: "post", action: "/picklists" });
+  }
+
   function openMain(remote: SharedPicklist) {
     clearUndo();
     setActiveBoard(null);
@@ -339,7 +357,10 @@ export function PicklistWorkspace({
         <div className="grid min-h-0 min-w-0 gap-3 lg:grid-cols-2">
           <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} /> : null}>
             {mainLists.map((list) => (
-              <ListButton key={list.id} list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} />
+              <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
+                <ListButton list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} embedded />
+                {resource.isAdmin ? <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => setMainDeleteTarget(list)} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}><Trash2 className="size-4" /></Button> : null}
+              </div>
             ))}
             {!mainLists.length ? <EmptyCollection text="暂无 Main Picklist" /> : null}
           </PicklistCollection>
@@ -405,6 +426,19 @@ export function PicklistWorkspace({
               const target = deleteTarget;
               setDeleteTarget(null);
               deletePersonal(target);
+            }}
+          />
+        ) : null}
+        {mainDeleteTarget ? (
+          <DeletePicklistDialog
+            name={mainDeleteTarget.name}
+            kind="Main"
+            busy={pendingCommand === "delete-main"}
+            onCancel={() => setMainDeleteTarget(null)}
+            onConfirm={() => {
+              const target = mainDeleteTarget;
+              setMainDeleteTarget(null);
+              deleteMain(target);
             }}
           />
         ) : null}
@@ -513,7 +547,7 @@ export function PicklistWorkspace({
   );
 }
 
-function DeletePicklistDialog({ list, busy, onCancel, onConfirm }: { list: LocalPersonalList; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+function DeletePicklistDialog({ list, name = list?.name ?? "", kind = "Personal", busy, onCancel, onConfirm }: { list?: LocalPersonalList; name?: string; kind?: "Main" | "Personal"; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && !busy) onCancel();
@@ -528,13 +562,13 @@ function DeletePicklistDialog({ list, busy, onCancel, onConfirm }: { list: Local
         <div className="flex items-center justify-between gap-3 border-b border-line p-4">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-md border border-danger/40 bg-danger/10 text-danger"><AlertTriangle className="size-5" /></span>
-            <h2 id="delete-picklist-title" className="min-w-0 text-lg font-semibold text-ink">删除 Personal Picklist</h2>
+            <h2 id="delete-picklist-title" className="min-w-0 text-lg font-semibold text-ink">删除 {kind} Picklist</h2>
           </div>
           <Button type="button" className="shrink-0 px-2" onClick={onCancel} disabled={busy} title="关闭"><X className="size-4" /></Button>
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-sm text-ink-dim">确定删除 <strong className="font-semibold text-ink">{list.name}</strong>？</p>
-          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">本机草稿和已提交版本都会被删除，此操作无法撤销。</p>
+          <p className="text-sm text-ink-dim">确定删除 <strong className="font-semibold text-ink">{name}</strong>？</p>
+          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{kind === "Main" ? "所有人将无法继续查看此 Main Picklist。" : "本机草稿和已提交版本都会被删除，"}此操作无法撤销。</p>
         </div>
         <div className="flex justify-end gap-2 border-t border-line bg-surface-2 p-3">
           <Button type="button" onClick={onCancel} disabled={busy}>取消</Button>
@@ -551,8 +585,8 @@ function PicklistCollection({ title, icon, count, children, footer }: { title: s
   return <Card className="min-h-0 min-w-0 overflow-hidden p-0 sm:flex sm:flex-col"><div className="flex shrink-0 items-center justify-between border-b border-line p-3"><h3 className="flex items-center gap-2 font-semibold text-ink">{icon}{title}</h3><span className="text-xs text-ink-dim">{count} 个</span></div><div className="min-w-0 space-y-2 overflow-y-auto p-3 sm:min-h-0 sm:flex-1">{children}</div>{footer ? <div className="shrink-0 border-t border-line p-3">{footer}</div> : null}</Card>;
 }
 
-function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick: () => void; readOnly: boolean }) {
-  return <button type="button" onClick={onClick} className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface-2 p-3 text-left hover:border-brand"><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span><span className="flex shrink-0 items-center gap-2 text-xs text-ink-dim">{readOnly ? <LockKeyhole className="size-3" /> : null}{list.createdByName}</span></button>;
+function ListButton({ list, onClick, readOnly, embedded = false }: { list: SharedPicklist; onClick: () => void; readOnly: boolean; embedded?: boolean }) {
+  return <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between gap-3 p-3 text-left", !embedded && "rounded-md border border-line bg-surface-2 hover:border-brand")}><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span><span className="flex shrink-0 items-center gap-2 text-xs text-ink-dim">{readOnly ? <LockKeyhole className="size-3" /> : null}{list.createdByName}</span></button>;
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy, error }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean; error?: string }) {
