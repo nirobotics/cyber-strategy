@@ -297,21 +297,18 @@ export function PicklistWorkspace({
 
   if (!active) {
     return (
-      <div className="min-h-0 min-w-0 space-y-3 sm:flex sm:flex-1 sm:flex-col sm:overflow-y-auto">
+      <div className="min-h-0 min-w-0 space-y-3 sm:grid sm:flex-1 sm:grid-rows-[minmax(0,3fr)_minmax(11rem,2fr)] sm:overflow-hidden">
         {resource.error ? <Badge className="w-fit border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
 
-        <div className="grid min-w-0 gap-3 lg:grid-cols-2">
-          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length}>
+        <div className="grid min-h-0 min-w-0 gap-3 lg:grid-cols-2">
+          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} /> : null}>
             {mainLists.map((list) => (
               <ListButton key={list.id} list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} />
             ))}
             {!mainLists.length ? <EmptyCollection text="暂无 Main Picklist" /> : null}
-            {resource.isAdmin ? (
-              <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} />
-            ) : null}
           </PicklistCollection>
 
-          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length}>
+          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length} footer={<CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />}>
             {personalLists.map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <button type="button" onClick={() => openPersonal(list)} className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 text-left">
@@ -324,22 +321,21 @@ export function PicklistWorkspace({
               </div>
             ))}
             {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
-            <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />
           </PicklistCollection>
         </div>
 
         {resource.isAdmin ? (
-          <Card className="p-4">
+          <Card className="min-h-0 overflow-hidden p-4 sm:flex sm:flex-col">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h3 className="font-semibold text-ink">Merge</h3>
               <Button type="button" variant="primary" disabled={!selectedMergeMain || !selectedMergePersonal.length} onClick={startMerge}>
                 <GitMerge className="size-4" />Merge
               </Button>
             </div>
-            <div className="grid items-start gap-3 md:grid-cols-2">
-              <div className="grid content-start gap-1.5 text-sm text-ink-dim">
+            <div className="grid min-h-0 items-stretch gap-3 md:grid-cols-2 sm:flex-1">
+              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-1.5 text-sm text-ink-dim">
                 Main Picklist
-                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
+                <div className="min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {mainLists.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergeMainId === list.id && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergeMainId === list.id} onChange={() => setMergeMainId((current) => current === list.id ? "" : list.id)} />
@@ -349,9 +345,9 @@ export function PicklistWorkspace({
                   {!mainLists.length ? <div className="px-3 py-2 text-ink-faint">暂无 Main Picklist</div> : null}
                 </div>
               </div>
-              <div className="grid gap-1.5 text-sm text-ink-dim">
+              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-1.5 text-sm text-ink-dim">
                 已提交 Personal Picklist
-                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
+                <div className="min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {mergeablePersonal.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
@@ -509,8 +505,8 @@ function DeletePicklistDialog({ list, busy, onCancel, onConfirm }: { list: Local
   );
 }
 
-function PicklistCollection({ title, icon, count, children }: { title: string; icon: React.ReactNode; count: number; children: React.ReactNode }) {
-  return <Card className="min-w-0 p-0"><div className="flex items-center justify-between border-b border-line p-3"><h3 className="flex items-center gap-2 font-semibold text-ink">{icon}{title}</h3><span className="text-xs text-ink-dim">{count} 个</span></div><div className="min-w-0 space-y-2 p-3">{children}</div></Card>;
+function PicklistCollection({ title, icon, count, children, footer }: { title: string; icon: React.ReactNode; count: number; children: React.ReactNode; footer?: React.ReactNode }) {
+  return <Card className="min-h-0 min-w-0 overflow-hidden p-0 sm:flex sm:flex-col"><div className="flex shrink-0 items-center justify-between border-b border-line p-3"><h3 className="flex items-center gap-2 font-semibold text-ink">{icon}{title}</h3><span className="text-xs text-ink-dim">{count} 个</span></div><div className="min-w-0 space-y-2 overflow-y-auto p-3 sm:min-h-0 sm:flex-1">{children}</div>{footer ? <div className="shrink-0 border-t border-line p-3">{footer}</div> : null}</Card>;
 }
 
 function ListButton({ list, onClick, readOnly }: { list: SharedPicklist; onClick: () => void; readOnly: boolean }) {
