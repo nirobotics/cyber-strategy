@@ -348,15 +348,15 @@ export function PicklistWorkspace({
       {saveFetcher.data?.error ? <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{saveFetcher.data.error}</div> : null}
 
       {mergeMode ? (
-        <Card className="mb-3 max-h-56 shrink-0 overflow-hidden p-0">
+        <Card className="mb-3 flex max-h-72 shrink-0 flex-col overflow-hidden p-0">
           <div className="flex flex-wrap items-center gap-2 border-b border-line p-2">
             {PICKLIST_ASSIGNED_COLUMNS.map((column) => (
               <Button key={column} type="button" variant={mergeTier === column ? "active" : "default"} onClick={() => setMergeTier(column)}>{TIER_LABELS[column]}</Button>
             ))}
           </div>
-          <div className="overflow-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="bg-surface-2 text-xs text-ink-faint">
+              <thead className="sticky top-0 z-10 bg-surface-2 text-xs text-ink-faint">
                 <tr><th className="px-3 py-2">Team</th>{comparisonLists.map((list) => <th key={list.id} className="px-3 py-2">{list.name}{list.kind === "personal" ? ` · ${list.createdByName}` : ""}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-line">
