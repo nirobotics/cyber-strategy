@@ -343,7 +343,15 @@ export function PicklistWorkspace({
             />
           </label>
           {editable ? (
-            <Button type="button" className="shrink-0" onClick={() => setResetToken((value) => value + 1)} disabled={!activeBoard || !PICKLIST_ASSIGNED_COLUMNS.some((column) => activeBoard[column].length)} title="重置 Picklist">
+            <Button
+              type="button"
+              className="shrink-0"
+              onClick={() => mergeMode && activeBoard
+                ? handleBoardChange({ ...activeBoard, [mergeTier]: [] })
+                : setResetToken((value) => value + 1)}
+              disabled={!activeBoard || (mergeMode ? !activeBoard[mergeTier].length : !PICKLIST_ASSIGNED_COLUMNS.some((column) => activeBoard[column].length))}
+              title={mergeMode ? `重置 ${TIER_LABELS[mergeTier]}` : "重置 Picklist"}
+            >
               <RotateCcw className="size-4" />重置
             </Button>
           ) : null}
@@ -360,7 +368,7 @@ export function PicklistWorkspace({
 
       {mergeMode && activeBoard ? (
         <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-          <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
+          <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} tierByTeam={tierByTeam} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
         </div>
       ) : <PicklistBoard
         datasetId={datasetId}
