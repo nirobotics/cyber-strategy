@@ -6,6 +6,7 @@ import {
   canViewSharedPicklist,
   comparePicklistTier,
   emptyPicklistBoard,
+  findPicklistTeamTier,
   migrateLegacyPicklist,
   movePicklistTeam,
   normalizePicklistBoard,
@@ -106,6 +107,14 @@ describe("picklist board", () => {
     const submitted = { tier1: ["1"], tier2: ["2"], tier3: [], dnp: [] };
     expect(samePicklistBoard(submitted, { ...submitted, tier1: ["1"] })).toBe(true);
     expect(samePicklistBoard(submitted, { ...submitted, tier1: ["1", "3"] })).toBe(false);
+  });
+
+  it("finds a searched team's tier with the Main board taking priority", () => {
+    const main = { tier1: [], tier2: ["2"], tier3: [], dnp: [] };
+    const personal = { tier1: ["2"], tier2: [], tier3: ["3"], dnp: [] };
+    expect(findPicklistTeamTier("2", [main, personal])).toBe("tier2");
+    expect(findPicklistTeamTier("3", [main, personal])).toBe("tier3");
+    expect(findPicklistTeamTier("4", [main, personal])).toBeNull();
   });
 
   it("normalizes stored boards and removes invalid or duplicate teams", () => {

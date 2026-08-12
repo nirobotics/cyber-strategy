@@ -35,6 +35,14 @@ export function samePicklistBoard(left: PicklistBoard, right: PicklistBoard) {
   return PICKLIST_ASSIGNED_COLUMNS.every((column) => left[column].join(",") === right[column].join(","));
 }
 
+export function findPicklistTeamTier(team: string, boards: PicklistBoard[]) {
+  for (const board of boards) {
+    const column = PICKLIST_ASSIGNED_COLUMNS.find((item) => board[item].includes(team));
+    if (column) return column;
+  }
+  return null;
+}
+
 export function sanitizePicklistBoard(board: Partial<PicklistBoard> | null | undefined, validTeams: string[]): PicklistBoard {
   const valid = new Set(validTeams);
   const seen = new Set<string>();

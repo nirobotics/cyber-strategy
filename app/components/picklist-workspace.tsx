@@ -10,6 +10,7 @@ import type { TierInfo } from "../lib/tier-settings";
 import {
   PICKLIST_ASSIGNED_COLUMNS,
   emptyPicklistBoard,
+  findPicklistTeamTier,
   samePicklistBoard,
   type PicklistAssignedColumn,
   type PicklistBoard as PicklistBoardState,
@@ -336,7 +337,15 @@ export function PicklistWorkspace({
             <Input
               className="h-9 pl-8 font-sans"
               value={teamSearch}
-              onChange={(event) => setTeamSearch(event.target.value.replace(/[^\dFRCfrc]/g, ""))}
+              onChange={(event) => {
+                const value = event.target.value.replace(/[^\dFRCfrc]/g, "");
+                const team = value.replace(/^frc/i, "").trim();
+                setTeamSearch(value);
+                if (mergeMode && activeBoard && teams.some((item) => item.team === team)) {
+                  const tier = findPicklistTeamTier(team, [activeBoard, ...selectedMergePersonal.map((list) => list.board)]);
+                  if (tier) setMergeTier(tier);
+                }
+              }}
               placeholder="查找队伍"
               inputMode="numeric"
               aria-label="查找队伍"
@@ -368,7 +377,7 @@ export function PicklistWorkspace({
 
       {mergeMode && activeBoard ? (
         <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-          <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} tierByTeam={tierByTeam} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
+          <PicklistMergeBoard board={activeBoard} column={mergeTier} personalLists={selectedMergePersonal} teams={teams} tierByTeam={tierByTeam} highlightedTeam={searchedTeam} onChange={handleBoardChange} onOpenTeam={onOpenTeam} />
         </div>
       ) : <PicklistBoard
         datasetId={datasetId}

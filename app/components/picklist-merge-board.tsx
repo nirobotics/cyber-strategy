@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -40,6 +40,7 @@ export function PicklistMergeBoard({
   personalLists,
   teams,
   tierByTeam,
+  highlightedTeam,
   onChange,
   onOpenTeam,
 }: {
@@ -48,6 +49,7 @@ export function PicklistMergeBoard({
   personalLists: SharedPicklist[];
   teams: TeamSummary[];
   tierByTeam: Map<string, TierInfo>;
+  highlightedTeam: string | null;
   onChange: (board: PicklistBoard) => void;
   onOpenTeam: (team: string) => void;
 }) {
@@ -59,12 +61,18 @@ export function PicklistMergeBoard({
   const previewRef = useRef<PicklistBoard | null>(null);
   const previousColumn = useRef<PicklistColumn>("pool");
   const activeSource = useRef<"main" | "personal" | "pool">("pool");
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 6 } }),
   );
   const visibleBoard = preview ?? board;
   const mainTeams = visibleBoard[column];
+
+  useEffect(() => {
+    if (!highlightedTeam) return;
+    boardRef.current?.querySelector<HTMLElement>(`[data-team="${highlightedTeam}"]`)?.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  }, [column, highlightedTeam]);
 
   function previewDrag(event: DragOverEvent) {
     const team = event.active.data.current?.team as string | undefined;
@@ -112,23 +120,23 @@ export function PicklistMergeBoard({
       onDragEnd={finishDrag}
       onDragCancel={clearDrag}
     >
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden">
+      <div ref={boardRef} className="flex min-h-0 flex-1 gap-3 overflow-x-auto overflow-y-hidden">
         <MergeColumn title="Main" count={mainTeams.length} column={column}>
           <SortableContext items={mainTeams.map(mainDragId)} strategy={verticalListSortingStrategy}>
-            {mainTeams.map((team) => <MainTeam key={team} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} column={column} onOpenTeam={onOpenTeam} />)}
+            {mainTeams.map((team) => <MainTeam key={team} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} column={column} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />)}
           </SortableContext>
           {!mainTeams.length ? <Empty text="拖拽到这里" /> : null}
         </MergeColumn>
 
         {personalLists.map((list) => (
           <ReadOnlyColumn key={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
-            {list.board[column].map((team) => <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" onOpenTeam={onOpenTeam} />)}
+            {list.board[column].map((team) => <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />)}
             {!list.board[column].length ? <Empty text="该 Tier 暂无队伍" /> : null}
           </ReadOnlyColumn>
         ))}
 
         <MergeColumn title="队伍列表" count={columns.pool.length} column="pool">
-          {columns.pool.map((team) => <SourceTeam key={team} id={`pool:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="pool" onOpenTeam={onOpenTeam} />)}
+          {columns.pool.map((team) => <SourceTeam key={team} id={`pool:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="pool" highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />)}
         </MergeColumn>
       </div>
 
@@ -161,19 +169,19 @@ function ReadOnlyColumn({ title, count, children }: { title: string; count: numb
   );
 }
 
-function MainTeam({ team, summary, tier, column, onOpenTeam }: { team: string; summary?: TeamSummary; tier?: TierInfo; column: PicklistAssignedColumn; onOpenTeam: (team: string) => void }) {
+function MainTeam({ team, summary, tier, column, highlighted, onOpenTeam }: { team: string; summary?: TeamSummary; tier?: TierInfo; column: PicklistAssignedColumn; highlighted: boolean; onOpenTeam: (team: string) => void }) {
   const sortable = useSortable({ id: mainDragId(team), data: { team, column, source: "main" } });
-  return <TeamRow team={team} summary={summary} tier={tier} onOpenTeam={onOpenTeam} cardRef={sortable.setNodeRef} dragProps={{ ...sortable.attributes, ...sortable.listeners }} style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }} className={cn(sortable.isDragging && "opacity-25", sortable.isOver && !sortable.isDragging && "border-brand ring-2 ring-brand/20")} />;
+  return <TeamRow team={team} summary={summary} tier={tier} highlighted={highlighted} onOpenTeam={onOpenTeam} cardRef={sortable.setNodeRef} dragProps={{ ...sortable.attributes, ...sortable.listeners }} style={{ transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }} className={cn(sortable.isDragging && "opacity-25", sortable.isOver && !sortable.isDragging && "border-brand ring-2 ring-brand/20")} />;
 }
 
-function SourceTeam({ id, team, summary, tier, source, onOpenTeam }: { id: string; team: string; summary?: TeamSummary; tier?: TierInfo; source: "personal" | "pool"; onOpenTeam: (team: string) => void }) {
+function SourceTeam({ id, team, summary, tier, source, highlighted, onOpenTeam }: { id: string; team: string; summary?: TeamSummary; tier?: TierInfo; source: "personal" | "pool"; highlighted: boolean; onOpenTeam: (team: string) => void }) {
   const draggable = useDraggable({ id, data: { team, source, column: source === "pool" ? "pool" : undefined } });
-  return <TeamRow team={team} summary={summary} tier={tier} onOpenTeam={onOpenTeam} cardRef={draggable.setNodeRef} dragProps={{ ...draggable.attributes, ...draggable.listeners }} className={draggable.isDragging ? "opacity-40" : undefined} />;
+  return <TeamRow team={team} summary={summary} tier={tier} highlighted={highlighted} onOpenTeam={onOpenTeam} cardRef={draggable.setNodeRef} dragProps={{ ...draggable.attributes, ...draggable.listeners }} className={draggable.isDragging ? "opacity-40" : undefined} />;
 }
 
-function TeamRow({ team, summary, tier, onOpenTeam, cardRef, dragProps, style, className, overlay = false }: { team: string; summary?: TeamSummary; tier?: TierInfo; onOpenTeam: (team: string) => void; cardRef?: (node: HTMLElement | null) => void; dragProps?: React.HTMLAttributes<HTMLElement>; style?: React.CSSProperties; className?: string; overlay?: boolean }) {
+function TeamRow({ team, summary, tier, highlighted = false, onOpenTeam, cardRef, dragProps, style, className, overlay = false }: { team: string; summary?: TeamSummary; tier?: TierInfo; highlighted?: boolean; onOpenTeam: (team: string) => void; cardRef?: (node: HTMLElement | null) => void; dragProps?: React.HTMLAttributes<HTMLElement>; style?: React.CSSProperties; className?: string; overlay?: boolean }) {
   return (
-    <article ref={cardRef} style={style} {...dragProps} className={cn("cursor-grab select-none rounded-md border border-line bg-surface-2 p-2.5 active:cursor-grabbing", overlay && "w-60 border-brand shadow-lg", className)}>
+    <article ref={cardRef} style={style} {...dragProps} data-team={team} className={cn("cursor-grab select-none rounded-md border border-line bg-surface-2 p-2.5 active:cursor-grabbing", overlay && "w-60 border-brand shadow-lg", highlighted && "border-brand bg-brand/10 ring-2 ring-brand/40", className)}>
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="grid size-8 shrink-0 place-items-center text-ink-faint" aria-hidden="true"><GripVertical className="size-4" /></span>
         <button type="button" onClick={() => onOpenTeam(team)} className="min-w-0 truncate rounded-md px-1 py-1 text-left font-semibold tabular-nums text-ink hover:bg-surface hover:text-brand">Team {team}</button>
