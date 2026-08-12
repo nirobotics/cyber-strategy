@@ -375,7 +375,7 @@ export function AnalyticsDashboard({
         </div>
       ) : null}
       {visitedTabs.has("picklist") ? (
-        <div className="min-h-0 flex-1" hidden={activeTab !== "picklist"}>
+        <div className="min-h-0 flex-1 flex-col" hidden={activeTab !== "picklist"} style={activeTab === "picklist" ? { display: "flex" } : undefined}>
           {teams.length && resolvedPicklists ? (
             <PicklistWorkspace
               key={`${dataset.id}:${resolvedEventKey}:${resolvedPicklists.userOpenId}`}

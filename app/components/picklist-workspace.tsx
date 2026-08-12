@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, Send, UserRound, Users } from "lucide-react";
+import { ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Send, UserRound, Users } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
 import { Badge, Button, Card, Input } from "./ui";
@@ -56,6 +56,7 @@ export function PicklistWorkspace({
   const [mergePersonalIds, setMergePersonalIds] = useState<string[]>([]);
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
   const [mergeMode, setMergeMode] = useState(false);
+  const [resetToken, setResetToken] = useState(0);
   const handledCommand = useRef<PicklistActionData | undefined>(undefined);
   const handledSave = useRef<PicklistActionData | undefined>(undefined);
   const submitMain = saveFetcher.submit;
@@ -314,11 +315,18 @@ export function PicklistWorkspace({
           {!editable ? <LockKeyhole className="size-4 text-ink-faint" aria-label="只读" /> : null}
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
         </div>
-        {!isMain ? (
-          <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || (!demoMode && commandFetcher.state !== "idle")}>
-            <Send className="size-4" />提交
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {editable ? (
+            <Button type="button" className="shrink-0" onClick={() => setResetToken((value) => value + 1)} disabled={!activeBoard || !PICKLIST_ASSIGNED_COLUMNS.some((column) => activeBoard[column].length)} title="重置 Picklist">
+              <RotateCcw className="size-4" />重置
+            </Button>
+          ) : null}
+          {!isMain ? (
+            <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || (!demoMode && commandFetcher.state !== "idle")}>
+              <Send className="size-4" />提交
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {commandFetcher.data?.error ? <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">{commandFetcher.data.error}</div> : null}
@@ -350,6 +358,7 @@ export function PicklistWorkspace({
         storageKey={storageKey}
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
         preferInitial={isMain}
+        resetToken={resetToken}
         readOnly={!editable}
         onBoardChange={handleBoardChange}
         teams={teams}

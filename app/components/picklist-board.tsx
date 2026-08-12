@@ -16,8 +16,8 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, RotateCcw } from "lucide-react";
-import { Button, cn } from "./ui";
+import { GripVertical } from "lucide-react";
+import { cn } from "./ui";
 import type { TeamSummary } from "../lib/scouting";
 import { tierDisplayLabel, type TierInfo } from "../lib/tier-settings";
 import {
@@ -52,6 +52,7 @@ export function PicklistBoard({
   initialBoard,
   readOnly = false,
   preferInitial = false,
+  resetToken = 0,
   onBoardChange,
   teams,
   tierByTeam,
@@ -62,6 +63,7 @@ export function PicklistBoard({
   initialBoard?: PicklistBoardState;
   readOnly?: boolean;
   preferInitial?: boolean;
+  resetToken?: number;
   onBoardChange?: (board: PicklistBoardState) => void;
   teams: TeamSummary[];
   tierByTeam: Map<string, TierInfo>;
@@ -74,6 +76,7 @@ export function PicklistBoard({
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
   const dragColumn = useRef<PicklistColumn | null>(null);
   const previewBoardRef = useRef<PicklistBoardState | null>(null);
+  const handledResetToken = useRef(resetToken);
   const columns = useMemo(() => buildPicklistColumns(teams, previewBoard ?? board), [board, previewBoard, teams]);
   const byTeam = useMemo(() => new Map(teams.map((team) => [team.team, team])), [teams]);
   const sensors = useSensors(
@@ -83,6 +86,12 @@ export function PicklistBoard({
   );
 
   const hasAssignments = PICKLIST_ASSIGNED_COLUMNS.some((column) => board[column].length);
+
+  useEffect(() => {
+    if (handledResetToken.current === resetToken) return;
+    handledResetToken.current = resetToken;
+    if (hasAssignments) setBoard(emptyPicklistBoard());
+  }, [hasAssignments, resetToken, setBoard]);
 
   function previewDrag(event: DragOverEvent) {
     const target = readDragTarget(event);
@@ -108,18 +117,6 @@ export function PicklistBoard({
 
   return (
     <div className="min-h-0 sm:flex sm:flex-1 sm:flex-col sm:overflow-hidden">
-      {!readOnly ? <div className="mb-3 flex shrink-0 justify-end">
-        <Button
-          type="button"
-          className="shrink-0"
-          onClick={() => setBoard(emptyPicklistBoard())}
-          disabled={!hasAssignments}
-          title="重置 Picklist"
-        >
-          <RotateCcw className="size-4" />
-          重置
-        </Button>
-      </div> : null}
       <DndContext
         sensors={sensors}
         collisionDetection={picklistCollisionDetection}
@@ -134,7 +131,7 @@ export function PicklistBoard({
         onDragCancel={clearDrag}
         onDragEnd={finishDrag}
       >
-        <div className="grid grid-cols-1 items-start gap-3 landscape:grid-cols-5 sm:min-h-0 sm:flex-1 sm:grid-cols-5 sm:items-stretch">
+        <div className="grid grid-cols-1 items-start gap-3 landscape:grid-cols-5 sm:min-h-0 sm:flex-1 sm:grid-cols-5 sm:items-stretch sm:overflow-hidden">
           {PICKLIST_COLUMNS.map((column) => (
             <PicklistColumnView
               key={column}
