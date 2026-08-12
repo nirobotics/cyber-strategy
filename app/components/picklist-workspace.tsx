@@ -486,13 +486,10 @@ function DeletePicklistDialog({ list, busy, onCancel, onConfirm }: { list: Local
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/55 p-3" role="dialog" aria-modal="true" aria-labelledby="delete-picklist-title" onMouseDown={() => { if (!busy) onCancel(); }}>
       <Card className="w-full max-w-md overflow-hidden p-0 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3 border-b border-line p-4">
-          <div className="flex min-w-0 items-start gap-3">
+        <div className="flex items-center justify-between gap-3 border-b border-line p-4">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-md border border-danger/40 bg-danger/10 text-danger"><AlertTriangle className="size-5" /></span>
-            <div className="min-w-0">
-              <p className="section-label text-danger">危险操作</p>
-              <h2 id="delete-picklist-title" className="mt-1 text-lg font-semibold text-ink">删除 Personal Picklist</h2>
-            </div>
+            <h2 id="delete-picklist-title" className="min-w-0 text-lg font-semibold text-ink">删除 Personal Picklist</h2>
           </div>
           <Button type="button" className="shrink-0 px-2" onClick={onCancel} disabled={busy} title="关闭"><X className="size-4" /></Button>
         </div>
