@@ -39,6 +39,10 @@ describe("scout confidence scoring", () => {
       scoredRecords: 3,
       totalNetScore: -2,
     });
+    expect(report.matches[0]).toMatchObject({
+      redPredictors: ["Ada"],
+      bluePredictors: ["Bea"],
+    });
   });
 
   it("keeps unfinished matches pending and invalid confidence incomplete", () => {

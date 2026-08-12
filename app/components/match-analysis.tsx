@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, ExternalLink, Gauge, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, Input, cn } from "./ui";
 import {
   buildTeamEventMap,
   enrichScheduledMatches,
   fmt,
+  hasLargeScoutingDifference,
   levelLabel,
   matchHasTeam,
   matchIdentity,
   matchLabel,
   matchScheduleIdentity,
   matchTeams,
+  needsScoutingReview,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -25,6 +27,7 @@ import {
   type WinProbability,
 } from "../lib/match-analysis";
 import type { TeamData } from "../lib/scouting";
+import { matchTypeFromTbaCompLevel } from "../lib/data-range";
 
 type LoadState =
   | { status: "idle" | "loading" }
@@ -40,14 +43,18 @@ export function MatchAnalysis({
   eventKey,
   schedule,
   teamData,
+  scoutingTeamData = teamData,
   enrich = true,
   initialMatchKey = null,
+  onOpenTeam,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData?: TeamData;
   enrich?: boolean;
   initialMatchKey?: string | null;
+  onOpenTeam?: (team: string) => void;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [state, setState] = useState<LoadState>(() => schedule.length || !enrich
@@ -133,14 +140,17 @@ export function MatchAnalysis({
           match={selectedMatch}
           matches={state.matches}
           teamData={teamData}
+          scoutingTeamData={scoutingTeamData}
           teamEvents={state.teamEvents}
           onBack={() => setSelectedMatchKey(null)}
+          onOpenTeam={onOpenTeam}
         />
       ) : null}
       {state.status === "ready" && !selectedMatch ? (
         <MatchSchedule
           matches={state.matches}
           teamData={teamData}
+          scoutingTeamData={scoutingTeamData}
           onSelectMatch={(match) => setSelectedMatchKey(matchIdentity(match))}
         />
       ) : null}
@@ -151,10 +161,12 @@ export function MatchAnalysis({
 function MatchSchedule({
   matches,
   teamData,
+  scoutingTeamData,
   onSelectMatch,
 }: {
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   onSelectMatch: (match: CombinedMatch) => void;
 }) {
   const [teamQuery, setTeamQuery] = useState("");
@@ -191,7 +203,7 @@ function MatchSchedule({
       {rows.map(({ match, group, showGroup }, index) => (
         <div key={matchIdentity(match)}>
           {showGroup && index > 0 ? <h3 className="mb-2 section-label">{group}</h3> : null}
-          <MatchCard match={match} matches={matches} teamData={teamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
+          <MatchCard match={match} matches={matches} teamData={teamData} scoutingTeamData={scoutingTeamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
         </div>
       ))}
     </div>
@@ -202,18 +214,20 @@ function MatchCard({
   match,
   matches,
   teamData,
+  scoutingTeamData,
   highlightTeam,
   onSelect,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   highlightTeam: string;
   onSelect: () => void;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
-  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData });
+  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
   const videos = match.videos ?? [];
 
@@ -245,6 +259,7 @@ function MatchCard({
           winner={score.winner === "red"}
           actualScore={score.actualRed}
           predictedScore={score.predictedRed}
+          scoutingScore={score.scoutingRed}
           teams={redTeams}
           highlightTeam={highlightTeam}
         />
@@ -267,6 +282,7 @@ function MatchCard({
           winner={score.winner === "blue"}
           actualScore={score.actualBlue}
           predictedScore={score.predictedBlue}
+          scoutingScore={score.scoutingBlue}
           teams={blueTeams}
           highlightTeam={highlightTeam}
         />
@@ -299,6 +315,7 @@ function AllianceBlock({
   winner,
   actualScore,
   predictedScore,
+  scoutingScore,
   teams,
   highlightTeam,
 }: {
@@ -306,11 +323,13 @@ function AllianceBlock({
   winner: boolean;
   actualScore: number | null;
   predictedScore: number | null;
+  scoutingScore: number | null;
   teams: string[];
   highlightTeam: string;
 }) {
   const hasActual = actualScore != null;
   const primaryScore = hasActual ? actualScore : predictedScore;
+  const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
     <div
       className={cn(
@@ -319,12 +338,16 @@ function AllianceBlock({
         winner && (color === "red" ? "ring-2 ring-danger" : "ring-2 ring-info"),
       )}
     >
-      <div className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
-        {primaryScore == null ? "-" : hasActual ? Math.round(primaryScore) : `~${Math.round(primaryScore)}`}
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        <span className={cn("text-2xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
+          {primaryScore == null ? "-" : hasActual ? Math.round(primaryScore) : `~${Math.round(primaryScore)}`}
+        </span>
+        {hasLargeDifference ? <span className="badge border-warning/30 bg-warning/10 text-warning">差异过大</span> : null}
       </div>
-      {hasActual && predictedScore != null ? (
-        <div className="mt-0.5 text-[11px] font-medium text-ink-faint">预测 {Math.round(predictedScore)}</div>
-      ) : null}
+      <div className="mt-0.5 flex items-center justify-center gap-x-2 whitespace-nowrap text-[11px] font-medium text-ink-faint">
+        {hasActual && predictedScore != null ? <span>预测 {Math.round(predictedScore)}</span> : null}
+        <span>Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</span>
+      </div>
       <div className="mt-1 text-xs leading-5 text-ink-dim">
         {teams.length ? teams.map((team, index) => (
           <span key={team}>
@@ -341,23 +364,28 @@ function MatchDetail({
   match,
   matches,
   teamData,
+  scoutingTeamData,
   teamEvents,
   onBack,
+  onOpenTeam,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
   teamData: TeamData;
+  scoutingTeamData: TeamData;
   teamEvents: TeamEvent[];
   onBack: () => void;
+  onOpenTeam?: (team: string) => void;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
-  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData });
+  const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
   const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
   const teamEventMap = useMemo(() => buildTeamEventMap(teamEvents), [teamEvents]);
   const matchNumber = match.match_number ?? null;
-  const redMetrics = redTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber }));
-  const blueMetrics = blueTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber }));
+  const matchType = matchTypeFromTbaCompLevel(match.comp_level);
+  const redMetrics = redTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber, matchType }));
+  const blueMetrics = blueTeams.map((team) => resolveTeamMetric({ team, teamData, teamEvents: teamEventMap, matchNumber, matchType }));
   const allMetrics = [...redMetrics, ...blueMetrics];
 
   return (
@@ -374,6 +402,7 @@ function MatchDetail({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <StatusPill label={actualLabel(score.actualRed, score.actualBlue)} tone={isActualScoreSource(score.source) ? "ok" : "muted"} />
           <StatusPill label={predictedLabel(score.predictedRed, score.predictedBlue)} tone="warn" />
+          <StatusPill label={scoutingLabel(score.scoutingRed, score.scoutingBlue)} tone="info" />
         </div>
       </Card>
 
@@ -387,7 +416,9 @@ function MatchDetail({
           metrics={redMetrics}
           actualScore={score.actualRed}
           predictedScore={score.predictedRed}
+          scoutingScore={score.scoutingRed}
           winner={score.winner === "red"}
+          onOpenTeam={onOpenTeam}
         />
         <AllianceDetail
           color="blue"
@@ -396,7 +427,9 @@ function MatchDetail({
           metrics={blueMetrics}
           actualScore={score.actualBlue}
           predictedScore={score.predictedBlue}
+          scoutingScore={score.scoutingBlue}
           winner={score.winner === "blue"}
+          onOpenTeam={onOpenTeam}
         />
       </div>
 
@@ -406,13 +439,6 @@ function MatchDetail({
             label="联盟 Auto 和 Tele 对比"
             configKey={`match-alliance:${matchIdentity(match)}:${metricKey(allMetrics)}`}
             buildConfig={(palette) => allianceContributionConfig(redMetrics, blueMetrics, palette)}
-          />
-        </ChartCard>
-        <ChartCard title="六队综合分范围" icon={<Gauge className="size-4" />}>
-          <ChartCanvas
-            label="六队综合分范围"
-            configKey={`match-range:${matchIdentity(match)}:${metricKey(allMetrics)}`}
-            buildConfig={(palette) => rangeConfig(allMetrics, palette)}
           />
         </ChartCard>
         <ChartCard title="命中率 / 可靠性" icon={<Target className="size-4" />}>
@@ -476,7 +502,9 @@ function AllianceDetail({
   metrics,
   actualScore,
   predictedScore,
+  scoutingScore,
   winner,
+  onOpenTeam,
 }: {
   color: "red" | "blue";
   label: string;
@@ -484,24 +512,31 @@ function AllianceDetail({
   metrics: TeamMetric[];
   actualScore: number | null;
   predictedScore: number | null;
+  scoutingScore: number | null;
   winner: boolean;
+  onOpenTeam?: (team: string) => void;
 }) {
+  const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
     <Card className={cn("overflow-hidden p-0", color === "red" ? "border-danger/30" : "border-info/30")}>
       <div className={cn("grid gap-3 p-3 lg:grid-cols-[140px_minmax(0,1fr)]", color === "red" ? "bg-danger/10" : "bg-info/10")}>
         <div className="flex items-center justify-between gap-3 lg:grid lg:content-center lg:justify-start">
           <div>
-            <p className={cn("text-xs font-semibold uppercase", color === "red" ? "text-danger" : "text-info")}>{label}</p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className={cn("text-xs font-semibold uppercase", color === "red" ? "text-danger" : "text-info")}>{label}</p>
+              {hasLargeDifference ? <span className="badge border-warning/30 bg-warning/10 text-warning">差异过大</span> : null}
+            </div>
             <p className={cn("text-3xl font-semibold", color === "red" ? "text-danger" : "text-info")}>
               {actualScore == null ? predictedScore == null ? "-" : `~${Math.round(predictedScore)}` : Math.round(actualScore)}
             </p>
             {predictedScore != null ? <p className="text-xs text-ink-dim">预测 {Math.round(predictedScore)}</p> : null}
+            <p className="text-xs text-ink-dim">Scouting {scoutingScore == null ? "-" : Math.round(scoutingScore)}</p>
           </div>
-          {winner ? <span className="rounded-full bg-ok/10 px-2 py-1 text-xs font-semibold text-ok">胜方</span> : null}
+          {winner ? <span className="w-fit rounded-full bg-ok/10 px-2 py-1 text-xs font-semibold text-ok">胜方</span> : null}
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {metrics.map((metric) => (
-            <TeamMetricCard key={metric.team} metric={metric} />
+            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} onOpenTeam={onOpenTeam} />
           ))}
           {!teams.length ? <div className="rounded-md border border-line bg-surface p-3 text-sm text-ink-dim">待定</div> : null}
         </div>
@@ -510,15 +545,26 @@ function AllianceDetail({
   );
 }
 
-function TeamMetricCard({ metric }: { metric: TeamMetric }) {
+function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean; onOpenTeam?: (team: string) => void }) {
+  const scoutingTotal = metric.scoutMatch?.scoutingPts ?? null;
+  const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
+  const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
+  const reviewRecommended = needsScoutingReview(allianceDifferenceIsLarge, metric.rating, scoutingTotal);
   return (
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-brand">Team {metric.team}</p>
-          <p className="text-[11px] font-semibold uppercase text-ink-faint">{metric.ratingLabel}</p>
+        <button
+          type="button"
+          disabled={!onOpenTeam}
+          onClick={() => onOpenTeam?.(metric.team)}
+          className="rounded-sm text-sm font-semibold text-brand outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand/50 disabled:cursor-default disabled:no-underline"
+        >
+          Team {metric.team}
+        </button>
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {reviewRecommended ? <span className="badge border-warning/30 bg-warning/10 text-warning">建议重新核查</span> : null}
+          <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
         </div>
-        <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs text-ink-dim">
         <span>Auto {fmt(metric.auto)}</span>
@@ -530,7 +576,7 @@ function TeamMetricCard({ metric }: { metric: TeamMetric }) {
       </div>
       {metric.scoutMatch ? (
         <div className="mt-2 rounded-md bg-surface-2 px-2 py-1 text-xs text-ink-dim">
-          本场 Scout：{fmt(metric.scoutMatch.totalPts)} / A {fmt(metric.scoutMatch.autoPts)} / T {fmt(metric.scoutMatch.telePts)}
+          本场 Scouting：{fmt(scoutingTotal)} / A {fmt(scoutingAuto)} / T {fmt(scoutingTele)}
         </div>
       ) : null}
     </div>
@@ -564,6 +610,11 @@ function actualLabel(red: number | null, blue: number | null) {
 
 function predictedLabel(red: number | null, blue: number | null) {
   return red == null || blue == null ? "预测 暂无" : `预测 ${Math.round(red)}-${Math.round(blue)}`;
+}
+
+function scoutingLabel(red: number | null, blue: number | null) {
+  if (red == null && blue == null) return "Scouting 暂无";
+  return `Scouting ${red == null ? "-" : Math.round(red)}-${blue == null ? "-" : Math.round(blue)}`;
 }
 
 function scoreBadgeClass(source: string) {
@@ -618,21 +669,6 @@ function allianceContributionConfig(red: TeamMetric[], blue: TeamMetric[], palet
   } as ChartConfiguration;
 }
 
-function rangeConfig(metrics: TeamMetric[], palette: ChartPaletteLike): ChartConfiguration {
-  return {
-    type: "bar",
-    data: {
-      labels: metrics.map((metric) => metric.team),
-      datasets: [
-        { label: "最低", data: metrics.map((metric) => metric.min ?? metric.rating ?? 0), backgroundColor: `${palette.colors[1]}55` },
-        { label: "平均", data: metrics.map((metric) => metric.rating ?? 0), backgroundColor: palette.colors[0] },
-        { label: "最高", data: metrics.map((metric) => metric.max ?? metric.rating ?? 0), backgroundColor: `${palette.colors[2]}77` },
-      ],
-    },
-    options: chartOptions(palette),
-  } as ChartConfiguration;
-}
-
 function healthConfig(metrics: TeamMetric[], palette: ChartPaletteLike): ChartConfiguration {
   return {
     type: "bar",
@@ -661,6 +697,7 @@ function autoTeleConfig(metrics: TeamMetric[], palette: ChartPaletteLike): Chart
       datasets: [
         { label: "Auto", data: metrics.map((metric) => metric.auto ?? 0), backgroundColor: palette.colors[0] },
         { label: "Tele", data: metrics.map((metric) => metric.tele ?? 0), backgroundColor: palette.colors[2] },
+        { label: "平均综合分", data: metrics.map((metric) => metric.rating ?? 0), backgroundColor: palette.colors[1] },
       ],
     },
     options: chartOptions(palette),

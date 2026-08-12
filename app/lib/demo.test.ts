@@ -51,6 +51,7 @@ describe("Apollo demo data", () => {
     expect(demo.matches[0].result?.alliances.red?.score).toBe(120);
     expect(toProposalMatches(demo.matches, DEMO_OWN_TEAMS)[0].redTeams).toContain("1000");
     expect(demo.scoutingLead.report.people[0].scoutName).toMatch(/^scout \d+$/);
+    expect(demo.scoutingLead.report.matches[0].redPredictors).toEqual([demo.scoutingLead.report.people[0].scoutName]);
     expect(demo.scoutingLead.leadData.recordSchedule.matches[0].red[0]).toMatchObject({
       team: "1000",
       normalRecords: [{ id: "demo-record-1", teamNumber: "1000", completedBy: expect.stringMatching(/^scout \d+$/) }],
@@ -74,6 +75,20 @@ function scoutingLead(): ScoutConfidenceResult {
     wrongCount: 0,
     accuracy: 1,
     averageNet: 3,
+  }];
+  report.matches = [{
+    matchType: "qualification",
+    matchNumber: 1,
+    predictionCount: 1,
+    redPredictions: 1,
+    bluePredictions: 0,
+    redPredictors: ["Alice"],
+    bluePredictors: [],
+    incompleteCount: 0,
+    averageConfidence: 3,
+    actualWinner: "red",
+    hasDisagreement: false,
+    isLowConfidence: false,
   }];
   const record = {
     id: "real-record-id",

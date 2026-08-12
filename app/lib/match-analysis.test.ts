@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildTeamEventMap,
   enrichScheduledMatches,
+  hasLargeScoutingDifference,
   matchHasTeam,
   matchTeams,
   mergeMatchResults,
+  needsScoutingReview,
   resolveMatchScores,
   resolveTeamMetric,
   resolveWinProbability,
@@ -18,6 +20,36 @@ import {
 import type { TeamData, TeamSummary } from "./scouting";
 
 describe("match analysis calculations", () => {
+  it("flags Scouting differences only when they exceed 40 percent of the actual score", () => {
+    expect(hasLargeScoutingDifference(100, 141)).toBe(true);
+    expect(hasLargeScoutingDifference(100, 60)).toBe(false);
+    expect(hasLargeScoutingDifference(100, 59)).toBe(true);
+    expect(hasLargeScoutingDifference(100, null)).toBe(false);
+  });
+
+  it("recommends review only for a large alliance difference and a team difference over 100 percent", () => {
+    expect(needsScoutingReview(true, 68.7, 8.7)).toBe(true);
+    expect(needsScoutingReview(true, 50, 100)).toBe(false);
+    expect(needsScoutingReview(false, 68.7, 8.7)).toBe(false);
+    expect(needsScoutingReview(true, 50, null)).toBe(false);
+  });
+
+  it("matches a team Scouting record by match type as well as match number", () => {
+    const teamData = teams({ 1: 10 });
+    teamData["1"].matches = [
+      { ...teamData["1"].matches[0], match: 3, matchType: "practice", scoutingPts: 130 },
+      { ...teamData["1"].matches[0], match: 3, matchType: "qualification", scoutingPts: 8.7 },
+    ];
+
+    expect(resolveTeamMetric({
+      team: "1",
+      teamData,
+      teamEvents: new Map(),
+      matchNumber: 3,
+      matchType: "qualification",
+    }).scoutMatch?.scoutingPts).toBe(8.7);
+  });
+
   it("uses Strategy composite ratings for win probability before Statbotics", () => {
     const teamData = teams({
       1: 100,
@@ -124,6 +156,34 @@ describe("match analysis calculations", () => {
       displayBlue: 456,
       source: "frc-events",
       winner: "blue",
+    });
+  });
+
+  it("keeps Scouting scores independent from ignored match filtering", () => {
+    const scoutingTeamData = teams({ 1: 10, 2: 20, 3: 30, 4: 40, 5: 50, 6: 60 });
+    scoutingTeamData["1"].matches[0].scoutingPts = 10;
+    scoutingTeamData["2"].matches[0].scoutingPts = 20;
+    scoutingTeamData["3"].matches[0].scoutingPts = 30;
+    scoutingTeamData["4"].matches[0].scoutingPts = 40;
+    scoutingTeamData["5"].matches[0].scoutingPts = 50;
+    scoutingTeamData["6"].matches[0].scoutingPts = 60;
+    const teamData = { ...scoutingTeamData, "4": { ...scoutingTeamData["4"], matches: [] } };
+
+    expect(resolveMatchScores({
+      match: schedule(["1", "2", "3"], ["4", "5", "6"], {
+        result: result("frc-events", 123, 98),
+      }),
+      redTeams: ["1", "2", "3"],
+      blueTeams: ["4", "5", "6"],
+      teamData,
+      scoutingTeamData,
+    })).toMatchObject({
+      actualRed: 123,
+      actualBlue: 98,
+      predictedRed: 60,
+      predictedBlue: 150,
+      scoutingRed: 60,
+      scoutingBlue: 150,
     });
   });
 

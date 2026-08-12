@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { averageRadarMetrics, compareRangeConfig, compareTeamDetailMatches, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
+import { averageRadarMetrics, compareRangeConfig, compareTeamDetailMatches, filterCompareTeams, matchDisplayLabel, nearestRankPercentile, rankRadarMetrics, relativeScoreVariation } from "./analytics-dashboard";
 import type { ScoutingMatch, TeamSummary } from "../lib/scouting";
 
 describe("analytics dashboard UI helpers", () => {
@@ -68,5 +68,11 @@ describe("analytics dashboard UI helpers", () => {
 
     expect(config.data.datasets[0].data).toEqual([[40, 110]]);
     expect(config.options?.interaction).toMatchObject({ mode: "index", axis: "x", intersect: false });
+  });
+
+  it("filters comparison teams by an entered team number", () => {
+    const teams = [{ team: "1036" }, { team: "1024" }, { team: "1001" }] as TeamSummary[];
+    expect(filterCompareTeams(teams, "10").map((team) => team.team)).toEqual(["1036", "1024", "1001"]);
+    expect(filterCompareTeams(teams, "Team 102").map((team) => team.team)).toEqual(["1024"]);
   });
 });

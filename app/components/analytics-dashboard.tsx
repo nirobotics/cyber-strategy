@@ -370,7 +370,7 @@ export function AnalyticsDashboard({
       {visitedTabs.has("match") ? (
         <div hidden={activeTab !== "match"}>
           {demoMode || fetchedMatchSchedule || matchSchedule.length ? (
-            <MatchAnalysis eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} enrich={!demoMode} />
+            <MatchAnalysis eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} onOpenTeam={setDetailTeam} />
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}
@@ -411,7 +411,11 @@ export function AnalyticsDashboard({
       ) : null}
       {visitedTabs.has("lead") ? (
         <div className="min-h-0 flex-1" hidden={activeTab !== "lead"}>
-          {resolvedScoutingLead ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} /> : <TabLoading label="正在加载 Scouting Lead" />}
+          {activeTab === "lead" ? (
+            resolvedScoutingLead
+              ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} />
+              : <TabLoading label="正在加载 Scouting Lead" />
+          ) : null}
         </div>
       ) : null}
       {visitedTabs.has("settings") ? (
@@ -588,7 +592,6 @@ export function TeamDetail({
                   ))}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
-                  <Badge className="border-line bg-surface-2 text-ink-dim">{route.alliance === "blue" ? "蓝方" : "红方"}</Badge>
                   {route.startPosition ? <Badge className="border-line bg-surface-2 text-ink-dim">起点 {route.startPosition}</Badge> : null}
                   {route.flipped ? <Badge className="border-line bg-surface-2 text-ink-dim">镜像</Badge> : null}
                   {route.scoutName ? <Badge className="border-line bg-surface-2 text-ink-dim">记录员 {route.scoutName}</Badge> : null}
@@ -710,6 +713,7 @@ export function TeamDetail({
 function CompareTeams({ teams }: { teams: TeamSummary[] }) {
   const defaults = [teams[0]?.team ?? "", teams[1]?.team ?? "", teams[2]?.team ?? ""];
   const [selected, setSelected] = useState<string[]>(defaults);
+  const [activeTeamSlot, setActiveTeamSlot] = useState<number | null>(null);
   const teamSet = useMemo(() => new Set(teams.map((team) => team.team)), [teams]);
   const selectedTeams = [0, 1, 2].map((index) => {
     const team = selected[index];
@@ -732,21 +736,16 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
       <Card className="p-3">
         <div className="grid gap-3 md:grid-cols-3 md:items-end">
           {[0, 1, 2].map((index) => (
-            <label key={index} className="grid gap-1 text-sm">
-              <span className="font-medium text-ink-dim">Team {index + 1}</span>
-              <select
-                value={selectedTeams[index] ?? ""}
-                onChange={(event) => setTeam(index, event.target.value)}
-                className="input h-10 font-sans"
-              >
-                <option value="">无</option>
-                {teams.map((team) => (
-                  <option key={team.team} value={team.team}>
-                    Team {team.team}（{team.avgTotal} 综合均分）
-                  </option>
-                ))}
-              </select>
-            </label>
+            <TeamSearchSelect
+              key={`${index}:${selectedTeams[index] ?? ""}`}
+              index={index}
+              teams={teams}
+              selectedTeam={selectedTeams[index] ?? ""}
+              open={activeTeamSlot === index}
+              onOpen={() => setActiveTeamSlot(index)}
+              onClose={() => setActiveTeamSlot(null)}
+              onChange={(team) => setTeam(index, team)}
+            />
           ))}
         </div>
       </Card>

@@ -530,10 +530,10 @@ function PeopleTable({ people }: { people: ScoutConfidencePerson[] }) {
   return (
     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <table className="w-full table-fixed text-center text-xs">
-        <thead className="sticky top-0 bg-surface-2 text-xs uppercase text-ink-faint">
+        <thead className="sticky top-0 z-20 bg-surface-2 text-xs uppercase text-ink-faint">
           <tr>
             <th className="w-8 px-2 py-2">#</th>
-            <th className="w-20 px-2 py-2">Scout</th>
+            <th className="w-1/4 px-2 py-2">Scout</th>
             <th className="px-2 py-2">净信心分</th>
             <th className="px-2 py-2">错误扣分</th>
             <th className="px-2 py-2">已计分</th>
@@ -545,7 +545,7 @@ function PeopleTable({ people }: { people: ScoutConfidencePerson[] }) {
           {people.map((person, index) => (
             <tr key={person.scoutName} className="hover:bg-surface-2/70">
               <td className="px-2 py-2 text-ink-faint">{index + 1}</td>
-              <td className="truncate px-2 py-2 font-semibold text-ink">{person.scoutName}</td>
+              <td className="break-words px-2 py-2 font-semibold text-ink" title={person.scoutName}>{person.scoutName}</td>
               <td className={cn("px-2 py-2 font-semibold tabular-nums", person.netScore >= 0 ? "text-ok" : "text-danger")}>
                 {signed(person.netScore)}
               </td>
@@ -567,7 +567,7 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
   return (
     <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
       <table className="w-full table-fixed text-left text-sm">
-        <thead className="sticky top-0 bg-surface-2 text-xs uppercase text-ink-faint">
+        <thead className="sticky top-0 z-20 bg-surface-2 text-xs uppercase text-ink-faint">
           <tr>
             <th className="px-3 py-2">比赛</th>
             <th className="px-3 py-2 text-center">红方预测</th>
@@ -579,14 +579,41 @@ function MatchTable({ matches }: { matches: ScoutConfidenceMatch[] }) {
           {matches.map((match) => (
             <tr key={`${match.matchType}-${match.matchNumber}`} className="hover:bg-surface-2/70">
               <td className="px-3 py-2 font-semibold text-ink">{scoutMatchLabel(match)}</td>
-              <td className={cn("px-3 py-2 text-center tabular-nums text-danger", match.actualWinner === "red" && "text-base font-black")}>{match.redPredictions}</td>
-              <td className={cn("px-3 py-2 text-center tabular-nums text-info", match.actualWinner === "blue" && "text-base font-black")}>{match.bluePredictions}</td>
+              <td
+                className={cn("px-3 py-2 text-center tabular-nums text-danger", match.actualWinner === "red" && "text-base font-black")}
+              >
+                <PredictionCount alliance="红方" count={match.redPredictions} predictors={match.redPredictors} />
+              </td>
+              <td
+                className={cn("px-3 py-2 text-center tabular-nums text-info", match.actualWinner === "blue" && "text-base font-black")}
+              >
+                <PredictionCount alliance="蓝方" count={match.bluePredictions} predictors={match.bluePredictors} />
+              </td>
               <td className="px-3 py-2 text-right tabular-nums text-ink-dim">{match.averageConfidence == null ? "-" : round1(match.averageConfidence)}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+function PredictionCount({ alliance, count, predictors }: { alliance: "红方" | "蓝方"; count: number; predictors: string[] }) {
+  const detail = predictors.length ? predictors.join("、") : "暂无预测者";
+  return (
+    <span
+      className="group relative inline-flex cursor-help justify-center outline-none"
+      tabIndex={0}
+      aria-label={`${count} 人预测${alliance}获胜：${detail}`}
+    >
+      {count}
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden w-max max-w-64 -translate-x-1/2 whitespace-normal rounded-md bg-black px-2 py-1 text-left text-xs font-normal text-white shadow-lg group-hover:block group-focus:block"
+      >
+        {detail}
+      </span>
+    </span>
   );
 }
 

@@ -50,6 +50,8 @@ export type ScoutConfidenceMatch = {
   predictionCount: number;
   redPredictions: number;
   bluePredictions: number;
+  redPredictors: string[];
+  bluePredictors: string[];
   incompleteCount: number;
   averageConfidence: number | null;
   actualWinner: ActualWinner | null;
@@ -230,6 +232,8 @@ function buildMatches(predictions: ScoutConfidencePrediction[]): ScoutConfidence
       const complete = values.filter((prediction) => prediction.predictedWinner && prediction.confidence != null);
       const redPredictions = complete.filter((prediction) => prediction.predictedWinner === "red").length;
       const bluePredictions = complete.filter((prediction) => prediction.predictedWinner === "blue").length;
+      const redPredictors = complete.filter((prediction) => prediction.predictedWinner === "red").map((prediction) => prediction.scoutName);
+      const bluePredictors = complete.filter((prediction) => prediction.predictedWinner === "blue").map((prediction) => prediction.scoutName);
       const averageConfidence = average(complete.map((prediction) => prediction.confidence ?? 0));
       return {
         matchType,
@@ -237,6 +241,8 @@ function buildMatches(predictions: ScoutConfidencePrediction[]): ScoutConfidence
         predictionCount: complete.length,
         redPredictions,
         bluePredictions,
+        redPredictors,
+        bluePredictors,
         incompleteCount: values.length - complete.length,
         averageConfidence,
         actualWinner: values.find((prediction) => prediction.actualWinner)?.actualWinner ?? null,

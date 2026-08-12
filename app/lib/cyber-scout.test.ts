@@ -301,7 +301,7 @@ describe("cyber-scout dataset conversion", () => {
       ],
     });
 
-    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 40, telePts: 60, totalPts: 100 });
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 40, telePts: 60, totalPts: 100, scoutingPts: 140 });
     expect(dataset.scoringOfficialMatches).toBe(1);
     expect(dataset.scoringFallbackMatches).toBe(0);
     expect(dataset.scoringZeroMatches).toBe(0);

@@ -56,6 +56,7 @@ export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[]
 function buildScoutMap(dataset: ScoutingDataset, scoutingLead: ScoutConfidenceResult) {
   const leadNames = [
     ...scoutingLead.report.people.map((person) => person.scoutName),
+    ...scoutingLead.report.matches.flatMap((match) => [...match.redPredictors, ...match.bluePredictors]),
     ...scoutingLead.leadData.users.map((user) => user.displayName),
     ...scoutingLead.leadData.assignments.map((assignment) => assignment.userName),
     ...scoutingLead.leadData.recordSchedule.matches.flatMap((match) => [...match.red, ...match.blue].flatMap((cell) =>
@@ -124,6 +125,11 @@ function anonymizeScoutingLead(
     report: {
       ...data.report,
       people: data.report.people.map((person) => ({ ...person, scoutName: anonymizedScout(scoutMap, person.scoutName) })),
+      matches: data.report.matches.map((match) => ({
+        ...match,
+        redPredictors: match.redPredictors.map((name) => anonymizedScout(scoutMap, name)),
+        bluePredictors: match.bluePredictors.map((name) => anonymizedScout(scoutMap, name)),
+      })),
     },
     events: [{ eventKey: DEMO_EVENT_KEY, name: DEMO_EVENT_NAME, isActive: true, updatedAt: data.sourceStatus.updatedAt }],
     selectedEventKey: DEMO_EVENT_KEY,
