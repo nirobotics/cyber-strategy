@@ -315,7 +315,7 @@ export function PicklistWorkspace({
             <div className="grid items-start gap-3 md:grid-cols-2">
               <label className="grid content-start gap-1.5 text-sm text-ink-dim">
                 Main Picklist
-                <select className="input h-10" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
+                <select className="input h-10 font-sans" value={mergeMainId} onChange={(event) => setMergeMainId(event.target.value)}>
                   <option value="">选择 Main</option>
                   {mainLists.map((list) => <option key={list.id} value={list.id}>{list.name}</option>)}
                 </select>
