@@ -332,10 +332,10 @@ export function PicklistWorkspace({
                 <GitMerge className="size-4" />Merge
               </Button>
             </div>
-            <div className="grid min-h-0 items-stretch gap-3 md:grid-cols-2 sm:flex-1">
-              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-1.5 text-sm text-ink-dim">
+            <div className="grid min-h-0 content-start items-start gap-3 md:grid-cols-2 sm:flex-1">
+              <div className="grid content-start gap-1.5 text-sm text-ink-dim">
                 Main Picklist
-                <div className="min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
+                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {mainLists.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergeMainId === list.id && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergeMainId === list.id} onChange={() => setMergeMainId((current) => current === list.id ? "" : list.id)} />
@@ -345,9 +345,9 @@ export function PicklistWorkspace({
                   {!mainLists.length ? <div className="px-3 py-2 text-ink-faint">暂无 Main Picklist</div> : null}
                 </div>
               </div>
-              <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-1.5 text-sm text-ink-dim">
+              <div className="grid content-start gap-1.5 text-sm text-ink-dim">
                 已提交 Personal Picklist
-                <div className="min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
+                <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {mergeablePersonal.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
