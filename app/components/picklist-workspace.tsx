@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, UserRound, Users, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, GitMerge, LockKeyhole, Plus, RotateCcw, Search, Send, Trash2, Undo2, UserRound, Users, X } from "lucide-react";
 import { useFetcher } from "react-router";
 import { PicklistBoard } from "./picklist-board";
 import { PicklistMergeBoard } from "./picklist-merge-board";
@@ -62,10 +62,15 @@ export function PicklistWorkspace({
   const [mergeTier, setMergeTier] = useState<PicklistAssignedColumn>("tier1");
   const [mergeMode, setMergeMode] = useState(false);
   const [resetToken, setResetToken] = useState(0);
+  const [restoreRequest, setRestoreRequest] = useState<{ token: number; board: PicklistBoardState } | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
   const [teamSearch, setTeamSearch] = useState("");
   const [stalePersonalIds, setStalePersonalIds] = useState<Set<string>>(new Set());
   const handledCommand = useRef<PicklistActionData | undefined>(undefined);
   const handledSave = useRef<PicklistActionData | undefined>(undefined);
+  const currentBoard = useRef<PicklistBoardState | null>(null);
+  const previousBoard = useRef<PicklistBoardState | null>(null);
+  const restoringBoard = useRef(false);
   const submitMain = saveFetcher.submit;
 
   const mainLists = useMemo(() => sharedLists.filter((list) => list.kind === "main"), [sharedLists]);
@@ -80,6 +85,13 @@ export function PicklistWorkspace({
   const selectedMergePersonal = mergeablePersonal.filter((list) => mergePersonalIds.includes(list.id));
   const personalNameExists = personalLists.some((list) => normalizePicklistName(list.name) === normalizePicklistName(personalName));
   const handleBoardChange = useCallback((board: PicklistBoardState) => {
+    const current = currentBoard.current;
+    if (current && !restoringBoard.current && !samePicklistBoard(current, board)) {
+      previousBoard.current = current;
+      setCanUndo(true);
+    }
+    restoringBoard.current = false;
+    currentBoard.current = board;
     setActiveBoard(board);
     if (demoMode && active?.kind === "main") {
       setSharedLists((current) => current.map((list) => list.id === active.remote.id ? { ...list, board, updatedAt: new Date().toISOString() } : list));
@@ -88,6 +100,13 @@ export function PicklistWorkspace({
       setStalePersonalIds((current) => updateSet(current, active.local.id, !samePicklistBoard(board, active.remote!.board)));
     }
   }, [active, demoMode]);
+  const clearUndo = useCallback(() => {
+    currentBoard.current = null;
+    previousBoard.current = null;
+    restoringBoard.current = false;
+    setCanUndo(false);
+    setRestoreRequest(null);
+  }, []);
   const removeLocalPersonal = useCallback((local: LocalPersonalList, remoteId?: string) => {
     setPersonalLists((current) => current.filter((list) => list.id !== local.id));
     localStorage.removeItem(personalBoardKey(datasetId, local.id));
@@ -207,6 +226,7 @@ export function PicklistWorkspace({
     const local = { id: crypto.randomUUID(), name: name.slice(0, 80), createdAt: new Date().toISOString() };
     setPersonalLists((current) => [local, ...current]);
     setPersonalName("");
+    clearUndo();
     setActive({ kind: "personal", local, remote: null });
   }
 
@@ -229,6 +249,7 @@ export function PicklistWorkspace({
       };
       setSharedLists((current) => [list, ...current]);
       setMainName("");
+      clearUndo();
       setActive({ kind: "main", remote: list });
       return;
     }
@@ -268,6 +289,7 @@ export function PicklistWorkspace({
   }
 
   function openPersonal(local: LocalPersonalList) {
+    clearUndo();
     setActiveBoard(null);
     setActive({ kind: "personal", local, remote: ownSubmissions.get(local.id) ?? null });
   }
@@ -284,6 +306,7 @@ export function PicklistWorkspace({
   }
 
   function openMain(remote: SharedPicklist) {
+    clearUndo();
     setActiveBoard(null);
     setActive({ kind: "main", remote });
   }
@@ -291,8 +314,21 @@ export function PicklistWorkspace({
   function startMerge() {
     if (!selectedMergeMain || !selectedMergePersonal.length) return;
     setActiveBoard(selectedMergeMain.board);
+    currentBoard.current = selectedMergeMain.board;
+    previousBoard.current = null;
+    setCanUndo(false);
     setActive({ kind: "main", remote: selectedMergeMain });
     setMergeMode(true);
+  }
+
+  function undoLastChange() {
+    const previous = previousBoard.current;
+    if (!previous || !activeBoard) return;
+    previousBoard.current = null;
+    restoringBoard.current = true;
+    setCanUndo(false);
+    if (mergeMode) handleBoardChange(previous);
+    else setRestoreRequest({ token: Date.now(), board: previous });
   }
 
   if (!active) {
@@ -392,7 +428,7 @@ export function PicklistWorkspace({
     <div className="min-h-0 sm:flex sm:flex-1 sm:flex-col sm:overflow-hidden">
       <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <Button type="button" className="shrink-0 px-2" onClick={() => { setActive(null); setActiveBoard(null); setMergeMode(false); }} title="返回 Picklist 选择">
+          <Button type="button" className="shrink-0 px-2" onClick={() => { setActive(null); setActiveBoard(null); setMergeMode(false); clearUndo(); }} title="返回 Picklist 选择">
             <ArrowLeft className="size-4" />
           </Button>
           <h2 className="truncate font-semibold text-ink">{listName}</h2>
@@ -427,6 +463,11 @@ export function PicklistWorkspace({
             />
           </label>
           {editable ? (
+            <Button type="button" className="shrink-0" onClick={undoLastChange} disabled={!canUndo} title="撤回上一步操作">
+              <Undo2 className="size-4" />撤回
+            </Button>
+          ) : null}
+          {editable ? (
             <Button
               type="button"
               className="shrink-0"
@@ -460,6 +501,7 @@ export function PicklistWorkspace({
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
         preferInitial={isMain}
         resetToken={resetToken}
+        restoreRequest={restoreRequest}
         highlightedTeam={searchedTeam}
         readOnly={!editable}
         onBoardChange={handleBoardChange}

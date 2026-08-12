@@ -53,6 +53,7 @@ export function PicklistBoard({
   readOnly = false,
   preferInitial = false,
   resetToken = 0,
+  restoreRequest,
   highlightedTeam = null,
   onBoardChange,
   teams,
@@ -65,6 +66,7 @@ export function PicklistBoard({
   readOnly?: boolean;
   preferInitial?: boolean;
   resetToken?: number;
+  restoreRequest?: { token: number; board: PicklistBoardState } | null;
   highlightedTeam?: string | null;
   onBoardChange?: (board: PicklistBoardState) => void;
   teams: TeamSummary[];
@@ -94,6 +96,10 @@ export function PicklistBoard({
     handledResetToken.current = resetToken;
     if (hasAssignments) setBoard(emptyPicklistBoard());
   }, [hasAssignments, resetToken, setBoard]);
+
+  useEffect(() => {
+    if (restoreRequest) setBoard(restoreRequest.board);
+  }, [restoreRequest, setBoard]);
 
   function previewDrag(event: DragOverEvent) {
     const target = readDragTarget(event);
