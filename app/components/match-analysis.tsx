@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRevalidator } from "react-router";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, ExternalLink, PlayCircle, RefreshCw, Search, Target, Trophy } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, Minus, Pencil, PlayCircle, Plus, RefreshCw, Search, Target, Trophy, X } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, Input, cn } from "./ui";
 import {
@@ -28,6 +29,7 @@ import {
 } from "../lib/match-analysis";
 import type { TeamData } from "../lib/scouting";
 import { matchTypeFromTbaCompLevel } from "../lib/data-range";
+import type { EditableScoutingRecord, EditableScoutingResponse } from "../lib/editable-scouting";
 
 type LoadState =
   | { status: "idle" | "loading" }
@@ -47,6 +49,7 @@ export function MatchAnalysis({
   enrich = true,
   initialMatchKey = null,
   onOpenTeam,
+  canEditScouting = false,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
@@ -55,6 +58,7 @@ export function MatchAnalysis({
   enrich?: boolean;
   initialMatchKey?: string | null;
   onOpenTeam?: (team: string) => void;
+  canEditScouting?: boolean;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [state, setState] = useState<LoadState>(() => schedule.length || !enrich
@@ -144,6 +148,8 @@ export function MatchAnalysis({
           teamEvents={state.teamEvents}
           onBack={() => setSelectedMatchKey(null)}
           onOpenTeam={onOpenTeam}
+          eventKey={eventKey}
+          canEditScouting={canEditScouting}
         />
       ) : null}
       {state.status === "ready" && !selectedMatch ? (
@@ -368,6 +374,8 @@ function MatchDetail({
   teamEvents,
   onBack,
   onOpenTeam,
+  eventKey,
+  canEditScouting,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
@@ -376,7 +384,10 @@ function MatchDetail({
   teamEvents: TeamEvent[];
   onBack: () => void;
   onOpenTeam?: (team: string) => void;
+  eventKey: string;
+  canEditScouting: boolean;
 }) {
+  const [editingTeam, setEditingTeam] = useState<{ team: string; alliance: "red" | "blue" } | null>(null);
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
   const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
@@ -419,6 +430,7 @@ function MatchDetail({
           scoutingScore={score.scoutingRed}
           winner={score.winner === "red"}
           onOpenTeam={onOpenTeam}
+          onEditTeam={canEditScouting ? (team) => setEditingTeam({ team, alliance: "red" }) : undefined}
         />
         <AllianceDetail
           color="blue"
@@ -430,6 +442,7 @@ function MatchDetail({
           scoutingScore={score.scoutingBlue}
           winner={score.winner === "blue"}
           onOpenTeam={onOpenTeam}
+          onEditTeam={canEditScouting ? (team) => setEditingTeam({ team, alliance: "blue" }) : undefined}
         />
       </div>
 
@@ -448,7 +461,7 @@ function MatchDetail({
             buildConfig={(palette) => healthConfig(allMetrics, palette)}
           />
         </ChartCard>
-        <ChartCard title="Auto vs Tele" icon={<Trophy className="size-4" />}>
+        <ChartCard title="队伍对比" icon={<Trophy className="size-4" />}>
           <ChartCanvas
             label="六队 Auto 和 Tele"
             configKey={`match-auto-tele:${matchIdentity(match)}:${metricKey(allMetrics)}`}
@@ -456,6 +469,17 @@ function MatchDetail({
           />
         </ChartCard>
       </div>
+      {editingTeam && matchNumber && matchType ? (
+        <ScoutingRecordEditor
+          eventKey={eventKey}
+          team={editingTeam.team}
+          alliance={editingTeam.alliance}
+          matchType={matchType}
+          matchNumber={matchNumber}
+          matchLabelText={matchLabel(match)}
+          onClose={() => setEditingTeam(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -505,6 +529,7 @@ function AllianceDetail({
   scoutingScore,
   winner,
   onOpenTeam,
+  onEditTeam,
 }: {
   color: "red" | "blue";
   label: string;
@@ -515,6 +540,7 @@ function AllianceDetail({
   scoutingScore: number | null;
   winner: boolean;
   onOpenTeam?: (team: string) => void;
+  onEditTeam?: (team: string) => void;
 }) {
   const hasLargeDifference = hasLargeScoutingDifference(actualScore, scoutingScore);
   return (
@@ -536,7 +562,7 @@ function AllianceDetail({
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {metrics.map((metric) => (
-            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} onOpenTeam={onOpenTeam} />
+            <TeamMetricCard key={metric.team} metric={metric} allianceDifferenceIsLarge={hasLargeDifference} onOpenTeam={onOpenTeam} onEdit={onEditTeam} />
           ))}
           {!teams.length ? <div className="rounded-md border border-line bg-surface p-3 text-sm text-ink-dim">待定</div> : null}
         </div>
@@ -545,7 +571,7 @@ function AllianceDetail({
   );
 }
 
-function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean; onOpenTeam?: (team: string) => void }) {
+function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam, onEdit }: { metric: TeamMetric; allianceDifferenceIsLarge: boolean; onOpenTeam?: (team: string) => void; onEdit?: (team: string) => void }) {
   const scoutingTotal = metric.scoutMatch?.scoutingPts ?? null;
   const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
   const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
@@ -562,6 +588,12 @@ function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam }: { met
           Team {metric.team}
         </button>
         <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {onEdit ? (
+            <button type="button" onClick={() => onEdit(metric.team)} className="inline-flex items-center gap-1 rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-dim hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50">
+              <Pencil className="size-3" />
+              修改
+            </button>
+          ) : null}
           {reviewRecommended ? <span className="badge border-warning/30 bg-warning/10 text-warning">建议重新核查</span> : null}
           <span className="text-xl font-semibold text-ink">{fmt(metric.rating)}</span>
         </div>
@@ -579,6 +611,157 @@ function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam }: { met
           本场 Scouting：{fmt(scoutingTotal)} / A {fmt(scoutingAuto)} / T {fmt(scoutingTele)}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ScoutingRecordEditor({
+  eventKey,
+  team,
+  alliance,
+  matchType,
+  matchNumber,
+  matchLabelText,
+  onClose,
+}: {
+  eventKey: string;
+  team: string;
+  alliance: "red" | "blue";
+  matchType: "practice" | "qualification" | "playoff";
+  matchNumber: number;
+  matchLabelText: string;
+  onClose: () => void;
+}) {
+  const revalidator = useRevalidator();
+  const [record, setRecord] = useState<EditableScoutingRecord | null>(null);
+  const [normal, setNormal] = useState({ shootingSeconds: 0, transferSeconds: 0 });
+  const [superValues, setSuperValues] = useState({ driveScore: 0, defenseScore: 0, accuracy: 0, bps: 0 });
+  const [status, setStatus] = useState<"loading" | "ready" | "saving">("loading");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && status !== "saving") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, status]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ event: eventKey, team, alliance, matchType, matchNumber: String(matchNumber) });
+    fetch(`/scouting-record?${params}`, { signal: controller.signal })
+      .then(async (response) => {
+        const data = await response.json() as EditableScoutingResponse;
+        if (!response.ok || !data.ok) throw new Error(data.ok ? "读取失败" : data.error);
+        setRecord(data.record);
+        if (data.record.normal) setNormal(data.record.normal);
+        if (data.record.super) setSuperValues(data.record.super);
+        setStatus("ready");
+      })
+      .catch((reason: Error) => {
+        if (reason.name !== "AbortError") {
+          setError(reason.message);
+          setStatus("ready");
+        }
+      });
+    return () => controller.abort();
+  }, [alliance, eventKey, matchNumber, matchType, team]);
+
+  async function save() {
+    setStatus("saving");
+    setError("");
+    try {
+      const response = await fetch("/scouting-record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventKey, team, alliance, matchType, matchNumber, normal: record?.normal ? normal : null, super: record?.super ? superValues : null }),
+      });
+      const data = await response.json() as EditableScoutingResponse;
+      if (!response.ok || !data.ok) throw new Error(data.ok ? "保存失败" : data.error);
+      revalidator.revalidate();
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "保存失败");
+      setStatus("ready");
+    }
+  }
+
+  const busy = status !== "ready";
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-3" role="dialog" aria-modal="true" aria-labelledby="scouting-editor-title" onMouseDown={() => { if (!busy) onClose(); }}>
+      <Card className="max-h-[90dvh] w-full max-w-xl overflow-hidden p-0" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between gap-3 border-b border-line p-4">
+          <div>
+            <p className="section-label">{matchLabelText} · Team {team}</p>
+            <h2 id="scouting-editor-title" className="text-lg font-semibold text-ink">修改本场 Scouting</h2>
+          </div>
+          <Button type="button" className="h-9 px-2" disabled={busy} onClick={onClose} title="关闭"><X className="size-4" /></Button>
+        </div>
+        <div className="grid max-h-[70dvh] gap-4 overflow-y-auto p-4">
+          {error ? <div className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">{error}</div> : null}
+          {status === "loading" ? <div className="grid place-items-center py-10 text-sm text-ink-dim"><RefreshCw className="mb-2 size-5 animate-spin" />正在读取 CyberScout 记录</div> : null}
+          {status !== "loading" && record ? (
+            <>
+              <section className="rounded-md border border-line bg-surface-2 p-3">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="font-semibold text-ink">Normal Scout</h3>
+                  {record.normal ? <span className="text-xs text-ink-faint">{record.normal.recordCount} 条记录</span> : null}
+                </div>
+                {record.normal ? (
+                  <div className="grid gap-3">
+                    {record.normal.recordCount > 1 ? <p className="text-xs text-warning">保存后将覆盖本队本场全部 {record.normal.recordCount} 条 Normal Scout 的计算值。</p> : null}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <NumberField label="射击时间（秒）" value={normal.shootingSeconds} min={0} max={150} onChange={(shootingSeconds) => setNormal({ ...normal, shootingSeconds })} />
+                      <NumberField label="Transfer 时间（秒）" value={normal.transferSeconds} min={0} max={150} onChange={(transferSeconds) => setNormal({ ...normal, transferSeconds })} />
+                    </div>
+                  </div>
+                ) : <p className="text-sm text-ink-dim">本场没有 Normal Scout 记录。</p>}
+              </section>
+              <section className="rounded-md border border-line bg-surface-2 p-3">
+                <h3 className="mb-3 font-semibold text-ink">Super Scout</h3>
+                {record.super ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <StepField label="Drive Score" value={superValues.driveScore} min={0} max={5} onChange={(driveScore) => setSuperValues({ ...superValues, driveScore })} />
+                    <StepField label="Defense Score" value={superValues.defenseScore} min={0} max={5} onChange={(defenseScore) => setSuperValues({ ...superValues, defenseScore })} />
+                    <StepField label="准确度（%）" value={superValues.accuracy} min={0} max={100} onChange={(accuracy) => setSuperValues({ ...superValues, accuracy })} />
+                    <StepField label="BPS" value={superValues.bps} min={0} max={35} onChange={(bps) => setSuperValues({ ...superValues, bps })} />
+                  </div>
+                ) : <p className="text-sm text-ink-dim">本场没有 Super Scout 记录。</p>}
+              </section>
+            </>
+          ) : null}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line p-4">
+          <Button type="button" disabled={busy} onClick={onClose}>取消</Button>
+          <Button type="button" disabled={busy || !record || (!record.normal && !record.super)} onClick={() => void save()} className="border-brand bg-brand text-brand-fg hover:brightness-110">
+            {status === "saving" ? <RefreshCw className="size-4 animate-spin" /> : null}
+            确认保存
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <label className="grid gap-1.5 text-sm text-ink-dim">
+      <span>{label}</span>
+      <Input type="number" value={value} min={min} max={max} step="0.1" onChange={(event) => onChange(Number(event.target.value))} />
+    </label>
+  );
+}
+
+function StepField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  return (
+    <div className="grid gap-1.5 text-sm text-ink-dim">
+      <span>{label}</span>
+      <div className="grid grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-line bg-surface">
+        <button type="button" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className="grid place-items-center border-r border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Minus className="size-4" /></button>
+        <span className="grid place-items-center font-semibold tabular-nums text-ink">{value}</span>
+        <button type="button" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className="grid place-items-center border-l border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Plus className="size-4" /></button>
+      </div>
     </div>
   );
 }

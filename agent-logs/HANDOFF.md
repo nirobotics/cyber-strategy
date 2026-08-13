@@ -1155,6 +1155,26 @@
 
 ---
 
+## 2026-08-13 · 管理员修改单场 Scouting 记录
+
+**当前状态**：比赛详情的队伍卡片为管理员新增“修改”按钮。弹窗可读取本队本场 Normal Scout 的射击/Transfer 时间和 Super Scout 的 Drive Score、Defense Score、准确度、BPS；Normal 数字输入，Super 加减调整，确认后保存至 CyberScout Supabase。重复 Normal 记录统一写入策略端修正值，分析计算优先读取该值；Super 只更新联盟记录中目标队伍的数组项。Demo 不显示修改入口。版本统一为 `2026.1.48`。
+
+**验证**：typecheck、定向 Vitest、lint、完整构建、版本一致性和 `git diff --check` 通过；本地浏览器确认 Demo 不显示修改入口且页脚为 `v2026.1.48`。本地未携带生产管理员会话，因此没有执行真实保存。
+
+**风险 / 待办**：策略端时间修正保留原始时间轴并写入 payload 的 `strategyOverride`，Cyber Strategy 会读取修正值；未适配该字段的 CyberScout 客户端仍会展示原始时间轴。
+
+---
+
+## 2026-08-11 · 比赛详情图表标题调整
+
+**当前状态**：比赛详情图表标题由“Auto vs Tele”改为“队伍对比”，图表数据不变；版本统一为 `1.0.126`。
+
+**验证**：四处版本一致，`git diff --check`、typecheck 和 lint 通过。
+
+**风险 / 待办**：尚未部署生产。
+
+---
+
 ## 2026-08-11 · 版本更新至 1.0.120
 
 **当前状态**：`package.json`、应用页脚、登录页页脚和 Demo 页脚版本统一为 `1.0.120`。

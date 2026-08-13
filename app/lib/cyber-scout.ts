@@ -10,6 +10,7 @@ import {
 import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
 import type { MatchResult } from "./match-analysis";
 import type { TbaMatch } from "./tba.server";
+import { normalTimeOverride } from "./editable-scouting";
 
 export type CyberScoutEventRow = {
   id: string;
@@ -510,6 +511,8 @@ function predictedTransferPieces(normal?: NormalRecord, superRecord?: SuperRecor
 }
 
 function manualShotTimes(payload: Record<string, unknown>) {
+  const override = normalTimeOverride(payload);
+  if (override) return { scoringMs: override.shootingMs, transferMs: override.transferShootingMs };
   const shots = [...timedPeriods(payload.manualShotWhileIntaking ?? payload.wi), ...timedPeriods(payload.manualShotDirect ?? payload.sd)];
   const zones = manualZoneIntervals(payload);
   let scoringMs = 0;
