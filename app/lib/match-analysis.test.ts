@@ -29,6 +29,8 @@ describe("match analysis calculations", () => {
 
   it("recommends review only for a large alliance difference and a team difference over 100 percent", () => {
     expect(needsScoutingReview(true, 68.7, 8.7)).toBe(true);
+    expect(needsScoutingReview(true, 9.9, 0)).toBe(false);
+    expect(needsScoutingReview(true, 10, 0)).toBe(true);
     expect(needsScoutingReview(true, 50, 100)).toBe(false);
     expect(needsScoutingReview(false, 68.7, 8.7)).toBe(false);
     expect(needsScoutingReview(true, 50, null)).toBe(false);

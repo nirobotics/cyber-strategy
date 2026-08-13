@@ -1,3 +1,5 @@
+import type { TeamSummary } from "./scouting";
+
 export type EditableNormalValues = {
   shootingSeconds: number;
   transferSeconds: number;
@@ -20,7 +22,7 @@ export type EditableScoutingRecord = {
 };
 
 export type EditableScoutingResponse =
-  | { ok: true; record: EditableScoutingRecord; saved?: boolean }
+  | { ok: true; record: EditableScoutingRecord; saved?: boolean; team?: TeamSummary }
   | { ok: false; error: string };
 
 type Payload = Record<string, unknown>;

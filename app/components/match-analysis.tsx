@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useRevalidator } from "react-router";
 import type { ChartConfiguration } from "chart.js";
 import { ArrowLeft, BarChart3, ExternalLink, Minus, Pencil, PlayCircle, Plus, RefreshCw, Search, Target, Trophy, X } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
@@ -27,7 +26,7 @@ import {
   type TeamMetric,
   type WinProbability,
 } from "../lib/match-analysis";
-import type { TeamData } from "../lib/scouting";
+import { summarizeTeamMatches, type TeamData, type TeamSummary } from "../lib/scouting";
 import { matchTypeFromTbaCompLevel } from "../lib/data-range";
 import type { EditableScoutingRecord, EditableScoutingResponse } from "../lib/editable-scouting";
 
@@ -61,6 +60,8 @@ export function MatchAnalysis({
   canEditScouting?: boolean;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
+  const [teamDataOverrides, setTeamDataOverrides] = useState<TeamData>({});
+  const [scoutingTeamDataOverrides, setScoutingTeamDataOverrides] = useState<TeamData>({});
   const [state, setState] = useState<LoadState>(() => schedule.length || !enrich
     ? { status: "ready", matches: schedule, teamEvents: [] }
     : { status: "idle" });
@@ -122,6 +123,13 @@ export function MatchAnalysis({
   const selectedMatch = state.status === "ready" && selectedMatchKey
     ? state.matches.find((match) => matchIdentity(match) === selectedMatchKey) ?? null
     : null;
+  const resolvedTeamData = useMemo(() => ({ ...teamData, ...teamDataOverrides }), [teamData, teamDataOverrides]);
+  const resolvedScoutingTeamData = useMemo(() => ({ ...scoutingTeamData, ...scoutingTeamDataOverrides }), [scoutingTeamData, scoutingTeamDataOverrides]);
+
+  function handleScoutingSaved(updatedTeam: TeamSummary, matchType: "practice" | "qualification" | "playoff", matchNumber: number) {
+    setTeamDataOverrides((current) => mergeUpdatedTeamMatch(teamData, current, updatedTeam, matchType, matchNumber));
+    setScoutingTeamDataOverrides((current) => mergeUpdatedTeamMatch(scoutingTeamData, current, updatedTeam, matchType, matchNumber));
+  }
 
   return (
     <div className="space-y-3">
@@ -143,20 +151,21 @@ export function MatchAnalysis({
         <MatchDetail
           match={selectedMatch}
           matches={state.matches}
-          teamData={teamData}
-          scoutingTeamData={scoutingTeamData}
+          teamData={resolvedTeamData}
+          scoutingTeamData={resolvedScoutingTeamData}
           teamEvents={state.teamEvents}
           onBack={() => setSelectedMatchKey(null)}
           onOpenTeam={onOpenTeam}
           eventKey={eventKey}
           canEditScouting={canEditScouting}
+          onScoutingSaved={handleScoutingSaved}
         />
       ) : null}
       {state.status === "ready" && !selectedMatch ? (
         <MatchSchedule
           matches={state.matches}
-          teamData={teamData}
-          scoutingTeamData={scoutingTeamData}
+          teamData={resolvedTeamData}
+          scoutingTeamData={resolvedScoutingTeamData}
           onSelectMatch={(match) => setSelectedMatchKey(matchIdentity(match))}
         />
       ) : null}
@@ -376,6 +385,7 @@ function MatchDetail({
   onOpenTeam,
   eventKey,
   canEditScouting,
+  onScoutingSaved,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
@@ -386,6 +396,7 @@ function MatchDetail({
   onOpenTeam?: (team: string) => void;
   eventKey: string;
   canEditScouting: boolean;
+  onScoutingSaved: (team: TeamSummary, matchType: "practice" | "qualification" | "playoff", matchNumber: number) => void;
 }) {
   const [editingTeam, setEditingTeam] = useState<{ team: string; alliance: "red" | "blue" } | null>(null);
   const redTeams = matchTeams(match, "red");
@@ -477,6 +488,7 @@ function MatchDetail({
           matchType={matchType}
           matchNumber={matchNumber}
           matchLabelText={matchLabel(match)}
+          onSaved={(team) => onScoutingSaved(team, matchType, matchNumber)}
           onClose={() => setEditingTeam(null)}
         />
       ) : null}
@@ -622,6 +634,7 @@ function ScoutingRecordEditor({
   matchType,
   matchNumber,
   matchLabelText,
+  onSaved,
   onClose,
 }: {
   eventKey: string;
@@ -630,9 +643,9 @@ function ScoutingRecordEditor({
   matchType: "practice" | "qualification" | "playoff";
   matchNumber: number;
   matchLabelText: string;
+  onSaved: (team: TeamSummary) => void;
   onClose: () => void;
 }) {
-  const revalidator = useRevalidator();
   const [record, setRecord] = useState<EditableScoutingRecord | null>(null);
   const [normal, setNormal] = useState({ shootingSeconds: 0, transferSeconds: 0 });
   const [superValues, setSuperValues] = useState({ driveScore: 0, defenseScore: 0, accuracy: 0, bps: 0 });
@@ -679,7 +692,7 @@ function ScoutingRecordEditor({
       });
       const data = await response.json() as EditableScoutingResponse;
       if (!response.ok || !data.ok) throw new Error(data.ok ? "保存失败" : data.error);
-      revalidator.revalidate();
+      if (data.team) onSaved(data.team);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "保存失败");
@@ -692,10 +705,7 @@ function ScoutingRecordEditor({
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-3" role="dialog" aria-modal="true" aria-labelledby="scouting-editor-title" onMouseDown={() => { if (!busy) onClose(); }}>
       <Card className="max-h-[90dvh] w-full max-w-xl overflow-hidden p-0" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-line p-4">
-          <div>
-            <p className="section-label">{matchLabelText} · Team {team}</p>
-            <h2 id="scouting-editor-title" className="text-lg font-semibold text-ink">修改本场 Scouting</h2>
-          </div>
+          <h2 id="scouting-editor-title" className="text-lg font-semibold text-ink">{matchLabelText} · Team {team}</h2>
           <Button type="button" className="h-9 px-2" disabled={busy} onClick={onClose} title="关闭"><X className="size-4" /></Button>
         </div>
         <div className="grid max-h-[70dvh] gap-4 overflow-y-auto p-4">
@@ -724,8 +734,8 @@ function ScoutingRecordEditor({
                   <div className="grid gap-3 sm:grid-cols-2">
                     <StepField label="Drive Score" value={superValues.driveScore} min={0} max={5} onChange={(driveScore) => setSuperValues({ ...superValues, driveScore })} />
                     <StepField label="Defense Score" value={superValues.defenseScore} min={0} max={5} onChange={(defenseScore) => setSuperValues({ ...superValues, defenseScore })} />
-                    <StepField label="准确度（%）" value={superValues.accuracy} min={0} max={100} onChange={(accuracy) => setSuperValues({ ...superValues, accuracy })} />
-                    <StepField label="BPS" value={superValues.bps} min={0} max={35} onChange={(bps) => setSuperValues({ ...superValues, bps })} />
+                    <StepField label="准确度（%）" value={superValues.accuracy} min={0} max={100} step={25} onChange={(accuracy) => setSuperValues({ ...superValues, accuracy })} />
+                    <StepField label="BPS" value={superValues.bps} min={0} max={35} step={5} onChange={(bps) => setSuperValues({ ...superValues, bps })} />
                   </div>
                 ) : <p className="text-sm text-ink-dim">本场没有 Super Scout 记录。</p>}
               </section>
@@ -745,25 +755,57 @@ function ScoutingRecordEditor({
 }
 
 function NumberField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+  const [inputValue, setInputValue] = useState(String(value));
   return (
     <label className="grid gap-1.5 text-sm text-ink-dim">
       <span>{label}</span>
-      <Input type="number" value={value} min={min} max={max} step="0.1" onChange={(event) => onChange(Number(event.target.value))} />
+      <Input
+        type="number"
+        value={inputValue}
+        min={min}
+        max={max}
+        step="0.1"
+        onChange={(event) => {
+          const next = event.target.value;
+          setInputValue(next);
+          if (next !== "") onChange(Number(next));
+        }}
+        onBlur={() => {
+          const next = Math.min(max, Math.max(min, Number(inputValue) || 0));
+          setInputValue(String(next));
+          onChange(next);
+        }}
+      />
     </label>
   );
 }
 
-function StepField({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+function StepField({ label, value, min, max, step = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void }) {
   return (
     <div className="grid gap-1.5 text-sm text-ink-dim">
       <span>{label}</span>
       <div className="grid grid-cols-[2.5rem_1fr_2.5rem] overflow-hidden rounded-md border border-line bg-surface">
-        <button type="button" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className="grid place-items-center border-r border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Minus className="size-4" /></button>
+        <button type="button" disabled={value <= min} onClick={() => onChange(Math.max(min, value - step))} className="grid place-items-center border-r border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Minus className="size-4" /></button>
         <span className="grid place-items-center font-semibold tabular-nums text-ink">{value}</span>
-        <button type="button" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className="grid place-items-center border-l border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Plus className="size-4" /></button>
+        <button type="button" disabled={value >= max} onClick={() => onChange(Math.min(max, value + step))} className="grid place-items-center border-l border-line p-2 hover:bg-surface-2 disabled:opacity-40"><Plus className="size-4" /></button>
       </div>
     </div>
   );
+}
+
+export function mergeUpdatedTeamMatch(
+  source: TeamData,
+  overrides: TeamData,
+  updatedTeam: TeamSummary,
+  matchType: "practice" | "qualification" | "playoff",
+  matchNumber: number,
+) {
+  const current = overrides[updatedTeam.team] ?? source[updatedTeam.team];
+  const updatedMatch = updatedTeam.matches.find((match) => match.match === matchNumber && match.matchType === matchType);
+  if (!current || !updatedMatch || !current.matches.some((match) => match.match === matchNumber && match.matchType === matchType)) return overrides;
+  const matches = current.matches.map((match) => match.match === matchNumber && match.matchType === matchType ? updatedMatch : match);
+  const summary = summarizeTeamMatches(updatedTeam.team, matches);
+  return summary ? { ...overrides, [updatedTeam.team]: summary } : overrides;
 }
 
 function ChartCard({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {

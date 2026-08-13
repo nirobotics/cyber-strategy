@@ -85,6 +85,7 @@ export function hasLargeScoutingDifference(actual: number | null, scouting: numb
 
 export function needsScoutingReview(allianceDifferenceIsLarge: boolean, rating: number | null, scouting: number | null) {
   return allianceDifferenceIsLarge && rating != null && scouting != null
+    && Math.abs(rating - scouting) >= 10
     && Math.max(rating, scouting) > Math.min(rating, scouting) * 2;
 }
 

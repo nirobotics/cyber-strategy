@@ -1,6 +1,7 @@
 import type { Route } from "./+types/_app.scouting-record";
 import { requireAdmin } from "../lib/auth.server";
 import { loadEditableScoutingRecord, saveEditableScoutingRecord } from "../lib/editable-scouting.server";
+import { loadCyberScoutDataset } from "../lib/cyber-scout.server";
 import type { EditableNormalValues, EditableSuperValues } from "../lib/editable-scouting";
 import { matchTypeFromValue, type DataRange } from "../lib/data-range";
 
@@ -25,7 +26,8 @@ export async function action({ request }: Route.ActionArgs) {
       superValues: body.super == null ? null : superValues(body.super),
       updatedBy: user.feishuOpenId,
     });
-    return Response.json({ ok: true, saved: true, record });
+    const refreshed = await loadCyberScoutDataset(query.eventKey);
+    return Response.json({ ok: true, saved: true, record, team: refreshed.dataset?.teamData[query.team] });
   } catch (error) {
     return Response.json({ ok: false, error: errorMessage(error) }, { status: 400 });
   }

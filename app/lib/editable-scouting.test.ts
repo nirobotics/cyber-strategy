@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalTimeOverride, patchNormalTimeOverride, patchSuperValues, readSuperValues } from "./editable-scouting";
+import { mergeUpdatedTeamMatch } from "../components/match-analysis";
+import { summarizeTeamMatches } from "./scouting";
 
 describe("editable scouting payload updates", () => {
   it("stores normal time overrides without replacing the original timeline", () => {
@@ -34,5 +36,16 @@ describe("editable scouting payload updates", () => {
       comments: ["a", "b", "c"],
     });
     expect(readSuperValues(patched, "5823")).toEqual({ driveScore: 5, defenseScore: 1, accuracy: 91, bps: 22 });
+  });
+});
+
+describe("local scouting refresh", () => {
+  it("updates the current match without restoring an ignored match", () => {
+    const visibleMatch = { match: 2, matchType: "qualification" as const, scoutingPts: 10, totalPts: 10, autoPts: 2, telePts: 8, transferPieces: 0, bps: 5, hubSuccess: 50, hubFail: 50, accuracy: 50, climbPts: 0, botState: 1, botStateText: "No Issue", disabled: false, downtimeMs: 0, driverRating: 3, fuelRating: 1, defenseRating: 2, comment: "", startPos: "", scoutName: "" };
+    const ignoredMatch = { ...visibleMatch, match: 1, totalPts: 99 };
+    const updatedMatch = { ...visibleMatch, scoutingPts: 20, totalPts: 20, bps: 10 };
+    const current = summarizeTeamMatches("1", [visibleMatch]);
+    const updated = summarizeTeamMatches("1", [ignoredMatch, updatedMatch]);
+    expect(current && updated && mergeUpdatedTeamMatch({ "1": current }, {}, updated, "qualification", 2)["1"]?.matches).toEqual([updatedMatch]);
   });
 });
