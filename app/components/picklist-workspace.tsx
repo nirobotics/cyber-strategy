@@ -396,7 +396,7 @@ export function PicklistWorkspace({
                   {mainLists.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergeMainId === list.id && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergeMainId === list.id} onChange={() => setMergeMainId((current) => current === list.id ? "" : list.id)} />
-                      <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
+                      <span className="min-w-0 truncate">{list.name}</span>
                     </label>
                   ))}
                   {!mainLists.length ? <div className="px-3 py-2 text-ink-faint">暂无 Main Picklist</div> : null}
@@ -408,7 +408,7 @@ export function PicklistWorkspace({
                   {mergeablePersonal.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
-                      <span className="min-w-0 truncate">{list.name} · {list.createdByName}</span>
+                      <span className="min-w-0 truncate">{list.name}</span>
                     </label>
                   ))}
                   {!mergeablePersonal.length ? <div className="px-3 py-2 text-ink-faint">暂无提交</div> : null}
@@ -586,7 +586,7 @@ function PicklistCollection({ title, icon, count, children, footer }: { title: s
 }
 
 function ListButton({ list, onClick, readOnly, embedded = false }: { list: SharedPicklist; onClick: () => void; readOnly: boolean; embedded?: boolean }) {
-  return <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between gap-3 p-3 text-left", !embedded && "rounded-md border border-line bg-surface-2 hover:border-brand")}><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span><span className="flex shrink-0 items-center gap-2 text-xs text-ink-dim">{readOnly ? <LockKeyhole className="size-3" /> : null}{list.createdByName}</span></button>;
+  return <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between gap-3 p-3 text-left", !embedded && "rounded-md border border-line bg-surface-2 hover:border-brand")}><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>{readOnly ? <LockKeyhole className="size-3 shrink-0 text-ink-dim" /> : null}</button>;
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy, error }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean; error?: string }) {

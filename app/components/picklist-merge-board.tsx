@@ -162,7 +162,7 @@ export function PicklistMergeBoard({
 
         <div className="flex min-h-0 min-w-0 gap-3 overflow-x-auto overflow-y-hidden">
           {personalLists.map((list) => (
-            <ReadOnlyColumn key={list.id} id={list.id} title={`${list.name} · ${list.createdByName}`} count={list.board[column].length}>
+            <ReadOnlyColumn key={list.id} id={list.id} title={list.name} count={list.board[column].length}>
               {list.board[column].map((team) => {
                 const mainTier = findPicklistTeamTier(team, [visibleBoard]);
                 return <SourceTeam key={team} id={`personal:${list.id}:${team}`} team={team} summary={byTeam.get(team)} tier={tierByTeam.get(team)} source="personal" mainAssignment={mainTier ? `Main · ${TIER_LABELS[mainTier]}` : undefined} highlighted={team === highlightedTeam} onOpenTeam={onOpenTeam} />;
