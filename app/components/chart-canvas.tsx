@@ -26,12 +26,14 @@ export function ChartCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buildRef = useRef(buildConfig);
   const themeRevision = useThemeRevision();
+  const visible = useVisible(canvasRef);
 
   useEffect(() => {
     buildRef.current = buildConfig;
   }, [buildConfig]);
 
   useEffect(() => {
+    if (!visible) return;
     let chart: { destroy: () => void } | null = null;
     let cancelled = false;
 
@@ -44,13 +46,35 @@ export function ChartCanvas({
       cancelled = true;
       chart?.destroy();
     };
-  }, [configKey, themeRevision]);
+  }, [configKey, themeRevision, visible]);
 
   return (
     <div className={className}>
       <canvas ref={canvasRef} aria-label={label} role="img" />
     </div>
   );
+}
+
+function useVisible(ref: React.RefObject<Element | null>) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !window.IntersectionObserver) {
+      setVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry?.isIntersecting) return;
+      setVisible(true);
+      observer.disconnect();
+    }, { rootMargin: "160px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return visible;
 }
 
 function loadChart() {

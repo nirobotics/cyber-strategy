@@ -50,6 +50,7 @@ export function MatchAnalysis({
   progressKey,
   onOpenTeam,
   canEditScouting = false,
+  allowBack = true,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
@@ -60,6 +61,7 @@ export function MatchAnalysis({
   progressKey?: string;
   onOpenTeam?: (team: string) => void;
   canEditScouting?: boolean;
+  allowBack?: boolean;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [teamDataOverrides, setTeamDataOverrides] = useState<TeamData>({});
@@ -168,7 +170,7 @@ export function MatchAnalysis({
           teamData={resolvedTeamData}
           scoutingTeamData={resolvedScoutingTeamData}
           teamEvents={state.teamEvents}
-          onBack={() => setSelectedMatchKey(null)}
+          onBack={allowBack ? () => setSelectedMatchKey(null) : undefined}
           onOpenTeam={onOpenTeam}
           eventKey={eventKey}
           canEditScouting={canEditScouting}
@@ -424,7 +426,7 @@ function MatchDetail({
   teamData: TeamData;
   scoutingTeamData: TeamData;
   teamEvents: TeamEvent[];
-  onBack: () => void;
+  onBack?: () => void;
   onOpenTeam?: (team: string) => void;
   eventKey: string;
   canEditScouting: boolean;
@@ -446,9 +448,11 @@ function MatchDetail({
     <div className="space-y-3" data-testid="match-detail">
       <Card className="flex flex-wrap items-center justify-between gap-3 p-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button type="button" onClick={onBack} className="h-9 px-2" title="返回赛程" data-testid="match-detail-back">
-            <ArrowLeft className="size-4" />
-          </Button>
+          {onBack ? (
+            <Button type="button" onClick={onBack} className="h-9 px-2" title="返回赛程" data-testid="match-detail-back">
+              <ArrowLeft className="size-4" />
+            </Button>
+          ) : null}
           <div className="min-w-0">
             <h3 className="truncate text-xl font-semibold text-ink">Match {matchLabel(match)}</h3>
           </div>

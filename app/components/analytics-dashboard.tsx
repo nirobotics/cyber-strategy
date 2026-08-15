@@ -187,13 +187,6 @@ export function AnalyticsDashboard({
   }, [demoMode, events, isAdmin, navigate, routeBase]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void Promise.allSettled([loadMatchAnalysis(), loadStrategyProposalPanel(), loadScoutingLeadPanel(), loadStrategySettingsPanel()]);
-    }, 500);
-    return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
     prepareTab(activeTab);
   }, [activeTab, prepareTab]);
 
@@ -257,7 +250,7 @@ export function AnalyticsDashboard({
             <SegmentedTab active={tab} value="match" onClick={selectTab} onPrefetch={prepareTab} icon={<Table2 className="size-4" />}>
               赛程分析
             </SegmentedTab>
-            <SegmentedTab active={tab} value="picklist" onClick={selectTab} icon={<ListChecks className="size-4" />}>
+            <SegmentedTab active={tab} value="picklist" onClick={selectTab} onPrefetch={prepareTab} icon={<ListChecks className="size-4" />}>
               Picklist
             </SegmentedTab>
             <SegmentedTab active={tab} value="proposal" onClick={selectTab} onPrefetch={prepareTab} icon={<FileText className="size-4" />}>

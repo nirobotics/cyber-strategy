@@ -1292,3 +1292,19 @@
 **验证**：typecheck、20 files / 137 tests、`app/routes/embed.tsx` ESLint、build、版本一致性和 `git diff --check` 通过。
 
 **风险 / 待办**：待生产部署后用已登录 Pit 会话检查点击队伍、关闭详情、移动端和 light/dark；未登录访问仍需在线复核为 204。
+
+---
+
+## 2026-08-15 18:29:21 +08:00 · Pit 嵌入固定比赛页与首开优化
+
+**当前状态**：Cyber Pit 的比赛分析嵌入页不再显示返回赛程按钮，用户只能查看 Pit 所选比赛及其队伍详情；版本升级为 `2026.1.59`。
+
+**本轮完成**：
+- `MatchAnalysis` 新增默认开启的 `allowBack` 参数，只有 `/embed` 关闭返回入口，普通 Strategy 赛程分析行为不变。
+- FRC Events 与 Super Scout 比分源改为并行读取，合并优先级不变。
+- 通用分析页不再首屏预载所有非当前功能模块；鼠标意图预取保持可用，并补齐 Picklist。
+- Chart.js 只在图表进入视口前 160px 时加载和初始化，比赛详情文字与队伍卡优先显示。
+
+**验证**：typecheck、20 files / 137 tests、全仓 ESLint、build、版本一致性和 `git diff --check` 通过。
+
+**风险 / 待办**：待生产部署后用已登录 Pit 会话检查返回按钮、队伍详情、桌面/移动端、light/dark 和实际首开体感；未增加跨实例缓存，避免比赛现场数据陈旧。

@@ -66,6 +66,7 @@ export default function CyberPitEmbed({ loaderData }: Route.ComponentProps) {
           teamData={dataset.teamData}
           enrich={false}
           initialMatchKey={loaderData.selectedMatchKey}
+          allowBack={false}
           onOpenTeam={(team) => {
             if (dataset.teamData[team]) setDetailTeam(team);
           }}

@@ -14,13 +14,17 @@ import { fetchMatchResults } from "./match-results.server";
 describe("match result source priority", () => {
   afterEach(() => vi.clearAllMocks());
 
-  it("requests FRC Events before Super Scout and keeps official scores", async () => {
+  it("requests FRC Events and Super Scout concurrently, while keeping official scores", async () => {
     const official = result("frc-events", 123, 98);
-    mocks.fetchFrcMatchResults.mockResolvedValue([official]);
+    let resolveOfficial!: (value: MatchResult[]) => void;
+    mocks.fetchFrcMatchResults.mockReturnValue(new Promise((resolve) => { resolveOfficial = resolve; }));
     mocks.loadSuperScoutMatchResults.mockResolvedValue([result("super-scout", 500, 400)]);
 
-    await expect(fetchMatchResults("2026cnsh")).resolves.toEqual([official]);
+    const pending = fetchMatchResults("2026cnsh");
     expect(mocks.fetchFrcMatchResults).toHaveBeenCalledBefore(mocks.loadSuperScoutMatchResults);
+    expect(mocks.loadSuperScoutMatchResults).toHaveBeenCalledTimes(1);
+    resolveOfficial([official]);
+    await expect(pending).resolves.toEqual([official]);
   });
 
   it("uses Super Scout after FRC Events has no result", async () => {
