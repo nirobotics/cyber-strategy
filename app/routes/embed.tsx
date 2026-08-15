@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import type { Route } from "./+types/embed";
-import { TeamDetail } from "../components/analytics-dashboard";
+import { TeamDetail, TeamDetailModal } from "../components/analytics-dashboard";
 import { MatchAnalysis } from "../components/match-analysis";
 import { verifyCyberPitEmbedUrl } from "../lib/cyber-pit-embed.server";
 import { resolveCyberPitEmbedData } from "../lib/cyber-pit-integration.server";
@@ -45,6 +45,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function CyberPitEmbed({ loaderData }: Route.ComponentProps) {
   const { payload, dataset, dataRange, schedule, tier } = loaderData;
+  const [detailTeam, setDetailTeam] = useState<string | null>(null);
+  const detail = detailTeam ? dataset.teamData[detailTeam] : null;
   return (
     <main className="min-h-dvh bg-bg p-3 text-ink md:p-4">
       {payload.kind === "team" ? (
@@ -64,8 +66,21 @@ export default function CyberPitEmbed({ loaderData }: Route.ComponentProps) {
           teamData={dataset.teamData}
           enrich={false}
           initialMatchKey={loaderData.selectedMatchKey}
+          onOpenTeam={(team) => {
+            if (dataset.teamData[team]) setDetailTeam(team);
+          }}
         />
       )}
+      {detail ? (
+        <TeamDetailModal
+          team={detail}
+          photos={[]}
+          pitInfo={dataset.teamPitData?.[detail.team]}
+          onOpenPhoto={() => {}}
+          onClose={() => setDetailTeam(null)}
+          showMatchTypes={dataRange.length > 1}
+        />
+      ) : null}
     </main>
   );
 }

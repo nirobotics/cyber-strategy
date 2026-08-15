@@ -1276,3 +1276,19 @@
 **验证**：阈值边界测试、typecheck、lint、完整测试、build、`git diff --check`，并用真实浏览器检查桌面、移动端及 light/dark。
 
 **风险 / 待办**：尚未部署生产。
+
+---
+
+## 2026-08-15 16:45:51 +08:00 · Pit 比赛嵌入队伍详情
+
+**当前状态**：Cyber Pit 的已登录用户在比赛分析嵌入页点击六支队伍名称，可直接打开既有 `TeamDetailModal`；未登录访客仍由 Pit 前端和服务端阻止访问。
+
+**本轮完成**：
+- `/embed` 为比赛分析传入 `onOpenTeam`，只在目标队伍存在于当前 Strategy dataset 时打开详情。
+- 队伍详情直接复用 `TeamDetailModal`、同一队伍数据和 Pit 信息；关闭后返回原比赛详情，不复制 UI 或数据逻辑。
+- 保持照片为空的既有嵌入边界，未开放 Scouting 修改或其他写权限。
+- 并发工作已占用 `2026.1.57`，本轮按仓库规则将版本同步到 `2026.1.58`；未回滚其他未提交改动。
+
+**验证**：typecheck、20 files / 137 tests、`app/routes/embed.tsx` ESLint、build、版本一致性和 `git diff --check` 通过。
+
+**风险 / 待办**：待生产部署后用已登录 Pit 会话检查点击队伍、关闭详情、移动端和 light/dark；未登录访问仍需在线复核为 204。
