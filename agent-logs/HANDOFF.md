@@ -1308,3 +1308,5 @@
 **验证**：typecheck、20 files / 137 tests、全仓 ESLint、build、版本一致性和 `git diff --check` 通过。
 
 **风险 / 待办**：待生产部署后用已登录 Pit 会话检查返回按钮、队伍详情、桌面/移动端、light/dark 和实际首开体感；未增加跨实例缓存，避免比赛现场数据陈旧。
+
+**生产验收更新（2026-08-15 18:35:17 +08:00）**：提交 `ae583fe` 已推送；Production `dpl_nxdG1fArFwCpUGuU2LSTAfU6s2kF` Ready 并绑定 `https://strategy.team8214.com`。使用已登录的生产 Pit 会话实测 Q10/Q11/Q12：比赛详情和六队正常显示、返回按钮为 0、队伍详情弹层可打开；390×844 无页面横向溢出，返回按钮仍为 0。最新部署近 10 分钟无 error 日志。自动化 iframe 定位存在竞态，未记录不可信的打开毫秒数。
