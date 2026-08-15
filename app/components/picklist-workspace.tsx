@@ -164,10 +164,10 @@ export function PicklistWorkspace({
       list.kind === "personal" && list.createdBy === resource.userOpenId && list.clientId && !personalLists.some((local) => local.id === list.clientId)
     );
     if (!imports.length) return;
-    queueMicrotask(() => setPersonalLists((current) => [
+    queueMicrotask(() => setPersonalLists((current) => normalizeLocalLists([
         ...current,
         ...imports.map((list) => ({ id: list.clientId!, name: list.name, createdAt: list.updatedAt })),
-      ]));
+      ])));
   }, [personalLists, resource.lists, resource.userOpenId, setPersonalLists]);
 
   useEffect(() => {

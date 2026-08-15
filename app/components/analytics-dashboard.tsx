@@ -370,7 +370,7 @@ export function AnalyticsDashboard({
       {visitedTabs.has("match") ? (
         <div hidden={activeTab !== "match"}>
           {demoMode || fetchedMatchSchedule || matchSchedule.length ? (
-            <MatchAnalysis key={resolvedEventKey} eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} onOpenTeam={setDetailTeam} canEditScouting={isAdmin && !demoMode} />
+            <MatchAnalysis key={resolvedEventKey} eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} progressKey={`cyber-strategy:match-progress:${user.id}:${resolvedEventKey}`} onOpenTeam={setDetailTeam} canEditScouting={isAdmin && !demoMode} />
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}

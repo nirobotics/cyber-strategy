@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
 import { ArrowLeft, BarChart3, ExternalLink, Minus, Pencil, PlayCircle, Plus, RefreshCw, Search, Target, Trophy, X } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
@@ -47,6 +47,7 @@ export function MatchAnalysis({
   scoutingTeamData = teamData,
   enrich = true,
   initialMatchKey = null,
+  progressKey,
   onOpenTeam,
   canEditScouting = false,
 }: {
@@ -56,12 +57,14 @@ export function MatchAnalysis({
   scoutingTeamData?: TeamData;
   enrich?: boolean;
   initialMatchKey?: string | null;
+  progressKey?: string;
   onOpenTeam?: (team: string) => void;
   canEditScouting?: boolean;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [teamDataOverrides, setTeamDataOverrides] = useState<TeamData>({});
   const [scoutingTeamDataOverrides, setScoutingTeamDataOverrides] = useState<TeamData>({});
+  const listScrollY = useRef(progressKey ? readScrollPosition(progressKey) : 0);
   const [state, setState] = useState<LoadState>(() => schedule.length || !enrich
     ? { status: "ready", matches: schedule, teamEvents: [] }
     : { status: "idle" });
@@ -126,6 +129,17 @@ export function MatchAnalysis({
   const resolvedTeamData = useMemo(() => ({ ...teamData, ...teamDataOverrides }), [teamData, teamDataOverrides]);
   const resolvedScoutingTeamData = useMemo(() => ({ ...scoutingTeamData, ...scoutingTeamDataOverrides }), [scoutingTeamData, scoutingTeamDataOverrides]);
 
+  useLayoutEffect(() => {
+    if (state.status !== "ready") return;
+    window.scrollTo(0, selectedMatchKey ? 0 : listScrollY.current);
+  }, [selectedMatchKey, state.status]);
+
+  function selectMatch(match: CombinedMatch) {
+    listScrollY.current = window.scrollY;
+    if (progressKey) storeScrollPosition(progressKey, listScrollY.current);
+    setSelectedMatchKey(matchIdentity(match));
+  }
+
   function handleScoutingSaved(updatedTeam: TeamSummary, matchType: "practice" | "qualification" | "playoff", matchNumber: number) {
     setTeamDataOverrides((current) => mergeUpdatedTeamMatch(teamData, current, updatedTeam, matchType, matchNumber));
     setScoutingTeamDataOverrides((current) => mergeUpdatedTeamMatch(scoutingTeamData, current, updatedTeam, matchType, matchNumber));
@@ -166,11 +180,29 @@ export function MatchAnalysis({
           matches={state.matches}
           teamData={resolvedTeamData}
           scoutingTeamData={resolvedScoutingTeamData}
-          onSelectMatch={(match) => setSelectedMatchKey(matchIdentity(match))}
+          onSelectMatch={selectMatch}
         />
       ) : null}
     </div>
   );
+}
+
+function readScrollPosition(key: string) {
+  if (typeof window === "undefined") return 0;
+  try {
+    const value = Number(window.localStorage.getItem(key));
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function storeScrollPosition(key: string, value: number) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // localStorage can be unavailable in restricted browser contexts.
+  }
 }
 
 function MatchSchedule({
