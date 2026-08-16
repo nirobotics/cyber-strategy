@@ -149,6 +149,14 @@ describe("picklist board", () => {
     expect(visiblePicklistsForEvent([expected, wildcardLookalike], "2026ab_cd", "u1", false)).toEqual([expected]);
   });
 
+  it("shows only the latest personal picklist for each user", () => {
+    const older = sharedList({ id: "older", kind: "personal", createdBy: "u1", submittedAt: "2026-08-10T00:00:00Z" });
+    const latest = sharedList({ id: "latest", kind: "personal", createdBy: "u1", submittedAt: "2026-08-12T00:00:00Z", updatedAt: "2026-08-12T00:00:00Z" });
+    const other = sharedList({ id: "other", kind: "personal", createdBy: "u2", submittedAt: "2026-08-11T00:00:00Z" });
+
+    expect(visiblePicklistsForEvent([older, other, latest], "2026cnsh", "admin", true)).toEqual([other, latest]);
+  });
+
   it("compares selected lists within one tier by rank and appearances", () => {
     const main = sharedList({ id: "main", board: { tier1: ["1", "2"], tier2: [], tier3: [], dnp: [] } });
     const personalA = sharedList({ id: "a", kind: "personal", board: { tier1: ["2", "1", "3"], tier2: [], tier3: [], dnp: [] } });

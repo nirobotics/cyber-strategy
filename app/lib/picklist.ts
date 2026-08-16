@@ -91,7 +91,16 @@ export function canViewSharedPicklist(
 }
 
 export function visiblePicklistsForEvent(lists: SharedPicklist[], eventKey: string, actorOpenId: string, isAdmin: boolean) {
-  return lists.filter((list) => list.eventKey === eventKey && canViewSharedPicklist(list, actorOpenId, isAdmin));
+  const visible = lists.filter((list) => list.eventKey === eventKey && canViewSharedPicklist(list, actorOpenId, isAdmin));
+  const latestPersonalByOwner = new Map<string, SharedPicklist>();
+  for (const list of visible) {
+    if (list.kind !== "personal" || !list.createdBy) continue;
+    const current = latestPersonalByOwner.get(list.createdBy);
+    if (!current || list.updatedAt > current.updatedAt) latestPersonalByOwner.set(list.createdBy, list);
+  }
+  return visible.filter((list) =>
+    list.kind !== "personal" || !list.createdBy || latestPersonalByOwner.get(list.createdBy)?.id === list.id
+  );
 }
 
 export function comparePicklistTier(lists: Array<Pick<SharedPicklist, "id" | "board">>, column: PicklistAssignedColumn) {

@@ -672,7 +672,7 @@ export function TeamDetail({
                           </button>
                         ) : null}
                         <span>{matchDisplayLabel(match, showMatchTypes)}</span>
-                        {ignored ? <span className="rounded-full border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[10px] text-danger">已忽略</span> : null}
+                        {ignored ? <span className="whitespace-nowrap rounded-full border border-danger/40 bg-danger/10 px-1.5 py-0.5 text-[10px] text-danger">已忽略</span> : null}
                       </div>
                     </td>
                     <td className="px-3 py-2">
@@ -992,7 +992,6 @@ function AutoRouteModal({ team, pitInfo, onClose }: { team: string; pitInfo: Tea
             {pitInfo.drivetrain ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.drivetrain}</Badge> : null}
             {pitInfo.swerveModule ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.swerveModule}</Badge> : null}
             {pitInfo.canCrossTrench ? <Badge className="border-info/40 bg-info/10 text-info">trench</Badge> : null}
-            {pitInfo.isSwerve ? <Badge className="border-brand/40 bg-brand/10 text-brand">swerve</Badge> : null}
           </div>
           {pitInfo.autoRoutes.map((route, index) => (
             <div key={route.id} className="rounded-md border border-line bg-surface p-3">
