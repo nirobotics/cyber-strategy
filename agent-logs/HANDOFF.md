@@ -1326,3 +1326,5 @@
 **验证**：typecheck、21 files / 139 tests、build、目标 ESLint、`git diff --check` 通过；真实浏览器检查 Demo 比赛详情与队伍弹窗，控制台无错误。
 
 **风险 / 待办**：服务端目前仍需读取完整 dataset 和赛程，主要收益在减小 SSR/loader 序列化与网络载荷；签名生产嵌入链路需部署后复测实际 payload 大小和各阶段耗时。
+
+**生产验收更新（2026-08-16 18:05:32 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已显示 `v2026.1.60`，确认新构建已绑定生产域名；签名嵌入的真实 payload 与完整计时仍需已登录 Pit 会话复测。
