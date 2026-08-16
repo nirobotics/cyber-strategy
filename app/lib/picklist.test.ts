@@ -149,10 +149,10 @@ describe("picklist board", () => {
     expect(visiblePicklistsForEvent([expected, wildcardLookalike], "2026ab_cd", "u1", false)).toEqual([expected]);
   });
 
-  it("shows only the latest personal picklist for each user", () => {
-    const older = sharedList({ id: "older", kind: "personal", createdBy: "u1", submittedAt: "2026-08-10T00:00:00Z" });
-    const latest = sharedList({ id: "latest", kind: "personal", createdBy: "u1", submittedAt: "2026-08-12T00:00:00Z", updatedAt: "2026-08-12T00:00:00Z" });
-    const other = sharedList({ id: "other", kind: "personal", createdBy: "u2", submittedAt: "2026-08-11T00:00:00Z" });
+  it("deduplicates the same personal picklist while keeping a user's other lists", () => {
+    const older = sharedList({ id: "older", clientId: "client-a", kind: "personal", createdBy: "u1", submittedAt: "2026-08-10T00:00:00Z" });
+    const latest = sharedList({ id: "latest", clientId: "client-a", kind: "personal", createdBy: "u1", submittedAt: "2026-08-12T00:00:00Z", updatedAt: "2026-08-12T00:00:00Z" });
+    const other = sharedList({ id: "other", clientId: "client-b", kind: "personal", createdBy: "u1", submittedAt: "2026-08-11T00:00:00Z" });
 
     expect(visiblePicklistsForEvent([older, other, latest], "2026cnsh", "admin", true)).toEqual([other, latest]);
   });

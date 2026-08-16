@@ -92,14 +92,16 @@ export function canViewSharedPicklist(
 
 export function visiblePicklistsForEvent(lists: SharedPicklist[], eventKey: string, actorOpenId: string, isAdmin: boolean) {
   const visible = lists.filter((list) => list.eventKey === eventKey && canViewSharedPicklist(list, actorOpenId, isAdmin));
-  const latestPersonalByOwner = new Map<string, SharedPicklist>();
+  const latestPersonalByClient = new Map<string, SharedPicklist>();
   for (const list of visible) {
-    if (list.kind !== "personal" || !list.createdBy) continue;
-    const current = latestPersonalByOwner.get(list.createdBy);
-    if (!current || list.updatedAt > current.updatedAt) latestPersonalByOwner.set(list.createdBy, list);
+    if (list.kind !== "personal" || !list.createdBy || !list.clientId) continue;
+    const key = `${list.createdBy}:${list.clientId}`;
+    const current = latestPersonalByClient.get(key);
+    if (!current || list.updatedAt > current.updatedAt) latestPersonalByClient.set(key, list);
   }
   return visible.filter((list) =>
-    list.kind !== "personal" || !list.createdBy || latestPersonalByOwner.get(list.createdBy)?.id === list.id
+    list.kind !== "personal" || !list.createdBy || !list.clientId
+      || latestPersonalByClient.get(`${list.createdBy}:${list.clientId}`)?.id === list.id
   );
 }
 

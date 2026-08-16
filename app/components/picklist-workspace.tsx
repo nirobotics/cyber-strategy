@@ -79,11 +79,6 @@ export function PicklistWorkspace({
   const ownSubmissions = useMemo(() => new Map(submittedPersonal
     .filter((list) => list.createdBy === resource.userOpenId && list.clientId)
     .map((list) => [list.clientId!, list])), [resource.userOpenId, submittedPersonal]);
-  const displayedPersonalLists = useMemo(() => {
-    const submitted = personalLists.find((list) => ownSubmissions.has(list.id));
-    const list = submitted ?? personalLists[0];
-    return list ? [list] : [];
-  }, [ownSubmissions, personalLists]);
   const mergeablePersonal = useMemo(() => submittedPersonal.filter((list) =>
     list.createdBy !== resource.userOpenId || !list.clientId || !stalePersonalIds.has(list.clientId)
   ), [resource.userOpenId, stalePersonalIds, submittedPersonal]);
@@ -233,7 +228,7 @@ export function PicklistWorkspace({
 
   function createPersonal() {
     const name = personalName.trim();
-    if (!name || personalLists.length) return;
+    if (!name || personalLists.some((list) => normalizePicklistName(list.name) === normalizePicklistName(name))) return;
     const local = { id: crypto.randomUUID(), name: name.slice(0, 80), createdAt: new Date().toISOString() };
     setPersonalLists((current) => [local, ...current]);
     setPersonalName("");
@@ -370,8 +365,8 @@ export function PicklistWorkspace({
             {!mainLists.length ? <EmptyCollection text="暂无 Main Picklist" /> : null}
           </PicklistCollection>
 
-          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={displayedPersonalLists.length} footer={!personalLists.length ? <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} /> : null}>
-            {displayedPersonalLists.map((list) => (
+          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length} footer={<CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />}>
+            {personalLists.map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <button type="button" onClick={() => openPersonal(list)} className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 text-left">
                   <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
@@ -382,7 +377,7 @@ export function PicklistWorkspace({
                 </Button>
               </div>
             ))}
-            {!displayedPersonalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
+            {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
           </PicklistCollection>
         </div>
 

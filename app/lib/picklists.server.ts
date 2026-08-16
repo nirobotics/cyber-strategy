@@ -86,8 +86,7 @@ export async function submitPersonalPicklist(opts: {
   if (readError) throw new Response("提交 Personal Picklist 失败", { status: 500 });
   const existing = ((rows as PicklistSettingRow[] | null) ?? [])
     .map((row) => ({ row, list: rowToPicklist(row) }))
-    .filter(({ list }) => list?.eventKey === eventKey && list.createdBy === opts.actorOpenId)
-    .sort((left, right) => (right.list?.updatedAt ?? "").localeCompare(left.list?.updatedAt ?? ""))[0];
+    .find(({ list }) => list?.eventKey === eventKey && list.createdBy === opts.actorOpenId && list.clientId === clientId);
   const list: StoredPicklist = {
     id: existing?.list?.id ?? crypto.randomUUID(),
     clientId,
