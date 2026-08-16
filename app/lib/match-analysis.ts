@@ -325,19 +325,17 @@ export function resolveWinProbability({
   blueTeams,
   teamData,
   matches,
-  scoreSdOverride,
 }: {
   match: CombinedMatch;
   redTeams: string[];
   blueTeams: string[];
   teamData: TeamData;
   matches: CombinedMatch[];
-  scoreSdOverride?: number;
 }): WinProbability | null {
   const redComposite = allianceCompositeScore(redTeams, teamData);
   const blueComposite = allianceCompositeScore(blueTeams, teamData);
   if (redComposite != null && blueComposite != null) {
-    const scoreSd = scoreSdOverride ?? strategyScoreSd(matches, teamData);
+    const scoreSd = strategyScoreSd(matches, teamData);
     const red = strategyWinProbability(redComposite, blueComposite, scoreSd);
     return { red, blue: 1 - red, source: "strategy", scoreSd };
   }
