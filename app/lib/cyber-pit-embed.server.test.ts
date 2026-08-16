@@ -4,7 +4,8 @@ import {
   isCyberPitEmbedRequestAuthorized,
   verifyCyberPitEmbedUrl,
 } from "./cyber-pit-embed.server";
-import { cyberPitMatchDataRange, matchesCyberPitMatch } from "./cyber-pit-integration.server";
+import { cyberPitMatchDataRange, matchesCyberPitMatch, selectCyberPitMatchData } from "./cyber-pit-integration.server";
+import type { TeamData } from "./scouting";
 
 const secret = "test-secret-with-enough-entropy";
 const now = Date.UTC(2026, 7, 1);
@@ -59,5 +60,19 @@ describe("Cyber Pit embed signing", () => {
     expect(matchesCyberPitMatch({ comp_level: "qm", match_number: 33 }, "2026otsan", "2026otsan_qm33")).toBe(true);
     expect(matchesCyberPitMatch({ comp_level: "sf", set_number: 5, match_number: 1 }, "2026otsan", "2026otsan_ef5m5")).toBe(true);
     expect(matchesCyberPitMatch({ comp_level: "f", set_number: 1, match_number: 3 }, "2026otsan", "2026otsan_f1m3")).toBe(true);
+  });
+
+  it("keeps only the six teams needed by the embedded match", () => {
+    const teams = ["1", "2", "3", "4", "5", "6", "999"];
+    const teamData = Object.fromEntries(teams.map((team) => [team, { team }])) as TeamData;
+    const selected = selectCyberPitMatchData({
+      alliances: {
+        red: { team_keys: ["1", "2", "3"] },
+        blue: { team_keys: ["4", "5", "6"] },
+      },
+    }, teamData, { "1": { drivetrain: "swerve", swerveModule: "", canCrossTrench: false, isSwerve: true, autoRoutes: [] }, "999": { drivetrain: "tank", swerveModule: "", canCrossTrench: false, isSwerve: false, autoRoutes: [] } });
+
+    expect(Object.keys(selected.teamData)).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(Object.keys(selected.teamPitData)).toEqual(["1"]);
   });
 });

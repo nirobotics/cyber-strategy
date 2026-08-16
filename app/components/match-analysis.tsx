@@ -51,6 +51,7 @@ export function MatchAnalysis({
   onOpenTeam,
   canEditScouting = false,
   allowBack = true,
+  strategyScoreSdOverride,
 }: {
   eventKey: string;
   schedule: CombinedMatch[];
@@ -62,6 +63,7 @@ export function MatchAnalysis({
   onOpenTeam?: (team: string) => void;
   canEditScouting?: boolean;
   allowBack?: boolean;
+  strategyScoreSdOverride?: number;
 }) {
   const [selectedMatchKey, setSelectedMatchKey] = useState<string | null>(initialMatchKey);
   const [teamDataOverrides, setTeamDataOverrides] = useState<TeamData>({});
@@ -175,6 +177,7 @@ export function MatchAnalysis({
           eventKey={eventKey}
           canEditScouting={canEditScouting}
           onScoutingSaved={handleScoutingSaved}
+          strategyScoreSdOverride={strategyScoreSdOverride}
         />
       ) : null}
       {state.status === "ready" && !selectedMatch ? (
@@ -183,6 +186,7 @@ export function MatchAnalysis({
           teamData={resolvedTeamData}
           scoutingTeamData={resolvedScoutingTeamData}
           onSelectMatch={selectMatch}
+          strategyScoreSdOverride={strategyScoreSdOverride}
         />
       ) : null}
     </div>
@@ -212,11 +216,13 @@ function MatchSchedule({
   teamData,
   scoutingTeamData,
   onSelectMatch,
+  strategyScoreSdOverride,
 }: {
   matches: CombinedMatch[];
   teamData: TeamData;
   scoutingTeamData: TeamData;
   onSelectMatch: (match: CombinedMatch) => void;
+  strategyScoreSdOverride?: number;
 }) {
   const [teamQuery, setTeamQuery] = useState("");
 
@@ -252,7 +258,7 @@ function MatchSchedule({
       {rows.map(({ match, group, showGroup }, index) => (
         <div key={matchIdentity(match)}>
           {showGroup && index > 0 ? <h3 className="mb-2 section-label">{group}</h3> : null}
-          <MatchCard match={match} matches={matches} teamData={teamData} scoutingTeamData={scoutingTeamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} />
+          <MatchCard match={match} matches={matches} teamData={teamData} scoutingTeamData={scoutingTeamData} highlightTeam={teamQuery} onSelect={() => onSelectMatch(match)} strategyScoreSdOverride={strategyScoreSdOverride} />
         </div>
       ))}
     </div>
@@ -266,6 +272,7 @@ function MatchCard({
   scoutingTeamData,
   highlightTeam,
   onSelect,
+  strategyScoreSdOverride,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
@@ -273,11 +280,12 @@ function MatchCard({
   scoutingTeamData: TeamData;
   highlightTeam: string;
   onSelect: () => void;
+  strategyScoreSdOverride?: number;
 }) {
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
   const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
-  const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
+  const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches, scoreSdOverride: strategyScoreSdOverride });
   const videos = match.videos ?? [];
 
   return (
@@ -420,6 +428,7 @@ function MatchDetail({
   eventKey,
   canEditScouting,
   onScoutingSaved,
+  strategyScoreSdOverride,
 }: {
   match: CombinedMatch;
   matches: CombinedMatch[];
@@ -431,12 +440,13 @@ function MatchDetail({
   eventKey: string;
   canEditScouting: boolean;
   onScoutingSaved: (team: TeamSummary, matchType: "practice" | "qualification" | "playoff", matchNumber: number) => void;
+  strategyScoreSdOverride?: number;
 }) {
   const [editingTeam, setEditingTeam] = useState<{ team: string; alliance: "red" | "blue" } | null>(null);
   const redTeams = matchTeams(match, "red");
   const blueTeams = matchTeams(match, "blue");
   const score = resolveMatchScores({ match, redTeams, blueTeams, teamData, scoutingTeamData });
-  const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches });
+  const probability = resolveWinProbability({ match, redTeams, blueTeams, teamData, matches, scoreSdOverride: strategyScoreSdOverride });
   const teamEventMap = useMemo(() => buildTeamEventMap(teamEvents), [teamEvents]);
   const matchNumber = match.match_number ?? null;
   const matchType = matchTypeFromTbaCompLevel(match.comp_level);
