@@ -1328,3 +1328,5 @@
 **风险 / 待办**：服务端目前仍需读取完整 dataset 和赛程，主要收益在减小 SSR/loader 序列化与网络载荷；签名生产嵌入链路需部署后复测实际 payload 大小和各阶段耗时。
 
 **生产验收更新（2026-08-16 18:05:32 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已显示 `v2026.1.60`，确认新构建已绑定生产域名；签名嵌入的真实 payload 与完整计时仍需已登录 Pit 会话复测。
+
+**效果复盘（2026-08-16 19:44:10 +08:00）**：用户反馈体感无提升，判断成立。`/api/cyber-pit-embed` 的 `canResolveCyberPitEmbed` 会先检查数据与赛程，随后 `/embed` 的 `resolveCyberPitEmbedData` 再次读取完整 dataset/赛程/结果；视图模型裁剪位于这些读取之后，不改善主要 TTFB。优先后续项是取消或合并重复预检，缓存需要单独评估现场数据陈旧风险。
