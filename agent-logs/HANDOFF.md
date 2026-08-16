@@ -1332,3 +1332,5 @@
 **效果复盘（2026-08-16 19:44:10 +08:00）**：用户反馈体感无提升，判断成立。`/api/cyber-pit-embed` 的 `canResolveCyberPitEmbed` 会先检查数据与赛程，随后 `/embed` 的 `resolveCyberPitEmbedData` 再次读取完整 dataset/赛程/结果；视图模型裁剪位于这些读取之后，不改善主要 TTFB。优先后续项是取消或合并重复预检，缓存需要单独评估现场数据陈旧风险。
 
 **回退更新（2026-08-16 19:48:54 +08:00）**：按用户要求取消方案 1、3。已通过反向提交移除所有 `Server-Timing`，恢复 `/embed` 的完整 dataset/赛程响应和原胜率计算路径，并将版本恢复为 `2026.1.59`。typecheck、20 files / 137 tests、全仓 lint、build、`git diff --check` 均通过。
+
+**生产验收更新（2026-08-16 19:55:00 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已恢复显示 `v2026.1.59`。
