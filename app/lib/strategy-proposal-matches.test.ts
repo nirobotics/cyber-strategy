@@ -41,7 +41,7 @@ describe("strategy proposal matches", () => {
       cyberScoutMatch("manual-qm1", "qm", 1, [8214, 111, 222, 333, 444, 555]),
       cyberScoutMatch("manual-sf2", "sf", 2, [111, 222, 333, 9635, 444, 555]),
       { matchType: "qm", matchNumber: 3, teams: { R1: 8214 } },
-    ])).toEqual([
+    ], undefined, ["8214", "9635"])).toEqual([
       { key: "manual-qm1", label: "Q1", redTeams: ["8214", "111", "222"], blueTeams: ["333", "444", "555"] },
       { key: "manual-sf2", label: "SF2-1", redTeams: ["111", "222", "333"], blueTeams: ["9635", "444", "555"] },
     ]);
@@ -52,7 +52,7 @@ describe("strategy proposal matches", () => {
       cyberScoutMatch("practice1", "practice", 1, [8214, 111, 222, 333, 444, 555]),
       cyberScoutMatch("qm1", "qm", 1, [8214, 111, 222, 333, 444, 555]),
       cyberScoutMatch("sf1", "sf", 1, [8214, 111, 222, 333, 444, 555]),
-    ], ["qualification"]).map((match) => match.key)).toEqual(["qm1"]);
+    ], ["qualification"], ["8214", "9635"]).map((match) => match.key)).toEqual(["qm1"]);
   });
 });
 

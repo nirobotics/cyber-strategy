@@ -1,19 +1,13 @@
 import type { DataRange } from "./data-range";
 import type { CombinedMatch, MatchResult } from "./match-analysis";
+import { extractFrcPeriodScores } from "../season/scoring";
 
 const frcEventsBaseUrl = "https://frc-api.firstinspires.org/v3.0";
 
 type FrcAllianceScore = {
   alliance?: string;
-  autoPoints?: number;
-  teleopPoints?: number;
-  totalAutoPoints?: number;
-  totalTeleopPoints?: number;
   totalPoints?: number;
-  hubScore?: {
-    autoPoints?: number;
-    teleopPoints?: number;
-  };
+  [key: string]: unknown;
 };
 
 type FrcMatchScore = {
@@ -201,17 +195,12 @@ function stationNumber(station: string | undefined) {
 function allianceScore(alliances: FrcAllianceScore[] | undefined, alliance: "red" | "blue") {
   const value = alliances?.find((item) => item.alliance?.toLowerCase() === alliance);
   if (!value || !validScore(value.totalPoints)) return null;
-  const autoPoints = firstValidScore(value.hubScore?.autoPoints, value.autoPoints, value.totalAutoPoints);
-  const teleopPoints = firstValidScore(value.hubScore?.teleopPoints, value.teleopPoints, value.totalTeleopPoints);
+  const { autoPoints, teleopPoints } = extractFrcPeriodScores(value);
   return {
     score: value.totalPoints,
     ...(autoPoints == null ? {} : { autoPoints }),
     ...(teleopPoints == null ? {} : { teleopPoints }),
   };
-}
-
-function firstValidScore(...values: unknown[]) {
-  return values.find(validScore) as number | undefined;
 }
 
 function validScore(value: unknown): value is number {

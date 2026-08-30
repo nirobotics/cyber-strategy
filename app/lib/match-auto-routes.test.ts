@@ -1,57 +1,58 @@
 import { describe, expect, it } from "vitest";
-import { analyzeRouteRepetition, autoNodeCenter, autoPathSignature, buildMatchAutoRoutes } from "./match-auto-routes";
+import { analyzeRouteRepetition, autoPathSignature, buildMatchAutoRoutes } from "./match-auto-routes";
 import type { ScoutingMatch, TeamSummary } from "./scouting";
 
 describe("match auto routes", () => {
-  it("uses cyber-scout button centers for route points", () => {
-    expect(autoNodeCenter("tower", "red")).toEqual({ x: 6, y: 50 });
-    expect(autoNodeCenter("tower", "blue")).toEqual({ x: 94, y: 50 });
-    expect(autoNodeCenter("neutral-left", "red")).toEqual({ x: 41.68, y: 28 });
+  it("uses normalized season coordinates for route points", () => {
+    const routes = buildMatchAutoRoutes(team([
+      match(1, [{ node: "start", atMs: 0, x: 10, y: 20 }, { node: "score", atMs: 1000, x: 30, y: 40 }]),
+    ]));
+    expect(routes[0].points).toEqual([{ x: 10, y: 20 }, { x: 30, y: 40 }]);
   });
 
   it("builds a signature from node order only", () => {
-    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }], { autoStartPosition: "hub-front" }))).toBe(
+    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 0, x: 10, y: 20 }, { node: "alliance-center", atMs: 1200, x: 30, y: 40 }]))).toBe(
       "tower>alliance-center",
     );
-    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 900 }, { node: "alliance-center", atMs: 1800 }], { autoStartPosition: "hub-front" }))).toBe(
+    expect(autoPathSignature(match(1, [{ node: "tower", atMs: 900, x: 10, y: 20 }, { node: "alliance-center", atMs: 1800, x: 30, y: 40 }]))).toBe(
       "tower>alliance-center",
     );
   });
 
-  it("starts routes from the selected start-position button", () => {
+  it("keeps the selected start position as route metadata", () => {
     const routes = buildMatchAutoRoutes(team([
-      match(1, [{ node: "alliance-center", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
+      match(1, [{ node: "alliance-center", atMs: 1200, x: 30, y: 40 }], { autoAlliance: "red", autoStartPosition: "center" }),
     ]));
 
-    expect(routes[0].nodes).toEqual(["tower", "alliance-center"]);
-    expect(routes[0].points).toEqual([{ x: 6, y: 50 }, { x: 17.5, y: 50 }]);
+    expect(routes[0].nodes).toEqual(["alliance-center"]);
+    expect(routes[0].startPosition).toBe("center");
   });
 
   it("keeps different start positions as different routes", () => {
     const routes = buildMatchAutoRoutes(team([
-      match(1, [{ node: "alliance-center", atMs: 1200 }], { autoStartPosition: "hub-front" }),
-      match(2, [{ node: "alliance-center", atMs: 1300 }], { autoStartPosition: "right-in" }),
+      match(1, [{ node: "alliance-center", atMs: 1200, x: 30, y: 40 }], { autoStartPosition: "center" }),
+      match(2, [{ node: "alliance-left", atMs: 1300, x: 20, y: 40 }], { autoStartPosition: "left" }),
     ]));
 
-    expect(routes.map((route) => route.signature)).toEqual(["tower>alliance-center", "right-trench>alliance-center"]);
+    expect(routes.map((route) => route.signature)).toEqual(["alliance-center", "alliance-left"]);
   });
 
   it("merges identical node sequences and keeps different sequences separate", () => {
     const routes = buildMatchAutoRoutes(team([
-      match(1, [{ node: "tower", atMs: 0 }, { node: "alliance-center", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
-      match(2, [{ node: "tower", atMs: 300 }, { node: "alliance-center", atMs: 1500 }], { autoAlliance: "blue", autoStartPosition: "hub-front" }),
-      match(3, [{ node: "tower", atMs: 0 }, { node: "alliance-left", atMs: 1200 }], { autoAlliance: "red", autoStartPosition: "hub-front" }),
+      match(1, [{ node: "tower", atMs: 0, x: 10, y: 20 }, { node: "alliance-center", atMs: 1200, x: 30, y: 40 }], { autoAlliance: "red" }),
+      match(2, [{ node: "tower", atMs: 300, x: 10, y: 20 }, { node: "alliance-center", atMs: 1500, x: 30, y: 40 }], { autoAlliance: "blue" }),
+      match(3, [{ node: "tower", atMs: 0, x: 10, y: 20 }, { node: "alliance-left", atMs: 1200, x: 20, y: 40 }], { autoAlliance: "red" }),
     ]));
 
     expect(routes).toHaveLength(2);
     expect(routes[0].matches.map((item) => item.match)).toEqual([1, 2]);
-    expect(routes[0].points).toEqual([{ x: 6, y: 50 }, { x: 17.5, y: 50 }]);
+    expect(routes[0].points).toEqual([{ x: 10, y: 20 }, { x: 30, y: 40 }]);
     expect(routes[1].signature).toBe("tower>alliance-left");
   });
 
   it("uses the normal match scout name for match-auto routes", () => {
     const routes = buildMatchAutoRoutes(team([
-      match(1, [{ node: "tower", atMs: 0 }], {
+      match(1, [{ node: "tower", atMs: 0, x: 10, y: 20 }], {
         autoScoutName: "Normal Scout",
         scoutName: "Super Scout",
       }),
@@ -76,8 +77,8 @@ describe("match auto routes", () => {
 
   it("ignores empty or unknown auto paths", () => {
     expect(buildMatchAutoRoutes(team([
-      match(1, [], { autoStartPosition: "hub-front" }),
-      match(2, [{ node: "unknown", atMs: 0 }], { autoStartPosition: "hub-front" }),
+      match(1, [], { autoStartPosition: "center" }),
+      match(2, [{ node: "unknown", atMs: 0 }], { autoStartPosition: "center" }),
     ]))).toEqual([]);
   });
 });
@@ -88,9 +89,8 @@ function team(matches: ScoutingMatch[]): TeamSummary {
     avgTotal: 0,
     avgAuto: 0,
     avgTele: 0,
-    avgAccuracy: 0,
+    metrics: {},
     avgDriver: 0,
-    avgFuel: 0,
     malfunctions: 0,
     commsIssues: 0,
     disabledEvents: 0,
@@ -111,15 +111,10 @@ function match(matchNumber: number, autoPath: ScoutingMatch["autoPath"], extra: 
     totalPts: 0,
     autoPts: 0,
     telePts: 0,
-    hubSuccess: 0,
-    hubFail: 0,
-    accuracy: null,
-    climbPts: 0,
-    botState: 1,
-    botStateText: "No Issue",
+    metrics: {},
+    status: "normal",
     disabled: false,
     driverRating: 0,
-    fuelRating: 0,
     defenseRating: 0,
     comment: "",
     startPos: "",

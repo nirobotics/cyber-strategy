@@ -2,7 +2,7 @@ import type { Route } from "./+types/_app.scouting-record";
 import { requireAdmin } from "../lib/auth.server";
 import { loadEditableScoutingRecord, saveEditableScoutingRecord } from "../lib/editable-scouting.server";
 import { loadCyberScoutDataset } from "../lib/cyber-scout.server";
-import type { EditableNormalValues, EditableSuperValues } from "../lib/editable-scouting";
+import type { EditableScoutingValues } from "../lib/editable-scouting";
 import { matchTypeFromValue, type DataRange } from "../lib/data-range";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -61,19 +61,17 @@ function matchQuery(value: Record<string, unknown>) {
   return { eventKey, team, matchNumber, matchType, alliance };
 }
 
-function normalValues(value: unknown): EditableNormalValues {
-  const record = objectValue(value);
-  return { shootingSeconds: numberValue(record.shootingSeconds), transferSeconds: numberValue(record.transferSeconds) };
+function normalValues(value: unknown): EditableScoutingValues {
+  return editableValues(value);
 }
 
-function superValues(value: unknown): EditableSuperValues {
+function superValues(value: unknown): EditableScoutingValues {
+  return editableValues(value);
+}
+
+function editableValues(value: unknown) {
   const record = objectValue(value);
-  return {
-    driveScore: numberValue(record.driveScore),
-    defenseScore: numberValue(record.defenseScore),
-    accuracy: numberValue(record.accuracy),
-    bps: numberValue(record.bps),
-  };
+  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, numberValue(item)]));
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

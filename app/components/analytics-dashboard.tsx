@@ -28,6 +28,7 @@ import {
   applyIgnoredMatchesToTeamData,
   matchIgnoreKey,
   reliability,
+  scoutingMatchStatus,
   sortedTeams,
   type ScoutingDataset,
   type ScoutingEventOption,
@@ -36,11 +37,13 @@ import {
   type TeamSummary,
 } from "../lib/scouting";
 import { buildTierAssignments, tierDisplayLabel, type TierInfo, type TierPercentages } from "../lib/tier-settings";
-import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } from "../lib/match-auto-routes";
+import { analyzeRouteRepetition, buildMatchAutoRoutes } from "../lib/match-auto-routes";
 import type { CombinedMatch } from "../lib/match-analysis";
 import type { DataRange } from "../lib/data-range";
 import { dashboardResourcePath } from "../lib/dashboard-performance";
 import type { PicklistResource } from "../lib/picklist";
+import { formatSeasonMetric, seasonConfig } from "../season/config";
+import { autoRouteField } from "../season/fields";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
@@ -70,7 +73,6 @@ export function AnalyticsDashboard({
   matchSchedule,
   strategyProposal,
   scoutingLead,
-  demo,
 }: {
   dataset: ScoutingDataset;
   events: ScoutingEventOption[];
@@ -82,7 +84,6 @@ export function AnalyticsDashboard({
   matchSchedule: CombinedMatch[];
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
   scoutingLead: ScoutingLeadPanelData | null;
-  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[] };
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -114,21 +115,15 @@ export function AnalyticsDashboard({
   const detail = detailTeam ? analysisTeamData[detailTeam] : null;
   const detailOriginal = detailTeam ? dataset.teamData[detailTeam] : null;
   const resolvedEventKey = selectedEventKey ?? dataset.eventKey;
-  const demoMode = Boolean(demo);
-  const routeBase = demo?.routeBase ?? "/";
-  const canViewLead = isAdmin || demoMode;
-  const canViewSettings = isAdmin || demoMode;
+  const canViewLead = isAdmin;
+  const canViewSettings = isAdmin;
   const activeTab = (tab === "lead" && !canViewLead) || (tab === "settings" && !canViewSettings) ? "browser" : tab;
   const showMatchTypes = dataRange.length > 1;
   const fetchedMatchSchedule = matchScheduleFetcher.data?.eventKey === resolvedEventKey ? matchScheduleFetcher.data.matches : null;
   const fetchedStrategyProposal = strategyProposalFetcher.data?.selectedEventKey === resolvedEventKey ? strategyProposalFetcher.data : null;
-  const resolvedStrategyProposal = demoMode || strategyProposal.loaded ? strategyProposal : fetchedStrategyProposal;
-  const resolvedScoutingLead = demoMode
-    ? scoutingLead
-    : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
-  const resolvedPicklists: PicklistResource | null = demoMode
-    ? { selectedEventKey: resolvedEventKey, isAdmin: true, userOpenId: user.feishuOpenId, lists: [], error: null }
-    : picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
+  const resolvedStrategyProposal = strategyProposal.loaded ? strategyProposal : fetchedStrategyProposal;
+  const resolvedScoutingLead = scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : scoutingLead;
+  const resolvedPicklists: PicklistResource | null = picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
 
   const prepareTab = useCallback((next: Tab) => {
     if (next === "match") void loadMatchAnalysis();
@@ -136,8 +131,6 @@ export function AnalyticsDashboard({
     if (next === "lead") void loadScoutingLeadPanel();
     if (next === "settings") void loadStrategySettingsPanel();
     if (next === "picklist") void loadPicklistWorkspace();
-    if (demoMode) return;
-
     if (next === "match" && matchScheduleFetcher.state === "idle" && matchScheduleFetcher.data?.eventKey !== resolvedEventKey) {
       matchScheduleFetcher.load(dashboardResourcePath("match", resolvedEventKey));
     }
@@ -151,7 +144,6 @@ export function AnalyticsDashboard({
       picklistFetcher.load(dashboardResourcePath("picklist", resolvedEventKey));
     }
   }, [
-    demoMode,
     isAdmin,
     matchScheduleFetcher,
     picklistFetcher,
@@ -165,7 +157,6 @@ export function AnalyticsDashboard({
   }, []);
 
   useEffect(() => {
-    if (demoMode) return;
     if (!isAdmin) return;
     const params = new URLSearchParams(window.location.search);
     const eventFromUrl = params.get("event")?.trim();
@@ -183,15 +174,15 @@ export function AnalyticsDashboard({
     }
 
     params.set("event", storedEvent);
-    navigate(`${routeBase}?${params.toString()}`, { replace: true });
-  }, [demoMode, events, isAdmin, navigate, routeBase]);
+    navigate(`/?${params.toString()}`, { replace: true });
+  }, [events, isAdmin, navigate]);
 
   useEffect(() => {
     prepareTab(activeTab);
   }, [activeTab, prepareTab]);
 
   function selectEvent(eventKey: string) {
-    if (demoMode || !isAdmin) return;
+    if (!isAdmin) return;
     const params = new URLSearchParams(window.location.search);
     if (eventKey) {
       storeSelectedEvent(eventKey);
@@ -201,7 +192,7 @@ export function AnalyticsDashboard({
       params.delete("event");
     }
     const search = params.toString();
-    navigate(search ? `${routeBase}?${search}` : routeBase);
+    navigate(search ? `/?${search}` : "/");
   }
 
   function selectTab(next: Tab) {
@@ -214,7 +205,7 @@ export function AnalyticsDashboard({
     if (next !== "proposal") params.delete("proposal");
     if (next !== "lead") params.delete("view");
     const search = params.toString();
-    const path = search ? `${routeBase}?${search}` : routeBase;
+    const path = search ? `/?${search}` : "/";
     window.history.replaceState(null, "", path);
   }
 
@@ -352,7 +343,7 @@ export function AnalyticsDashboard({
               ignoredMatchKeys={ignoredMatchSet}
               onToggleIgnoreMatch={toggleIgnoredMatch}
               onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
-              hideComments={demoMode}
+              hideComments={false}
               showMatchTypes={showMatchTypes}
             />
           </div>
@@ -362,8 +353,8 @@ export function AnalyticsDashboard({
       {teams.length && activeTab === "compare" ? <CompareTeams teams={teams} /> : null}
       {visitedTabs.has("match") ? (
         <div hidden={activeTab !== "match"}>
-          {demoMode || fetchedMatchSchedule || matchSchedule.length ? (
-            <MatchAnalysis key={resolvedEventKey} eventKey={resolvedEventKey} schedule={demo?.matches ?? fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich={!demoMode} progressKey={`cyber-strategy:match-progress:${user.id}:${resolvedEventKey}`} onOpenTeam={setDetailTeam} canEditScouting={isAdmin && !demoMode} />
+          {fetchedMatchSchedule || matchSchedule.length ? (
+            <MatchAnalysis key={resolvedEventKey} eventKey={resolvedEventKey} schedule={fetchedMatchSchedule ?? matchSchedule} teamData={analysisTeamData} scoutingTeamData={dataset.teamData} enrich progressKey={`cyber-strategy:match-progress:${user.id}:${resolvedEventKey}`} onOpenTeam={setDetailTeam} canEditScouting={isAdmin} />
           ) : <TabLoading label="正在加载赛程数据" />}
         </div>
       ) : null}
@@ -378,7 +369,6 @@ export function AnalyticsDashboard({
               tierByTeam={tierByTeam}
               onOpenTeam={setDetailTeam}
               resource={resolvedPicklists}
-              demoMode={demoMode}
             />
           ) : <TabLoading label="正在加载 Picklist" />}
         </div>
@@ -395,9 +385,6 @@ export function AnalyticsDashboard({
                 ...resolvedStrategyProposal,
               }}
               initialSelectedId={searchParams.get("proposal")}
-              demoMode={demoMode}
-              ownTeams={demo?.ownTeams}
-              routeBase={routeBase}
             />
           ) : <TabLoading label="正在加载 Strategy Proposal" />}
         </div>
@@ -406,7 +393,7 @@ export function AnalyticsDashboard({
         <div className="min-h-0 flex-1" hidden={activeTab !== "lead"}>
           {activeTab === "lead" ? (
             resolvedScoutingLead
-              ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={demoMode} routeBase={routeBase} />
+              ? <ScoutingLeadPanel data={resolvedScoutingLead} readOnly={false} routeBase="/" />
               : <TabLoading label="正在加载 Scouting Lead" />
           ) : null}
         </div>
@@ -415,8 +402,8 @@ export function AnalyticsDashboard({
         <div hidden={activeTab !== "settings"}>
           <StrategySettingsPanel
             tierPercentages={tierPercentages}
-            dataRange={demo?.dataRange ?? dataRange}
-            readOnly={demoMode}
+            dataRange={dataRange}
+            readOnly={false}
             events={isAdmin ? events : []}
             selectedEventKey={resolvedEventKey}
             onSelectEvent={selectEvent}
@@ -435,7 +422,7 @@ export function AnalyticsDashboard({
           onToggleIgnoreMatch={toggleIgnoredMatch}
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
-          hideComments={demoMode}
+          hideComments={false}
           showMatchTypes={showMatchTypes}
         />
       ) : null}
@@ -501,6 +488,8 @@ export function TeamDetail({
     .map((match, originalIndex) => ({ match, originalIndex }))
     .sort((a, b) => compareTeamDetailMatches(a.match, b.match) || a.originalIndex - b.originalIndex);
   const trendText = team.trend === "up" ? "上升" : team.trend === "down" ? "下降" : "稳定";
+  const summaryMetrics = seasonConfig.metrics.filter((metric) => metric.summary);
+  const tableMetrics = seasonConfig.metrics.filter((metric) => metric.matchTable);
   return (
     <div className="min-w-0 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -515,8 +504,11 @@ export function TeamDetail({
         >
           {trendText}
         </Badge>
-        {pitInfo?.canCrossTrench ? <Badge className="border-info/40 bg-info/10 text-info">trench</Badge> : null}
-        {pitInfo?.isSwerve ? <Badge className="border-brand/40 bg-brand/10 text-brand">swerve</Badge> : null}
+        {pitInfo?.attributes.map((attribute) => (
+          <Badge key={attribute.key} className="border-line bg-surface-2 text-ink-dim">
+            {attribute.label}：{attribute.value}
+          </Badge>
+        ))}
         {pitInfo?.autoRoutes.length ? (
           <Button type="button" className="h-8 px-2" onClick={() => setRouteOpen(true)}>
             <MapIcon className="size-4" />
@@ -532,9 +524,9 @@ export function TeamDetail({
         <Stat label="平均综合分" value={team.avgTotal} />
         <Stat label="自动贡献" value={team.avgAuto} />
         <Stat label="手动贡献" value={team.avgTele} />
-        <Stat label="Transfer 球量" value={(team.avgTransferPieces ?? 0) > 0 ? team.avgTransferPieces : "-"} />
-        <Stat label="平均 BPS" value={(team.avgBps ?? 0) > 0 ? team.avgBps : "-"} />
-        <Stat label="命中率" value={team.avgAccuracy > 0 ? `${team.avgAccuracy}%` : "-"} />
+        {summaryMetrics.map((metric) => (
+          <Stat key={metric.key} label={metric.label} value={formatSeasonMetric(team.metrics[metric.key], metric)} />
+        ))}
         <Stat label="可靠性" value={`${reliability(team)}%`} />
         <Stat label="标准差" value={`±${team.stdDev}`} />
         <Stat label="综合分范围" value={`${team.minPts}–${team.maxPts}`} />
@@ -580,7 +572,7 @@ export function TeamDetail({
                 <div className="mt-2 flex flex-wrap gap-1 text-xs text-ink-dim">
                   {route.nodes.map((node, nodeIndex) => (
                     <span key={`${route.id}:${nodeIndex}`} className="rounded-full bg-surface-2 px-2 py-0.5">
-                      {nodeIndex + 1}. {MATCH_AUTO_NODE_LABELS[node] ?? node}
+                      {nodeIndex + 1}. {node}
                     </span>
                   ))}
                 </div>
@@ -644,10 +636,10 @@ export function TeamDetail({
                 <th className="px-3 py-2 text-left">综合分</th>
                 <th className="px-3 py-2 text-left">自动贡献</th>
                 <th className="px-3 py-2 text-left">手动贡献</th>
-                <th className="px-3 py-2 text-left">Transfer</th>
-                <th className="px-3 py-2 text-left">命中率</th>
+                {tableMetrics.map((metric) => <th key={metric.key} className="px-3 py-2 text-left">{metric.label}</th>)}
                 <th className="px-3 py-2 text-left">状态</th>
                 {!hideComments ? <th className="px-3 py-2 text-left">备注</th> : null}
+                {!hideComments ? <th className="px-3 py-2 text-left">记录员</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -680,17 +672,18 @@ export function TeamDetail({
                     </td>
                     <td className="px-3 py-2">{match.autoPts}</td>
                     <td className="px-3 py-2">{match.telePts}</td>
-                    <td className="px-3 py-2">{(match.transferPieces ?? 0) > 0 ? match.transferPieces : "-"}</td>
-                    <td className="px-3 py-2">{match.accuracy == null ? "-" : `${match.accuracy}%`}</td>
+                    {tableMetrics.map((metric) => (
+                      <td key={metric.key} className="px-3 py-2">{formatSeasonMetric(match.metrics[metric.key], metric)}</td>
+                    ))}
                     <td className="px-3 py-2">
                       <StatePill match={match} />
                     </td>
                     {!hideComments ? (
                       <td className="max-w-md px-3 py-2 text-ink-dim">
                         <p>{match.comment || "-"}</p>
-                        {match.scoutName ? <p className="mt-1 text-xs text-ink-faint">记录员：{match.scoutName}</p> : null}
                       </td>
                     ) : null}
+                    {!hideComments ? <td className="px-3 py-2 text-ink-dim">{match.scoutName || "-"}</td> : null}
                   </tr>
                 );
               })}
@@ -714,11 +707,11 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
     return team && teamSet.has(team) ? team : defaults[index] ?? "";
   });
   const compared = selectedTeams.map((team) => teams.find((item) => item.team === team)).filter(Boolean) as TeamSummary[];
-  const stabilityBaseline = nearestRankPercentile(teams.map((team) => team.avgTotal), 0.1);
-  const rankedRadarMetrics = rankRadarMetrics(teams.map((team) => radarMetrics(team, stabilityBaseline)));
+  const rankedRadarMetrics = rankRadarMetrics(teams.map(radarMetrics));
   const radarMetricsByTeam = new Map(teams.map((team, index) => [team.team, rankedRadarMetrics[index] ?? [0, 0, 0, 0, 0, 0]]));
   const regionRadarMetrics = averageRadarMetrics(rankedRadarMetrics);
   const comparedRadarMetrics = compared.map((team) => radarMetricsByTeam.get(team.team) ?? [0, 0, 0, 0, 0, 0]);
+  const compareMetrics = seasonConfig.metrics.filter((metric) => metric.compare);
 
   function setTeam(index: number, team: string) {
     setSelected((current) => [0, 1, 2].map((slot) => (slot === index ? team : current[slot] ?? defaults[slot] ?? "")));
@@ -761,14 +754,16 @@ function CompareTeams({ teams }: { teams: TeamSummary[] }) {
             buildConfig={(palette) => compareBarConfig(compared, palette)}
           />
         </Card>
-        <Card className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-ink-dim">Scout 命中率</h3>
-          <ChartCanvas
-            label="Scout 命中率对比"
-            configKey={`cmp-accuracy:${selectedTeams.join(",")}`}
-            buildConfig={(palette) => compareAccuracyConfig(compared, palette)}
-          />
-        </Card>
+        {compareMetrics.map((metric) => (
+          <Card key={metric.key} className="p-4">
+            <h3 className="mb-3 text-sm font-semibold text-ink-dim">{metric.label}</h3>
+            <ChartCanvas
+              label={`${metric.label}对比`}
+              configKey={`cmp-metric:${metric.key}:${selectedTeams.join(",")}`}
+              buildConfig={(palette) => compareMetricConfig(compared, metric.key, metric.label, palette)}
+            />
+          </Card>
+        ))}
         <Card className="p-4">
           <h3 className="mb-3 text-sm font-semibold text-ink-dim">能力雷达</h3>
           <ChartCanvas
@@ -989,9 +984,11 @@ function AutoRouteModal({ team, pitInfo, onClose }: { team: string; pitInfo: Tea
         </div>
         <div className="grid gap-3 overflow-y-auto p-3 md:p-4">
           <div className="flex flex-wrap gap-2 text-sm text-ink-dim">
-            {pitInfo.drivetrain ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.drivetrain}</Badge> : null}
-            {pitInfo.swerveModule ? <Badge className="border-line bg-surface-2 text-ink-dim">{pitInfo.swerveModule}</Badge> : null}
-            {pitInfo.canCrossTrench ? <Badge className="border-info/40 bg-info/10 text-info">trench</Badge> : null}
+            {pitInfo.attributes.map((attribute) => (
+              <Badge key={attribute.key} className="border-line bg-surface-2 text-ink-dim">
+                {attribute.label}：{attribute.value}
+              </Badge>
+            ))}
           </div>
           {pitInfo.autoRoutes.map((route, index) => (
             <div key={route.id} className="rounded-md border border-line bg-surface p-3">
@@ -1022,16 +1019,26 @@ function AutoRoutePreview({
   points: TeamPitInfo["autoRoutes"][number]["points"];
   showRepetition?: boolean;
 }) {
+  const field = autoRouteField();
   const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
   const repetition = analyzeRouteRepetition(points);
   const visits = showRepetition ? repetition.visits : repetition.visits.map((visit) => ({ ...visit, occurrence: 1, total: 1 }));
   const hasRepeatedVisits = repetition.visits.some((visit) => visit.total > 1);
   return (
     <div
-      className="relative aspect-[2/1] overflow-hidden rounded-md border border-line bg-surface-2"
+      className="relative overflow-hidden rounded-md border border-line bg-surface-2"
+      style={{
+        aspectRatio: field.aspectRatio,
+        backgroundImage: field.backgroundImage
+          ? undefined
+          : "linear-gradient(rgb(var(--line)) 1px, transparent 1px), linear-gradient(90deg, rgb(var(--line)) 1px, transparent 1px)",
+        backgroundSize: field.backgroundImage ? undefined : "10% 10%",
+      }}
       aria-label={showRepetition && hasRepeatedVisits ? "自动路线预览，含重复经过路线" : "自动路线预览"}
     >
-      <img src="/pit-field-map.webp" alt="" className="absolute inset-0 h-full w-full object-fill" />
+      {field.backgroundImage ? <img src={field.backgroundImage} alt="" className="absolute inset-0 h-full w-full object-fill" /> : (
+        <span className="absolute inset-0 grid place-items-center text-xs font-medium text-ink-faint">未配置年度场地图</span>
+      )}
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
         <polyline points={polyline} fill="none" stroke="rgb(var(--brand))" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         {showRepetition ? repetition.segments.map((segment) => (
@@ -1206,48 +1213,34 @@ function PointsBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-const INCAP_DISPLAY_THRESHOLD_MS = 20_000;
-
 function StatePill({ match }: { match: ScoutingMatch }) {
-  const displayBotState = displayedBotState(match);
+  const status = scoutingMatchStatus(match);
   const className =
-    displayBotState === 2
+    status === "comms_issue"
       ? "border-warn/40 bg-warn/10 text-warn"
-      : displayBotState === 3
+      : status === "minor_fault" || status === "incap"
         ? "border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-300"
-        : displayBotState === 4
+        : status === "major_fault" || status === "no_show"
           ? "border-danger/40 bg-danger/10 text-danger"
-          : "border-ok/40 bg-ok/10 text-ok";
+          : status === "unknown" ? "border-line bg-surface-2 text-ink-dim" : "border-ok/40 bg-ok/10 text-ok";
   return (
     <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold", className)}>
-      {botStateLabel(match)}
+      {robotStatusLabel(status)}
       {match.disabled ? <span className="text-danger">已禁用</span> : null}
     </span>
   );
 }
 
-function displayedBotState(match: ScoutingMatch) {
-  return isShortIncap(match) ? 1 : match.botState;
-}
-
-function botStateLabel(match: ScoutingMatch) {
-  if (isShortIncap(match)) return "正常";
-  const normalized = match.botStateText.trim().toLowerCase();
-  const byText: Record<string, string> = {
-    "no issue": "正常",
-    "comms issue": "通信问题",
-    "minor malfunction": "轻微故障",
-    "major malfunction": "严重故障",
-    "no show": "未到场",
+function robotStatusLabel(status: ScoutingMatch["status"]) {
+  return {
+    normal: "正常",
+    comms_issue: "通信问题",
+    minor_fault: "轻微故障",
+    major_fault: "严重故障",
+    no_show: "未到场",
     incap: "宕机",
     unknown: "未知",
-  };
-  if (byText[normalized]) return byText[normalized];
-  return { 1: "正常", 2: "通信问题", 3: "轻微故障", 4: "严重故障" }[displayedBotState(match)] ?? match.botStateText;
-}
-
-function isShortIncap(match: ScoutingMatch) {
-  return match.botStateText.trim().toLowerCase() === "incap" && (match.downtimeMs ?? 0) <= INCAP_DISPLAY_THRESHOLD_MS;
+  }[status];
 }
 
 function useStoredList(key: string) {
@@ -1326,7 +1319,9 @@ function teamLineConfig(matches: ScoutingMatch[], palette: { accent: string; mut
           borderColor: palette.accent,
           backgroundColor: `${palette.accent}18`,
           pointBackgroundColor: matches.map((match) =>
-            match.botState === 4 ? "#dc2626" : match.botState === 2 ? "#f97316" : palette.accent,
+            ["major_fault", "no_show"].includes(scoutingMatchStatus(match))
+              ? "#dc2626"
+              : scoutingMatchStatus(match) === "comms_issue" ? "#f97316" : palette.accent,
           ),
           pointRadius: 5,
           borderWidth: 2,
@@ -1418,12 +1413,12 @@ function compareBarConfig(teams: TeamSummary[], palette: ChartPaletteLike): Char
   } as ChartConfiguration;
 }
 
-function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike): ChartConfiguration {
+function compareMetricConfig(teams: TeamSummary[], metricKey: string, label: string, palette: ChartPaletteLike): ChartConfiguration {
   return {
     type: "bar",
     data: {
       labels: teams.map((team) => `Team ${team.team}`),
-      datasets: [{ label: "Scout 命中率 %", data: teams.map((team) => team.avgAccuracy), backgroundColor: teams.map((_, index) => palette.colors[index]) }],
+      datasets: [{ label, data: teams.map((team) => team.metrics[metricKey] ?? 0), backgroundColor: teams.map((_, index) => palette.colors[index]) }],
     },
     options: {
       indexAxis: "y",
@@ -1431,15 +1426,15 @@ function compareAccuracyConfig(teams: TeamSummary[], palette: ChartPaletteLike):
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: tooltipOptions(palette) },
       scales: {
-        x: { ticks: { color: palette.muted, callback: (value) => `${value}%` }, grid: { color: palette.grid }, min: 0, max: 101 },
+        x: { ticks: { color: palette.muted }, grid: { color: palette.grid }, beginAtZero: true },
         y: { ticks: { color: palette.muted }, grid: { color: palette.grid } },
       },
     },
   } as ChartConfiguration;
 }
 
-function radarMetrics(team: TeamSummary, stabilityBaseline: number) {
-  return [team.avgDriver, defenceScore(team), team.avgFuel, team.avgAccuracy, reliability(team), -relativeScoreVariation(team.stdDev, team.avgTotal, stabilityBaseline)];
+function radarMetrics(team: TeamSummary) {
+  return [team.avgTotal, team.avgAuto, team.avgTele, team.avgDriver, defenceScore(team), reliability(team)];
 }
 
 export function nearestRankPercentile(values: number[], percentile: number) {
@@ -1473,7 +1468,7 @@ function compareRadarConfig(teams: TeamSummary[], teamMetrics: number[][], regio
   return {
     type: "radar",
     data: {
-      labels: ["Drive score", "Defence score", "BPS", "命中率", "可靠性", "稳定性"],
+      labels: ["综合分", "Auto", "Tele", "Drive score", "Defence score", "可靠性"],
       datasets: [
         ...teams.map((team, index) => ({
           label: `Team ${team.team}`,

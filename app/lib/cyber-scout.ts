@@ -1,16 +1,28 @@
 import {
   summarizeTeamMatches,
-  type MatchAutoPathPoint,
   type ScoutingDataset,
   type ScoutingMatch,
   type TeamPitData,
   type TeamData,
   type TeamPhotos,
 } from "./scouting";
-import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, matchTypeFromValue, type DataRange } from "./data-range";
+import { DEFAULT_DATA_RANGE, matchTypeFromTbaCompLevel, type DataRange } from "./data-range";
 import type { MatchResult } from "./match-analysis";
 import type { TbaMatch } from "./tba.server";
-import { normalTimeOverride } from "./editable-scouting";
+import { extractTbaPeriodScores } from "../season/scoring";
+import {
+  mergeSeasonNormalRecords,
+  parseSeasonNormalRecord,
+  parseSeasonPitRecord,
+  parseSeasonSuperRecords,
+  seasonPitInfo,
+  seasonScoreWeights,
+  toSeasonScoutingMatch,
+  type SeasonNormalRecord,
+  type SeasonPitRecord,
+  type SeasonSuperRecord,
+  type SeasonTeamScore,
+} from "../season/scouting";
 
 export type CyberScoutEventRow = {
   id: string;
@@ -36,64 +48,6 @@ export type CyberScoutRecordRow = {
   created_at: string | null;
 };
 
-type NormalRecord = {
-  team: string;
-  match: number;
-  matchType: DataRange;
-  tbaMatchKey: string | null;
-  scoutName: string;
-  startPos: string;
-  alliance: string;
-  fieldSideFlipped: boolean;
-  autoPath: MatchAutoPathPoint[];
-  noShow: boolean;
-  climbPosition: string;
-  climbFailed: boolean;
-  incapMs: number;
-  shootingMs: number;
-  transferShootingMs: number;
-  normalRecordCount: number;
-  shootingMsTotal: number;
-  transferShootingMsTotal: number;
-  sourceAt: number;
-};
-
-type SuperRecord = {
-  team: string;
-  teams: string[];
-  alliance: "red" | "blue" | null;
-  match: number;
-  matchType: DataRange;
-  tbaMatchKey: string | null;
-  autoScore: number | null;
-  teleopScore: number | null;
-  scoutName: string;
-  auto: number;
-  drive: number;
-  defense: number;
-  bps: number;
-  accuracy: number | null;
-  comment: string;
-  sourceAt: number;
-};
-
-type PitRecord = {
-  team: string;
-  photoPaths: string[];
-  canCrossTrench: boolean;
-  isSwerve: boolean;
-  drivetrain: string;
-  swerveModule: string;
-  autoRoutes: Array<{ id: string; points: Array<{ x: number; y: number }> }>;
-  sourceAt: number;
-};
-
-type TeamScore = {
-  autoPts: number;
-  teleGamePiecePts: number;
-  source: "frc-events" | "tba" | "super-scout" | "zero";
-};
-
 type ScoredDataset = ScoutingDataset & {
   scoringOfficialMatches: number;
   scoringFallbackMatches: number;
@@ -113,9 +67,9 @@ export function buildCyberScoutDataset({
   tbaMatches?: TbaMatch[];
   includedMatchTypes?: DataRange[];
 }): ScoredDataset {
-  const normalByTeamMatch = new Map<string, NormalRecord>();
-  const superByTeamMatch = new Map<string, SuperRecord>();
-  const pitByTeam = new Map<string, PitRecord>();
+  const normalByTeamMatch = new Map<string, SeasonNormalRecord>();
+  const superByTeamMatch = new Map<string, SeasonSuperRecord>();
+  const pitByTeam = new Map<string, SeasonPitRecord>();
   const includedTypes = new Set(includedMatchTypes);
 
   for (const row of records) {
@@ -141,11 +95,11 @@ export function buildCyberScoutDataset({
 
     if (teamScore?.source === "frc-events") scoringOfficialMatches += 1;
     if (teamScore?.source === "super-scout") scoringFallbackMatches += 1;
-    const scoutingMatch = toScoutingMatch({
+    const scoutingMatch = toSeasonScoutingMatch({
       normal,
       superRecord,
       match,
-      teamScore: teamScore ?? { autoPts: 0, teleGamePiecePts: 0, source: "zero" },
+      teamScore: teamScore ?? { autoPts: 0, telePts: 0, source: "zero" },
     });
     matchesByTeam.set(team, [...(matchesByTeam.get(team) ?? []), scoutingMatch]);
   }
@@ -177,14 +131,13 @@ export function buildSuperScoutMatchResults(records: CyberScoutRecordRow[]): Mat
   const latestByAlliance = new Map<string, { result: MatchResult; alliance: "red" | "blue"; score: number; sourceAt: number }>();
   for (const row of records) {
     if (row.record_type !== "super_match") continue;
-    const payload = objectPayload(row.payload);
-    const autoScore = finiteOrNull(payload.autoScore ?? payload.asc);
-    const teleopScore = finiteOrNull(payload.teleopScore ?? payload.tsc);
-    const alliance = allianceValue(row.alliance ?? payload.alliance ?? payload.al);
-    const identity = resultMatchIdentity(row, payload);
+    const record = parseSeasonSuperRecords(row)[0];
+    if (!record) continue;
+    const { autoScore, teleopScore, alliance } = record;
+    const identity = seasonResultMatchIdentity(record);
     if (autoScore == null || teleopScore == null || !alliance || !identity) continue;
     const key = `${identity.comp_level}:${identity.set_number ?? 0}:${identity.match_number}:${alliance}`;
-    const sourceAt = rowTimestamp(row);
+    const sourceAt = record.sourceAt;
     if ((latestByAlliance.get(key)?.sourceAt ?? -1) > sourceAt) continue;
     latestByAlliance.set(key, {
       result: { source: "super-scout", ...identity, alliances: {} },
@@ -214,155 +167,27 @@ export function isSafeCyberScoutPhotoPath(path: string): boolean {
   return /\.(?:jpe?g|png|webp)$/i.test(path);
 }
 
-function addNormalRecord(map: Map<string, NormalRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
-  const payload = objectPayload(row.payload);
-  const team = positiveId(row.team_number) ?? positiveId(payload.teamNumber);
-  const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
-  if (!team || !match) return;
-  const matchType = recordMatchType(row, payload);
-  if (!includedMatchTypes.has(matchType)) return;
-  const shotTimes = manualShotTimes(payload);
-  const tbaMatchKey = recordTbaMatchKey(payload);
-
-  const record: NormalRecord = {
-    team,
-    match,
-    matchType,
-    tbaMatchKey,
-    scoutName: stringValue(payload.scout),
-    startPos: stringValue(payload.startPosition ?? payload.sp),
-    alliance: stringValue(payload.alliance ?? payload.al ?? row.alliance),
-    fieldSideFlipped: booleanValue(payload.fieldSideFlipped ?? payload.ff),
-    autoPath: autoPathArray(payload.autoPath ?? payload.ap),
-    noShow: booleanValue(payload.noShow),
-    climbPosition: stringValue(payload.climbPosition),
-    climbFailed: booleanValue(payload.climbFailed),
-    incapMs: timedPeriodsMs(payload.incapPeriods ?? payload.ip),
-    shootingMs: shotTimes.scoringMs,
-    transferShootingMs: shotTimes.transferMs,
-    normalRecordCount: 1,
-    shootingMsTotal: shotTimes.scoringMs,
-    transferShootingMsTotal: shotTimes.transferMs,
-    sourceAt: rowTimestamp(row),
-  };
-  upsertNormalRecord(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
+function addNormalRecord(map: Map<string, SeasonNormalRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
+  const record = parseSeasonNormalRecord(row);
+  if (!record || !includedMatchTypes.has(record.matchType)) return;
+  const key = teamMatchKey(record.team, record.matchType, record.match, record.tbaMatchKey);
+  const current = map.get(key);
+  map.set(key, current ? mergeSeasonNormalRecords(current, record) : record);
 }
 
-function addSuperRecord(map: Map<string, SuperRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
-  const payload = objectPayload(row.payload);
-  const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber);
-  const teams = arrayValue(payload.teams);
-  if (!match || !teams.length) return;
-  const matchType = recordMatchType(row, payload);
-  if (!includedMatchTypes.has(matchType)) return;
-  const tbaMatchKey = recordTbaMatchKey(payload);
-  const teamNumbers = teams.map(positiveId).filter((team): team is string => Boolean(team));
-  const alliance = allianceValue(row.alliance ?? payload.alliance ?? payload.al);
-  const autoScore = finiteOrNull(payload.autoScore ?? payload.asc);
-  const teleopScore = finiteOrNull(payload.teleopScore ?? payload.tsc);
-
-  teams.forEach((teamValue, index) => {
-    const team = positiveId(teamValue);
-    if (!team) return;
-    const record: SuperRecord = {
-      team,
-      teams: teamNumbers,
-      alliance,
-      match,
-      matchType,
-      tbaMatchKey,
-      autoScore,
-      teleopScore,
-      scoutName: stringValue(payload.scout),
-      auto: numberAt(payload.auto, index),
-      drive: numberAt(payload.drive, index),
-      defense: numberAt(payload.defense, index),
-      bps: numberAt(payload.bps, index),
-      accuracy: nullableNumberAt(payload.accuracy, index),
-      comment: stringAt(payload.comments, index),
-      sourceAt: rowTimestamp(row),
-    };
-    upsertLatest(map, teamMatchKey(team, matchType, match, tbaMatchKey), record);
-  });
+function addSuperRecord(map: Map<string, SeasonSuperRecord>, row: CyberScoutRecordRow, includedMatchTypes: Set<DataRange>) {
+  for (const record of parseSeasonSuperRecords(row)) {
+    if (!includedMatchTypes.has(record.matchType)) continue;
+    upsertLatest(map, teamMatchKey(record.team, record.matchType, record.match, record.tbaMatchKey), record);
+  }
 }
 
-function addPitRecord(map: Map<string, PitRecord>, row: CyberScoutRecordRow) {
-  const payload = objectPayload(row.payload);
-  const team = positiveId(row.team_number) ?? positiveId(payload.teamNumber);
-  if (!team) return;
-
-  const photoPaths = arrayValue(payload.photoPaths).filter((value): value is string =>
-    typeof value === "string" && isSafeCyberScoutPhotoPath(value),
-  );
-  const drivetrain = drivetrainValue(payload.drivetrain ?? payload.dt);
-  const autoRoutes = autoRouteArray(payload.autoRoutes ?? payload.ar);
-  const record = {
-    team,
-    photoPaths,
-    canCrossTrench: booleanValue(payload.canCrossTrench ?? payload.ct),
-    isSwerve: drivetrain === "Swerve",
-    drivetrain,
-    swerveModule: stringValue(payload.swerveModule ?? payload.sm),
-    autoRoutes,
-    sourceAt: rowTimestamp(row),
-  };
-  if (!photoPaths.length && !record.drivetrain && !record.canCrossTrench && !record.autoRoutes.length) return;
-
-  upsertLatest(map, team, record);
-}
-
-function toScoutingMatch({
-  normal,
-  superRecord,
-  match,
-  teamScore,
-}: {
-  normal?: NormalRecord;
-  superRecord?: SuperRecord;
-  match: number;
-  teamScore: TeamScore;
-}): ScoutingMatch {
-  const noShow = normal?.noShow ?? false;
-  const climbPts = normal?.climbPosition && !normal.climbFailed ? 5 : 0;
-  const autoScore = noShow ? 0 : round1(teamScore.autoPts);
-  const teleScore = noShow ? 0 : round1(teamScore.teleGamePiecePts + climbPts);
-  const transferPieces = noShow ? 0 : predictedTransferPieces(normal, superRecord);
-  const totalScore = noShow ? 0 : round1(autoScore + teleScore);
-  const scoutingPts = noShow ? 0 : round1(teamScore.autoPts + predictedGamePieces(normal, superRecord) + climbPts);
-  const safeAuto = Math.min(autoScore, totalScore);
-  const accuracy = noShow ? null : normalizeAccuracy(superRecord?.accuracy);
-  const disabled = noShow;
-  const botState = noShow ? 4 : (normal?.incapMs ?? 0) > 0 ? 3 : 1;
-
-  return {
-    match,
-    matchType: normal?.matchType ?? superRecord?.matchType,
-    scoutingPts,
-    totalPts: totalScore,
-    autoPts: round1(safeAuto),
-    telePts: round1(Math.max(0, totalScore - safeAuto)),
-    transferPieces,
-    bps: clamp(superRecord?.bps ?? 0, 0, 35),
-    hubSuccess: accuracy ?? 0,
-    hubFail: accuracy == null ? 0 : round1(100 - accuracy),
-    accuracy,
-    climbPts,
-    botState,
-    botStateText: noShow ? "No Show" : botState === 3 ? "Incap" : "No Issue",
-    disabled,
-    downtimeMs: normal?.incapMs ?? 0,
-    driverRating: clamp(superRecord?.drive ?? 0, 0, 5),
-    fuelRating: round1((clamp(superRecord?.bps ?? 0, 0, 35) / 35) * 5),
-    defenseRating: clamp(superRecord?.defense ?? 0, 0, 5),
-    comment: buildComment(normal, superRecord),
-    startPos: normal?.startPos ?? "",
-    scoutName: superRecord?.scoutName || normal?.scoutName || "",
-    autoScoutName: normal?.scoutName || undefined,
-    autoPath: normal?.autoPath.length ? normal.autoPath : undefined,
-    autoStartPosition: normal?.startPos || undefined,
-    autoAlliance: normal?.alliance || undefined,
-    autoFieldSideFlipped: normal ? normal.fieldSideFlipped : undefined,
-  };
+function addPitRecord(map: Map<string, SeasonPitRecord>, row: CyberScoutRecordRow) {
+  const parsed = parseSeasonPitRecord(row);
+  if (!parsed) return;
+  const record = { ...parsed, photoPaths: parsed.photoPaths.filter(isSafeCyberScoutPhotoPath) };
+  if (!record.photoPaths.length && !record.attributes.length && !record.autoRoutes.length) return;
+  upsertLatest(map, record.team, record);
 }
 
 function buildTeamScores({
@@ -374,10 +199,10 @@ function buildTeamScores({
 }: {
   officialResults: MatchResult[];
   tbaMatches: TbaMatch[];
-  normalByTeamMatch: Map<string, NormalRecord>;
-  superByTeamMatch: Map<string, SuperRecord>;
+  normalByTeamMatch: Map<string, SeasonNormalRecord>;
+  superByTeamMatch: Map<string, SeasonSuperRecord>;
   includedMatchTypes: Set<DataRange>;
-}): Map<string, TeamScore> {
+}): Map<string, SeasonTeamScore> {
   const scores = buildSuperScoutTeamScores(normalByTeamMatch, superByTeamMatch);
   for (const match of tbaMatches) {
     const matchType = matchTypeFromTbaCompLevel(match.comp_level);
@@ -390,29 +215,28 @@ function buildTeamScores({
     for (const alliance of ["red", "blue"] as const) {
       const teams = teamNumbers(match.alliances?.[alliance]?.team_keys);
       const breakdown = objectPayload(match.score_breakdown?.[alliance]);
-      const autoTotal = tbaAutoPoints(breakdown);
-      const teleGamePieceTotal = tbaTeleGamePiecePoints(breakdown);
-      if (!teams.length || (autoTotal == null && teleGamePieceTotal == null)) continue;
+      const { autoPoints: autoTotal, teleopPoints: teleTotal } = extractTbaPeriodScores(breakdown);
+      if (!teams.length || autoTotal == null || teleTotal == null) continue;
 
       const rows = teams.map((team) => {
         const key = teamMatchKey(team, matchType, matchNumber, matchType === "playoff" ? tbaKey : null);
         const normal = normalByTeamMatch.get(key);
         const superRecord = superByTeamMatch.get(key);
-        const noShow = normal?.noShow ?? false;
+        const weights = seasonScoreWeights(normal, superRecord);
         return {
           key,
-          autoWeight: noShow ? 0 : clamp(superRecord?.auto ?? 0, 0, 100),
-          teleWeight: noShow ? 0 : predictedGamePieces(normal, superRecord),
+          autoWeight: weights.auto,
+          teleWeight: weights.tele,
         };
       });
       const autoAllocations = allocateByWeight(autoTotal, rows.map((row) => row.autoWeight));
-      const teleAllocations = allocateByWeight(teleGamePieceTotal, rows.map((row) => row.teleWeight));
+      const teleAllocations = allocateByWeight(teleTotal, rows.map((row) => row.teleWeight));
 
       rows.forEach((row, index) => {
         const autoPts = autoAllocations[index];
-        const teleGamePiecePts = teleAllocations[index];
-        if (autoPts != null && teleGamePiecePts != null) {
-          scores.set(row.key, { autoPts, teleGamePiecePts, source: "tba" });
+        const telePts = teleAllocations[index];
+        if (autoPts != null && telePts != null) {
+          scores.set(row.key, { autoPts, telePts, source: "tba" });
         }
       });
     }
@@ -435,23 +259,23 @@ function buildTeamScores({
         const record = normal ?? superRecord;
         const recordAlliance = allianceValue(superRecord?.alliance ?? normal?.alliance);
         if (!record || record.matchType !== matchType || record.match !== matchNumber || recordAlliance !== alliance) return [];
-        const noShow = normal?.noShow ?? false;
+        const weights = seasonScoreWeights(normal, superRecord);
         return [{
           key,
-          noShow,
-          autoWeight: noShow ? 0 : clamp(superRecord?.auto ?? 0, 0, 100),
-          teleWeight: noShow ? 0 : predictedGamePieces(normal, superRecord),
+          active: !normal?.noShow,
+          autoWeight: weights.auto,
+          teleWeight: weights.tele,
         }];
       });
-      const activeWeights = rows.map((row) => row.noShow ? 0 : 1);
+      const activeWeights = rows.map((row) => row.active ? 1 : 0);
       const autoWeights = rows.map((row) => row.autoWeight);
       const teleWeights = rows.map((row) => row.teleWeight);
       const autoAllocations = allocateByWeight(autoTotal, autoWeights.some((weight) => weight > 0) ? autoWeights : activeWeights);
       const teleAllocations = allocateByWeight(teleTotal, teleWeights.some((weight) => weight > 0) ? teleWeights : activeWeights);
       rows.forEach((row, index) => {
         const autoPts = autoAllocations[index];
-        const teleGamePiecePts = teleAllocations[index];
-        if (autoPts != null && teleGamePiecePts != null) scores.set(row.key, { autoPts, teleGamePiecePts, source: "frc-events" });
+        const telePts = teleAllocations[index];
+        if (autoPts != null && telePts != null) scores.set(row.key, { autoPts, telePts, source: "frc-events" });
       });
     }
   }
@@ -459,10 +283,10 @@ function buildTeamScores({
 }
 
 function buildSuperScoutTeamScores(
-  normalByTeamMatch: Map<string, NormalRecord>,
-  superByTeamMatch: Map<string, SuperRecord>,
-): Map<string, TeamScore> {
-  const scores = new Map<string, TeamScore>();
+  normalByTeamMatch: Map<string, SeasonNormalRecord>,
+  superByTeamMatch: Map<string, SeasonSuperRecord>,
+): Map<string, SeasonTeamScore> {
+  const scores = new Map<string, SeasonTeamScore>();
   const processed = new Set<string>();
   for (const superRecord of superByTeamMatch.values()) {
     if (superRecord.autoScore == null || superRecord.teleopScore == null || !superRecord.teams.length) continue;
@@ -474,15 +298,15 @@ function buildSuperScoutTeamScores(
       const key = teamMatchKey(team, superRecord.matchType, superRecord.match, superRecord.tbaMatchKey);
       const normal = normalByTeamMatch.get(key);
       const teamSuperRecord = superByTeamMatch.get(key);
-      const noShow = normal?.noShow ?? false;
+      const weights = seasonScoreWeights(normal, teamSuperRecord);
       return {
         key,
-        noShow,
-        autoWeight: noShow ? 0 : clamp(teamSuperRecord?.auto ?? 0, 0, 100),
-        teleWeight: noShow ? 0 : predictedGamePieces(normal, teamSuperRecord),
+        active: !normal?.noShow,
+        autoWeight: weights.auto,
+        teleWeight: weights.tele,
       };
     });
-    const activeWeights = rows.map((row) => row.noShow ? 0 : 1);
+    const activeWeights = rows.map((row) => row.active ? 1 : 0);
     const autoWeights = rows.map((row) => row.autoWeight);
     const teleWeights = rows.map((row) => row.teleWeight);
     const autoAllocations = allocateByWeight(superRecord.autoScore, autoWeights.some((weight) => weight > 0) ? autoWeights : activeWeights);
@@ -490,74 +314,13 @@ function buildSuperScoutTeamScores(
 
     rows.forEach((row, index) => {
       const autoPts = autoAllocations[index];
-      const teleGamePiecePts = teleAllocations[index];
-      if (autoPts != null && teleGamePiecePts != null) {
-        scores.set(row.key, { autoPts, teleGamePiecePts, source: "super-scout" });
+      const telePts = teleAllocations[index];
+      if (autoPts != null && telePts != null) {
+        scores.set(row.key, { autoPts, telePts, source: "super-scout" });
       }
     });
   }
   return scores;
-}
-
-function predictedGamePieces(normal?: NormalRecord, superRecord?: SuperRecord) {
-  const shootingSeconds = Math.max(0, normal?.shootingMs ?? 0) / 1000;
-  const accuracy = clamp(superRecord?.accuracy ?? 0, 0, 100) / 100;
-  return clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds * accuracy;
-}
-
-function predictedTransferPieces(normal?: NormalRecord, superRecord?: SuperRecord) {
-  const shootingSeconds = Math.max(0, normal?.transferShootingMs ?? 0) / 1000;
-  return round1(clamp(superRecord?.bps ?? 0, 0, 35) * shootingSeconds);
-}
-
-function manualShotTimes(payload: Record<string, unknown>) {
-  const override = normalTimeOverride(payload);
-  if (override) return { scoringMs: override.shootingMs, transferMs: override.transferShootingMs };
-  const shots = [...timedPeriods(payload.manualShotWhileIntaking ?? payload.wi), ...timedPeriods(payload.manualShotDirect ?? payload.sd)];
-  const zones = manualZoneIntervals(payload);
-  let scoringMs = 0;
-  let transferMs = 0;
-
-  for (const shot of shots) {
-    for (const zone of zones) {
-      const overlap = Math.max(0, Math.min(shot.endMs, zone.endMs) - Math.max(shot.startMs, zone.startMs));
-      if (!overlap) continue;
-      if (zone.kind === "alliance") scoringMs += overlap;
-      if (zone.kind === "transfer") transferMs += overlap;
-    }
-  }
-
-  return { scoringMs, transferMs };
-}
-
-function manualZoneIntervals(payload: Record<string, unknown>) {
-  const events = arrayValue(payload.manualZoneEvents ?? payload.me)
-    .map((event) => {
-      const item = objectPayload(event);
-      const atMs = numberValue(item.atMs ?? item.a, Number.NaN);
-      const kind = zoneKind(item.zone);
-      return Number.isFinite(atMs) && kind ? { atMs, kind } : null;
-    })
-    .filter((event): event is { atMs: number; kind: "alliance" | "transfer" } => Boolean(event))
-    .sort((a, b) => a.atMs - b.atMs);
-
-  if (!events.length) {
-    const kind = zoneKind(payload.manualZone ?? payload.mz ?? payload.finalZone ?? payload.fz);
-    return kind ? [{ startMs: 0, endMs: Number.POSITIVE_INFINITY, kind }] : [];
-  }
-
-  return events.map((event, index) => ({
-    startMs: event.atMs,
-    endMs: events[index + 1]?.atMs ?? Number.POSITIVE_INFINITY,
-    kind: event.kind,
-  }));
-}
-
-function zoneKind(value: unknown): "alliance" | "transfer" | null {
-  const zone = stringValue(value).toLowerCase();
-  if (zone === "联盟" || zone === "alliance" || zone === "a") return "alliance";
-  if (zone === "中立" || zone === "对方" || zone === "neutral" || zone === "opponent" || zone === "n" || zone === "o") return "transfer";
-  return null;
 }
 
 function allocateByWeight(total: number | null, weights: number[]) {
@@ -577,14 +340,6 @@ function allocateByWeight(total: number | null, weights: number[]) {
   });
 }
 
-function tbaAutoPoints(breakdown: Record<string, unknown>) {
-  return finiteOrNull(objectPayload(breakdown.hubScore).autoPoints);
-}
-
-function tbaTeleGamePiecePoints(breakdown: Record<string, unknown>) {
-  return finiteOrNull(objectPayload(breakdown.hubScore).teleopPoints);
-}
-
 function finiteOrNull(value: unknown) {
   const parsed = numberValue(value, Number.NaN);
   return Number.isFinite(parsed) ? parsed : null;
@@ -594,17 +349,7 @@ function teamNumbers(values: Array<string | number> | undefined) {
   return (values ?? []).map((team) => String(team).replace(/^frc/, ""));
 }
 
-function buildComment(normal?: NormalRecord, superRecord?: SuperRecord) {
-  const values = [
-    superRecord?.comment,
-    normal?.noShow ? "No show" : "",
-    normal && normal.incapMs > 0 ? `Incap ${(normal.incapMs / 1000).toFixed(1)}s` : "",
-    normal?.climbFailed ? "Climb failed" : "",
-  ].filter(Boolean);
-  return values.join(" · ");
-}
-
-function buildTeamPhotos(pitByTeam: Map<string, PitRecord>): TeamPhotos {
+function buildTeamPhotos(pitByTeam: Map<string, SeasonPitRecord>): TeamPhotos {
   const photos: TeamPhotos = {};
   for (const [team, record] of pitByTeam.entries()) {
     photos[team] = record.photoPaths.map((path) => `/api/cyber-scout/photos?path=${encodeURIComponent(path)}`);
@@ -612,16 +357,10 @@ function buildTeamPhotos(pitByTeam: Map<string, PitRecord>): TeamPhotos {
   return photos;
 }
 
-function buildTeamPitData(pitByTeam: Map<string, PitRecord>): TeamPitData {
+function buildTeamPitData(pitByTeam: Map<string, SeasonPitRecord>): TeamPitData {
   const pitData: TeamPitData = {};
   for (const [team, record] of pitByTeam.entries()) {
-    pitData[team] = {
-      canCrossTrench: record.canCrossTrench,
-      isSwerve: record.isSwerve,
-      drivetrain: record.drivetrain,
-      swerveModule: record.swerveModule,
-      autoRoutes: record.autoRoutes,
-    };
+    pitData[team] = seasonPitInfo(record);
   }
   return pitData;
 }
@@ -639,47 +378,14 @@ function upsertLatest<T extends { sourceAt: number }>(map: Map<string, T>, key: 
   if (!current || record.sourceAt >= current.sourceAt) map.set(key, record);
 }
 
-function upsertNormalRecord(map: Map<string, NormalRecord>, key: string, record: NormalRecord) {
-  const current = map.get(key);
-  if (!current) {
-    map.set(key, record);
-    return;
-  }
-
-  const count = current.normalRecordCount + 1;
-  const shootingMsTotal = current.shootingMsTotal + record.shootingMs;
-  const transferShootingMsTotal = current.transferShootingMsTotal + record.transferShootingMs;
-  const latest = record.sourceAt >= current.sourceAt ? record : current;
-  map.set(key, {
-    ...latest,
-    normalRecordCount: count,
-    shootingMsTotal,
-    transferShootingMsTotal,
-    shootingMs: round1(shootingMsTotal / count),
-    transferShootingMs: round1(transferShootingMsTotal / count),
-  });
-}
-
 function teamMatchKey(team: string, matchType: DataRange, match: number, tbaMatchKey: string | null) {
   return `${team}:${matchType}:${tbaMatchKey || match}`;
 }
 
-function recordMatchType(row: CyberScoutRecordRow, payload: Record<string, unknown>): DataRange {
-  return matchTypeFromValue(row.match_type ?? payload.matchType ?? payload.mt ?? payload.compLevel ?? payload.comp_level);
-}
-
-function recordTbaMatchKey(payload: Record<string, unknown>): string | null {
-  return stringValue(payload.tbaMatchKey ?? payload.tba_match_key ?? payload.matchKey ?? payload.key) || null;
-}
-
-function resultMatchIdentity(row: CyberScoutRecordRow, payload: Record<string, unknown>) {
-  const match = positiveNumber(row.match_number) ?? positiveNumber(payload.matchNumber ?? payload.mn);
-  if (!match) return null;
-  const type = stringValue(row.match_type ?? payload.matchType ?? payload.mt).toLowerCase();
-  if (["p", "pr", "practice", "practice_match"].includes(type)) return { comp_level: "practice", match_number: match };
-  if (type === "sf") return { comp_level: "sf", set_number: match, match_number: 1 };
-  if (["f", "final", "finals"].includes(type)) return { comp_level: "f", set_number: match, match_number: 1 };
-  return { comp_level: "qm", match_number: match };
+function seasonResultMatchIdentity(record: SeasonSuperRecord) {
+  if (record.matchType === "practice") return { comp_level: "practice", match_number: record.match };
+  if (record.matchType === "qualification") return { comp_level: "qm", match_number: record.match };
+  return { comp_level: "sf", set_number: record.match, match_number: 1 };
 }
 
 function allianceValue(value: unknown): "red" | "blue" | null {
@@ -691,84 +397,6 @@ function allianceValue(value: unknown): "red" | "blue" | null {
 
 function objectPayload(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function numberAt(value: unknown, index: number): number {
-  const item = arrayValue(value)[index];
-  return numberValue(item);
-}
-
-function nullableNumberAt(value: unknown, index: number): number | null {
-  const parsed = numberValue(arrayValue(value)[index], Number.NaN);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function stringAt(value: unknown, index: number): string {
-  const item = arrayValue(value)[index];
-  return typeof item === "string" ? item.trim() : "";
-}
-
-function timedPeriodsMs(value: unknown): number {
-  return timedPeriods(value).reduce<number>((sum, period) => sum + Math.max(0, period.endMs - period.startMs), 0);
-}
-
-function timedPeriods(value: unknown): Array<{ startMs: number; endMs: number }> {
-  return arrayValue(value).map((period) => {
-    const item = objectPayload(period);
-    const start = numberValue(item.startMs ?? item.s);
-    const end = numberValue(item.endMs ?? item.e);
-    return { startMs: start, endMs: end };
-  });
-}
-
-function autoRouteArray(value: unknown): Array<{ id: string; points: Array<{ x: number; y: number }> }> {
-  return arrayValue(value)
-    .map((route, index) => {
-      const item = objectPayload(route);
-      const points = arrayValue(item.points ?? item.pts)
-        .map((point) => {
-          const value = objectPayload(point);
-          const x = numberValue(value.x, Number.NaN);
-          const y = numberValue(value.y, Number.NaN);
-          return Number.isFinite(x) && Number.isFinite(y) ? { x: clamp(x, 0, 100), y: clamp(y, 0, 100) } : null;
-        })
-        .filter((point): point is { x: number; y: number } => Boolean(point));
-      return points.length ? { id: stringValue(item.id) || `route-${index + 1}`, points } : null;
-    })
-    .filter((route): route is { id: string; points: Array<{ x: number; y: number }> } => Boolean(route));
-}
-
-function autoPathArray(value: unknown): MatchAutoPathPoint[] {
-  return arrayValue(value)
-    .map((point) => {
-      const item = objectPayload(point);
-      const node = stringValue(item.node ?? item.n);
-      if (!node) return null;
-      return { node, atMs: Math.max(0, numberValue(item.atMs ?? item.a)) };
-    })
-    .filter((point): point is MatchAutoPathPoint => Boolean(point));
-}
-
-function drivetrainValue(value: unknown): string {
-  if (value === "sw") return "Swerve";
-  if (value === "tk") return "坦克";
-  if (value === "mc") return "麦克纳母轮";
-  if (value === "ot") return "其他";
-  return stringValue(value);
-}
-
-function normalizeAccuracy(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return null;
-  return round1(clamp(value, 0, 100));
-}
-
-function positiveId(value: unknown): string | null {
-  const parsed = positiveNumber(value);
-  return parsed ? String(parsed) : null;
 }
 
 function positiveNumber(value: unknown): number | null {
@@ -783,20 +411,6 @@ function numberValue(value: unknown, fallback = 0): number {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function booleanValue(value: unknown): boolean {
-  return value === true || value === "true" || value === 1 || value === "1";
-}
-
-function rowTimestamp(row: CyberScoutRecordRow): number {
-  const value = row.uploaded_at ?? row.client_created_at ?? row.created_at ?? "";
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 function round1(value: number): number {

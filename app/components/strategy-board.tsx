@@ -2,15 +2,17 @@ import { Eraser, Pencil, RotateCw, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Button, Card, cn } from "./ui";
 import type { ProposalMatch } from "../lib/strategy-proposal-matches";
+import { strategyBoardField } from "../season/fields";
 import {
   autoWinners,
   compactRoutePoints,
+  defaultStrategyBoardPhase,
   defaultStrategyRobots,
   ensureStrategyBoardTeams,
   eraseStrategyStrokes,
   shouldFinishRouteStroke,
   strategyBoardColors,
-  strategyBoardPhases,
+  strategyBoardPhaseLabel,
   strategyBoardStations,
   type AutoProposalPayload,
   type AutoWinner,
@@ -46,30 +48,30 @@ export function StrategyBoard({
     () => ensureStrategyBoardTeams(payload, match.redTeams, match.blueTeams),
     [match.blueTeams, match.redTeams, payload],
   );
-  const [phase, setPhase] = useState<StrategyBoardPhaseId>("auto");
+  const field = strategyBoardField();
+  const phaseIds = Object.keys(normalized.phases);
+  const [phase, setPhase] = useState<StrategyBoardPhaseId>(defaultStrategyBoardPhase);
+  const activePhase = normalized.phases[phase] ? phase : phaseIds[0] ?? defaultStrategyBoardPhase;
   const [tool, setTool] = useState<BoardTool>("pen");
   const [color, setColor] = useState<string>(strategyBoardColors[0]);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
-  const [phaseDraft, setPhaseDraft] = useState(normalized.phases.auto);
+  const [phaseDraft, setPhaseDraft] = useState<StrategyBoardPhase>(
+    normalized.phases[activePhase] ?? { strokes: [], robots: [] },
+  );
   const [draftStroke, setDraftStroke] = useState<RoutePoint[]>([]);
-  const [undoCounts, setUndoCounts] = useState<Record<StrategyBoardPhaseId, number>>({ auto: 0, transition: 0, active: 0, inactive: 0 });
+  const [undoCounts, setUndoCounts] = useState<Record<StrategyBoardPhaseId, number>>({});
   const phaseRef = useRef(phaseDraft);
   const drawingRef = useRef(false);
   const eraseChangedRef = useRef(false);
   const robotGestureRef = useRef<RobotGesture | null>(null);
-  const historyRef = useRef<Record<StrategyBoardPhaseId, StrategyBoardPhase[]>>({
-    auto: [],
-    transition: [],
-    active: [],
-    inactive: [],
-  });
+  const historyRef = useRef<Record<StrategyBoardPhaseId, StrategyBoardPhase[]>>({});
 
   useEffect(() => {
     if (drawingRef.current || robotGestureRef.current) return;
-    const next = normalized.phases[phase];
+    const next = normalized.phases[activePhase] ?? { strokes: [], robots: [] };
     phaseRef.current = next;
     setPhaseDraft(next);
-  }, [normalized, phase]);
+  }, [activePhase, normalized]);
 
   function pointFromPointer(event: ReactPointerEvent<HTMLElement>) {
     const rect = event.currentTarget.closest("[data-strategy-field]")?.getBoundingClientRect();
@@ -83,14 +85,14 @@ export function StrategyBoard({
   function updatePhase(next: StrategyBoardPhase, commit = true) {
     phaseRef.current = next;
     setPhaseDraft(next);
-    if (commit) onChange({ ...normalized, phases: { ...normalized.phases, [phase]: next } });
+    if (commit) onChange({ ...normalized, phases: { ...normalized.phases, [activePhase]: next } });
   }
 
   function pushHistory(value: StrategyBoardPhase) {
-    const history = historyRef.current[phase];
+    const history = historyRef.current[activePhase] ?? (historyRef.current[activePhase] = []);
     history.push(value);
     if (history.length > 40) history.shift();
-    setUndoCounts((current) => ({ ...current, [phase]: history.length }));
+    setUndoCounts((current) => ({ ...current, [activePhase]: history.length }));
   }
 
   function startBoardPointer(event: ReactPointerEvent<HTMLDivElement>) {
@@ -210,9 +212,10 @@ export function StrategyBoard({
   }
 
   function undo() {
-    const previous = historyRef.current[phase].pop();
+    const history = historyRef.current[activePhase] ?? [];
+    const previous = history.pop();
     if (previous) {
-      setUndoCounts((current) => ({ ...current, [phase]: historyRef.current[phase].length }));
+      setUndoCounts((current) => ({ ...current, [activePhase]: history.length }));
       updatePhase(previous);
     }
   }
@@ -235,18 +238,18 @@ export function StrategyBoard({
         <div className="grid gap-3 border-b border-line p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2" aria-label="比赛阶段">
-              {strategyBoardPhases.map((item) => (
-                <Button key={item} type="button" variant={phase === item ? "active" : "default"} onClick={() => {
+              {phaseIds.map((item) => (
+                <Button key={item} type="button" variant={activePhase === item ? "active" : "default"} onClick={() => {
                   setSelectedTeam(null);
                   setDraftStroke([]);
                   setPhase(item);
                 }}>
-                  {phaseLabel(item)}
+                  {strategyBoardPhaseLabel(item)}
                 </Button>
               ))}
             </div>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" onClick={undo} disabled={disabled || !undoCounts[phase]}>
+              <Button type="button" onClick={undo} disabled={disabled || !undoCounts[activePhase]}>
                 <Undo2 className="size-4" />撤销
               </Button>
               <Button type="button" onClick={clearStrokes} disabled={disabled || !phaseDraft.strokes.length}>
@@ -281,20 +284,33 @@ export function StrategyBoard({
 
         <div
           data-strategy-field
-          className={cn("relative aspect-[3510/1610] touch-none overflow-hidden bg-black [container-type:inline-size]", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
+          className={cn("relative touch-none overflow-hidden [container-type:inline-size]", field.backgroundImage ? "bg-black" : "bg-surface-2", !disabled && (tool === "pen" ? "cursor-crosshair" : "cursor-cell"))}
+          style={{ aspectRatio: field.aspectRatio }}
           onPointerDown={startBoardPointer}
           onPointerMove={moveBoardPointer}
           onPointerUp={stopBoardPointer}
           onPointerCancel={stopBoardPointer}
           onPointerLeave={stopBoardPointer}
           role="application"
-          aria-label={`${phaseLabel(phase)}策略绘制板`}
+          aria-label={`${strategyBoardPhaseLabel(activePhase)}策略绘制板`}
         >
-          <img src="/strategy-board-2026.png" alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
+          {field.backgroundImage ? (
+            <img src={field.backgroundImage} alt="" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full select-none object-fill" />
+          ) : (
+            <div
+              className="pointer-events-none absolute inset-0 grid select-none place-items-center text-sm font-semibold text-ink-dim"
+              style={{
+                backgroundImage: "linear-gradient(rgba(128,128,128,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(128,128,128,.18) 1px, transparent 1px)",
+                backgroundSize: "5% 5%",
+              }}
+            >
+              未配置年度场地图
+            </div>
+          )}
           {strategyBoardStations(match.redTeams, match.blueTeams).map((station) => (
             <span
               key={`${station.alliance}-${station.team}`}
-              className="pointer-events-none absolute z-[5] -translate-x-1/2 -translate-y-1/2 rotate-90 whitespace-nowrap text-[clamp(0.375rem,1.82cqw,1rem)] font-bold leading-none text-white tabular-nums"
+              className={cn("pointer-events-none absolute z-[5] -translate-x-1/2 -translate-y-1/2 rotate-90 whitespace-nowrap text-[clamp(0.375rem,1.82cqw,1rem)] font-bold leading-none tabular-nums", field.backgroundImage ? "text-white" : "text-ink")}
               style={{ left: `${station.x}%`, top: `${station.y}%` }}
               data-strategy-station={`${station.alliance}-${station.team}`}
               aria-hidden
@@ -342,7 +358,7 @@ export function StrategyBoard({
                 style={{
                   left: `${robot.x}%`,
                   top: `${robot.y}%`,
-                  width: "max(4.342%, 2.25rem)",
+                  width: "max(5%, 2.25rem)",
                   aspectRatio: "1",
                   transform: `translate(-50%, -50%) rotate(${robot.rotation}deg)`,
                 }}
@@ -412,13 +428,6 @@ export function StrategyBoard({
       </label>
     </div>
   );
-}
-
-function phaseLabel(phase: StrategyBoardPhaseId) {
-  if (phase === "auto") return "AUTO";
-  if (phase === "transition") return "TRANSITION";
-  if (phase === "active") return "ACTIVE";
-  return "INACTIVE";
 }
 
 function autoWinnerLabel(value: AutoWinner) {

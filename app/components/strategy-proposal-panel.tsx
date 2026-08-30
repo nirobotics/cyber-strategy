@@ -15,6 +15,8 @@ import { StrategyBoard } from "./strategy-board";
 import { Badge, Button, Card, cn } from "./ui";
 import type { SessionUser } from "../lib/auth-types";
 import { reliability, type ScoutingDataset, type TeamPitInfo, type TeamSummary } from "../lib/scouting";
+import { formatSeasonMetric, seasonConfig } from "../season/config";
+import { autoRouteField, strategyBoardField } from "../season/fields";
 import {
   firstProposalMatchForTeam,
   proposalMatchForKeyOrFirst,
@@ -33,6 +35,7 @@ import {
   normalizeProposalPayload,
   ownStrategyTeams,
   proposalStatuses,
+  strategyBoardPhaseLabel,
   strategyBoardStations,
   strategyShifts,
   type AutoProposalPayload,
@@ -71,15 +74,9 @@ type EditorState = {
 export function StrategyProposalPanel({
   data,
   initialSelectedId,
-  demoMode = false,
-  ownTeams = ownStrategyTeams,
-  routeBase = "/",
 }: {
   data: StrategyProposalPanelData;
   initialSelectedId: string | null;
-  demoMode?: boolean;
-  ownTeams?: readonly string[];
-  routeBase?: string;
 }) {
   const navigation = useNavigation();
   const proposalFetcher = useFetcher<StrategyProposalActionData>();
@@ -91,6 +88,8 @@ export function StrategyProposalPanel({
   const [detailTeam, setDetailTeam] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ team: string; index: number } | null>(null);
   const [printProposals, setPrintProposals] = useState<StrategyProposal[] | null>(null);
+  const ownTeams = ownStrategyTeams;
+  const ownTeamsConfigured = ownTeams.length > 0;
   const matchProposals = data.proposals.filter((proposal) => proposal.proposalType === "auto");
   const selected = matchProposals.find((proposal) => proposal.id === selectedId) ?? null;
   const [editor, setEditor] = useState(() => initialEditorState(selected, data.matches, ownTeams));
@@ -102,10 +101,10 @@ export function StrategyProposalPanel({
   const approvedSnapshot = selected?.lastApprovedSnapshot
     ? { ...selected.lastApprovedSnapshot, payload: ensureMatchPayload(selected.lastApprovedSnapshot.payload, selectedMatch) }
     : null;
-  const editable = canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
-  const deletable = canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
-  const reviewer = canReviewProposal(selected, data.isAdmin);
-  const restorable = canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
+  const editable = ownTeamsConfigured && canEditProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
+  const deletable = ownTeamsConfigured && canDeleteProposalAs(selected, data.user.feishuOpenId, data.isAdmin);
+  const reviewer = ownTeamsConfigured && canReviewProposal(selected, data.isAdmin);
+  const restorable = ownTeamsConfigured && canRestoreApprovedSnapshot(selected, data.user.feishuOpenId, data.isAdmin);
   const adminEditingApproved = Boolean(selected?.status === "approved" && data.isAdmin);
   const teamFilterDigits = teamFilter.replace(/\D/g, "");
   const approvedEditorChanged = Boolean(selected?.status === "approved" && !proposalMatchesSnapshot({
@@ -130,7 +129,7 @@ export function StrategyProposalPanel({
       const timeout = window.setTimeout(() => {
         setSelectedId(null);
         setEditor(initialEditorState(null, data.matches, ownTeams));
-        replaceProposalUrl(searchParams, null, routeBase);
+        replaceProposalUrl(searchParams, null);
       }, 0);
       return () => window.clearTimeout(timeout);
     }
@@ -139,10 +138,10 @@ export function StrategyProposalPanel({
     const timeout = window.setTimeout(() => {
       setSelectedId(proposalId);
       setEditor((current) => ({ ...current, id: proposalId }));
-      replaceProposalUrl(searchParams, proposalId, routeBase);
+      replaceProposalUrl(searchParams, proposalId);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, ownTeams, routeBase]);
+  }, [proposalFetcher.data, searchParams, data.matches, data.dataset, ownTeams]);
 
   useEffect(() => {
     if (!printProposals?.length) return;
@@ -158,14 +157,14 @@ export function StrategyProposalPanel({
   function newProposal() {
     setSelectedId(null);
     setEditor(initialEditorState(null, data.matches, ownTeams));
-    replaceProposalUrl(searchParams, null, routeBase);
+    replaceProposalUrl(searchParams, null);
   }
 
   function openProposal(id: string) {
     const proposal = matchProposals.find((item) => item.id === id) ?? null;
     setSelectedId(id);
     setEditor(initialEditorState(proposal, data.matches, ownTeams));
-    replaceProposalUrl(searchParams, id, routeBase);
+    replaceProposalUrl(searchParams, id);
   }
 
   function updateOwnTeam(ownTeam: string) {
@@ -200,6 +199,11 @@ export function StrategyProposalPanel({
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 xl:h-full xl:min-h-0">
       {actionData?.error ? <Card className="border-danger/40 bg-danger/10 p-3 text-sm text-danger">{actionData.error}</Card> : null}
       {data.proposalError ? <Card className="border-warn/40 bg-warn/10 p-3 text-sm text-warn">{data.proposalError}</Card> : null}
+      {!ownTeamsConfigured ? (
+        <Card className="border-warn/40 bg-warn/10 p-3 text-sm text-warn">
+          请先在赛季配置中设置己方队伍；配置完成前只能查看已有 Strategy Proposal。
+        </Card>
+      ) : null}
 
       <div className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="overflow-hidden p-0 xl:flex xl:min-h-0 xl:flex-col">
@@ -223,7 +227,7 @@ export function StrategyProposalPanel({
                   导出 PDF
                 </Button>
               ) : null}
-              <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal}>
+              <Button type="button" variant={!selected ? "active" : "default"} onClick={newProposal} disabled={!ownTeamsConfigured}>
                 <Plus className="size-4" />
                 新建
               </Button>
@@ -275,7 +279,6 @@ export function StrategyProposalPanel({
             method="post"
             action="/strategy-proposal"
             className="grid gap-4 p-3 md:p-4 xl:min-h-0 xl:flex-1 xl:overflow-y-auto"
-            onSubmit={demoMode ? (event) => event.preventDefault() : undefined}
           >
             <input type="hidden" name="id" value={editor.id ?? ""} />
             <input type="hidden" name="eventKey" value={data.selectedEventKey} />
@@ -293,6 +296,8 @@ export function StrategyProposalPanel({
                   onChange={(event) => updateOwnTeam(event.target.value)}
                   className="input h-10 font-sans"
                 >
+                  {!ownTeamsConfigured ? <option value="">请配置己方队伍</option> : null}
+                  {editor.ownTeam && !ownTeams.includes(editor.ownTeam) ? <option value={editor.ownTeam}>Team {editor.ownTeam}（未配置）</option> : null}
                   {ownTeams.map((team) => <option key={team} value={team}>Team {team}</option>)}
                 </select>
               </label>
@@ -313,7 +318,11 @@ export function StrategyProposalPanel({
               </label>
             </div>
 
-            {!selectedMatch ? (
+            {!ownTeamsConfigured ? (
+              <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
+                未配置己方队伍，不能新建或提交比赛策略。
+              </div>
+            ) : !selectedMatch ? (
               <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
                 当前赛事没有 Team {editor.ownTeam} 的 Cyber Scout 赛程，暂不能创建比赛策略。
               </div>
@@ -329,7 +338,7 @@ export function StrategyProposalPanel({
             />
 
             <div className="flex flex-wrap justify-end gap-2 border-t border-line pt-3">
-              {demoMode ? <span className="text-sm text-ink-dim">Demo 中的修改不会保存。</span> : deletable ? (
+              {deletable ? (
                 <Button
                   type="submit"
                   name="intent"
@@ -344,13 +353,13 @@ export function StrategyProposalPanel({
                   删除
                 </Button>
               ) : null}
-              {!demoMode && restorable ? (
+              {restorable ? (
                 <Button type="submit" name="intent" value="restore" disabled={busy}>
                   <Undo2 className="size-4" />
                   恢复到已通过版本
                 </Button>
               ) : null}
-              {!demoMode && editable ? (
+              {editable ? (
                 selected?.status === "approved" ? (
                   adminEditingApproved && approvedEditorChanged ? (
                     <Button type="submit" name="intent" value="save" disabled={busy || !selectedMatch}>
@@ -377,9 +386,9 @@ export function StrategyProposalPanel({
                     </Button>
                   </>
                 )
-              ) : !demoMode ? (
+              ) : (
                 <span className="text-sm text-ink-dim">当前状态不可编辑。</span>
-              ) : null}
+              )}
             </div>
           </proposalFetcher.Form>
 
@@ -414,7 +423,7 @@ export function StrategyProposalPanel({
           pitInfo={data.dataset.teamPitData?.[teamDetail.team]}
           onOpenPhoto={(index) => setLightbox({ team: teamDetail.team, index })}
           onClose={() => setDetailTeam(null)}
-          hideComments={demoMode}
+          hideComments={false}
         />
       ) : null}
       {detailTeam && !teamDetail ? <MissingTeamDetailModal team={detailTeam} onClose={() => setDetailTeam(null)} /> : null}
@@ -677,17 +686,15 @@ function PrintTeamDetail({
       </div>
       <div className="proposal-print-badges">
         <span>{teamTrendLabel(summary.trend)}</span>
-        {pitInfo?.canCrossTrench ? <span>trench</span> : null}
-        {pitInfo?.isSwerve ? <span>swerve</span> : null}
-        {pitInfo?.drivetrain ? <span>{pitInfo.drivetrain}</span> : null}
+        {pitInfo?.attributes.map((attribute) => <span key={attribute.key}>{attribute.label}: {attribute.value}</span>)}
       </div>
       <div className="proposal-print-stats">
         <PrintStat label="综合均分" value={formatPrintNumber(summary.avgTotal)} />
         <PrintStat label="自动贡献" value={formatPrintNumber(summary.avgAuto)} />
         <PrintStat label="手动贡献" value={formatPrintNumber(summary.avgTele)} />
-        <PrintStat label="Transfer" value={summary.avgTransferPieces ? formatPrintNumber(summary.avgTransferPieces) : "-"} />
-        <PrintStat label="平均 BPS" value={summary.avgBps ? formatPrintNumber(summary.avgBps) : "-"} />
-        <PrintStat label="命中率" value={summary.avgAccuracy > 0 ? `${formatPrintNumber(summary.avgAccuracy)}%` : "-"} />
+        {seasonConfig.metrics.filter((metric) => metric.summary).map((metric) => (
+          <PrintStat key={metric.key} label={metric.label} value={formatSeasonMetric(summary.metrics[metric.key], metric)} />
+        ))}
         <PrintStat label="可靠性" value={`${formatPrintNumber(reliability(summary))}%`} />
         <PrintStat label="标准差" value={`±${formatPrintNumber(summary.stdDev)}`} />
         <PrintStat label="综合分范围" value={`${formatPrintNumber(summary.minPts)}–${formatPrintNumber(summary.maxPts)}`} />
@@ -774,6 +781,7 @@ function PrintStrategyBoardPhase({
   match: ProposalMatch | null;
   teams: string[];
 }) {
+  const field = strategyBoardField();
   return (
     <div className="proposal-print-map-card">
       <div className="proposal-print-map-head">
@@ -782,12 +790,12 @@ function PrintStrategyBoardPhase({
           {teams.map((team) => <span key={team}>Team {team}</span>)}
         </div>
       </div>
-      <div className="proposal-print-field">
-        <img src="/strategy-board-2026.png" alt="" />
+      <div className="proposal-print-field" style={{ aspectRatio: field.aspectRatio }}>
+        <PrintFieldBackground image={field.backgroundImage} />
         {match ? strategyBoardStations(match.redTeams, match.blueTeams).map((station) => (
           <span
             key={`${station.alliance}-${station.team}`}
-            className="proposal-print-station"
+            className={cn("proposal-print-station", !field.backgroundImage && "proposal-print-station-neutral")}
             style={{ left: `${station.x}%`, top: `${station.y}%` }}
           >
             {station.team}
@@ -806,17 +814,16 @@ function PrintStrategyBoardPhase({
               vectorEffect="non-scaling-stroke"
             />
           ))}
-          {phase.robots.map((robot) => {
-            const red = match?.redTeams.includes(robot.team) ?? false;
-            return (
-              <g key={robot.team} transform={`translate(${robot.x} ${robot.y}) rotate(${robot.rotation})`}>
-                <rect x="-2.171" y="-4.733" width="4.342" height="9.466" rx="0.7" fill={red ? "#ef4444" : "#3b82f6"} />
-                <rect x="-1.687" y="-3.678" width="3.374" height="7.356" rx="0.45" fill="#242429" />
-                <text x="0" y="0.65" textAnchor="middle" fill="#fff" fontSize="1.8" fontWeight="700">{robot.team}</text>
-              </g>
-            );
-          })}
         </svg>
+        {phase.robots.map((robot) => (
+          <span
+            key={robot.team}
+            className={cn("proposal-print-robot", match?.redTeams.includes(robot.team) ? "proposal-print-robot-red" : "proposal-print-robot-blue")}
+            style={{ left: `${robot.x}%`, top: `${robot.y}%`, transform: `translate(-50%, -50%) rotate(${robot.rotation}deg)` }}
+          >
+            <span>{robot.team}</span>
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -833,6 +840,7 @@ function PrintRouteMap({
   routes: RouteMap;
   notes: Array<{ label: string; value: string }>;
 }) {
+  const field = autoRouteField();
   const orderedTeams = [...teams, ...Object.keys(routes)].filter(uniqueString);
   const hasRoutes = orderedTeams.some((team) => (routes[team] ?? []).length > 0);
   return (
@@ -848,8 +856,8 @@ function PrintRouteMap({
           ))}
         </div>
       </div>
-      <div className="proposal-print-field">
-        <img src="/pit-field-map.webp" alt="" />
+      <div className="proposal-print-field" style={{ aspectRatio: field.aspectRatio }}>
+        <PrintFieldBackground image={field.backgroundImage} />
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
           {orderedTeams.map((team, index) => {
             const points = routes[team] ?? [];
@@ -894,6 +902,12 @@ function PrintRouteMap({
       ) : null}
     </div>
   );
+}
+
+function PrintFieldBackground({ image }: { image: string | null }) {
+  return image
+    ? <img src={image} alt="" />
+    : <div className="proposal-print-field-placeholder">未配置年度场地图</div>;
 }
 
 function PrintProposalNotes({ proposal }: { proposal: StrategyProposal }) {
@@ -947,7 +961,7 @@ function initialEditorState(
   ownTeams: readonly string[],
 ): EditorState {
   const proposalType: StrategyProposalType = "auto";
-  const ownTeam = proposal?.ownTeam ?? ownTeams[0] ?? ownStrategyTeams[0];
+  const ownTeam = proposal?.ownTeam ?? ownTeams[0] ?? "";
   const ownMatches = proposalMatchesForTeam(matches, ownTeam);
   const match = proposal ? proposalMatchForKeyOrFirst(ownMatches, proposal.matchKey) : firstProposalMatchForTeam(matches, ownTeam);
   const payload = proposal?.proposalType === "auto" ? proposal.payload : normalizeProposalPayload("auto", {});
@@ -983,13 +997,13 @@ function opponentTeams(match: ProposalMatch | null, ownTeam: string) {
   return [];
 }
 
-function replaceProposalUrl(searchParams: URLSearchParams, id: string | null, routeBase: string) {
+function replaceProposalUrl(searchParams: URLSearchParams, id: string | null) {
   const params = new URLSearchParams(searchParams);
   if (id) params.set("proposal", id);
   else params.delete("proposal");
   params.set("tab", "proposal");
   const search = params.toString();
-  window.history.replaceState(null, "", search ? `${routeBase}?${search}` : routeBase);
+  window.history.replaceState(null, "", search ? `/?${search}` : "/");
 }
 
 function proposalTypeLabel(type: StrategyProposalType) {
@@ -1009,13 +1023,6 @@ function shiftLabel(shift: StrategyShift) {
   if (shift === "inactive") return "Inactive";
   if (shift === "endgame") return "Endgame";
   return "Active";
-}
-
-function strategyBoardPhaseLabel(phase: StrategyBoardPhaseId) {
-  if (phase === "auto") return "AUTO";
-  if (phase === "transition") return "TRANSITION";
-  if (phase === "active") return "ACTIVE";
-  return "INACTIVE";
 }
 
 function autoWinnerLabel(value: AutoWinner) {
@@ -1430,8 +1437,9 @@ const PROPOSAL_PRINT_CSS = `
 
   .proposal-print-field {
     position: relative;
-    aspect-ratio: 3510 / 1610;
-    background: #000;
+    background-color: #f3f4f6;
+    background-image: linear-gradient(rgba(107, 114, 128, .2) 1px, transparent 1px), linear-gradient(90deg, rgba(107, 114, 128, .2) 1px, transparent 1px);
+    background-size: 5% 5%;
     container-type: inline-size;
   }
 
@@ -1447,6 +1455,20 @@ const PROPOSAL_PRINT_CSS = `
     object-fit: fill;
   }
 
+  .proposal-print-field svg {
+    z-index: 1;
+  }
+
+  .proposal-print-field-placeholder {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: #6b7280;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
   .proposal-print-station {
     position: absolute;
     z-index: 2;
@@ -1456,6 +1478,40 @@ const PROPOSAL_PRINT_CSS = `
     line-height: 1;
     white-space: nowrap;
     transform: translate(-50%, -50%) rotate(90deg);
+  }
+
+  .proposal-print-station-neutral {
+    color: #111827;
+  }
+
+  .proposal-print-robot {
+    position: absolute;
+    z-index: 3;
+    display: grid;
+    width: 5%;
+    aspect-ratio: 1;
+    place-items: center;
+    border-radius: 2px;
+    color: #fff;
+    font-size: clamp(4px, 1.2cqw, 7px);
+    font-weight: 700;
+  }
+
+  .proposal-print-robot span {
+    display: grid;
+    width: 78%;
+    height: 78%;
+    place-items: center;
+    border-radius: 1px;
+    background: #242429;
+  }
+
+  .proposal-print-robot-red {
+    background: #ef4444;
+  }
+
+  .proposal-print-robot-blue {
+    background: #3b82f6;
   }
 
   .proposal-print-empty-map {

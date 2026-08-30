@@ -1334,3 +1334,37 @@
 **回退更新（2026-08-16 19:48:54 +08:00）**：按用户要求取消方案 1、3。已通过反向提交移除所有 `Server-Timing`，恢复 `/embed` 的完整 dataset/赛程响应和原胜率计算路径，并将版本恢复为 `2026.1.59`。typecheck、20 files / 137 tests、全仓 lint、build、`git diff --check` 均通过。
 
 **生产验收更新（2026-08-16 19:55:00 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已恢复显示 `v2026.1.59`。
+
+---
+
+## 2026-08-30 · Cyber Strategy Template 通用化
+
+**当前状态**：`strategy-template` 已从 2026 专用应用改造为“单分支、单赛季”的长期通用模板；模板版本重置为 `0.0.1`。
+
+**本轮完成**：
+- 建立 `app/season/` 年度边界，集中赛季配置、Scout 映射、计分适配和场地定义。
+- 移除通用层中的 2026 队号、计分字段、固定阶段、地图与坐标依赖，并保留历史 Proposal/Picklist 数据兼容。
+- 新增 `SEASON_CUSTOMIZATION.md`，说明年度分支、数据源职责、定制入口、空场地图和验收流程。
+- 新增迁移移除 Proposal 己方队号的旧数据库约束，改由当前赛季配置在服务端校验。
+- 移动端功能导航改为独立横向滚动行，避免 390px 下被品牌与操作按钮压缩。
+- 本地启动地址与飞书 OAuth 默认回调统一为 Vite 实际使用的 `http://localhost:5173`。
+- 同步 `package.json`、应用页脚、登录页页脚和 Demo 页脚至 `0.0.1`。
+
+**验证**：`pnpm typecheck`、`pnpm lint`、23 个测试文件 / 146 项测试、`pnpm build`、版本一致性和 `git diff --check` 全部通过。真实浏览器验证登录页与 Demo 全部功能页、桌面 1440px / 移动 390px、light / dark、通用逐场列、单一动态阶段、空场地图及临时已配置背景图路径；页面无横向溢出，控制台无 error / warning。临时测试背景已删除并恢复空配置。
+
+**风险 / 待办**：新数据库迁移尚未应用；年度 TBA breakdown、Scout payload、场地图、队号和 Demo 数据仍需在每个年度分支按当年规则实现并验证。
+
+---
+
+## 2026-08-30 · 移除模板 Demo
+
+**当前状态**：`strategy-template` 不再提供公开 Demo；模板版本升级为 `0.0.2`。
+
+**本轮完成**：
+- 删除 `/demo` 路由、登录页 Demo 入口、合成数据与对应测试。
+- 删除 Analytics、Picklist、Strategy Proposal 和应用 Header 中仅服务 Demo 的状态与只读分支。
+- 年度定制入口不再包含 Demo 数据或 Demo 页脚。
+
+**验证**：`pnpm typecheck`、`pnpm lint`、22 个测试文件 / 145 项测试、`pnpm build` 和 `git diff --check` 全部通过。真实浏览器确认登录页无 Demo 入口、版本为 `0.0.2`、`/demo` 返回 404；390×844 深色模式无横向溢出，干净页面控制台无 error / warning。
+
+**风险 / 待办**：新数据库迁移仍未应用；年度 TBA breakdown、Scout payload、场地图和队号仍需在每个年度分支按当年规则实现并验证。

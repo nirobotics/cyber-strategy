@@ -36,8 +36,8 @@ describe("FRC Events match results", () => {
       match_number: 3,
       winning_alliance: "red",
       alliances: {
-        red: { score: 123, autoPoints: 35, teleopPoints: 88 },
-        blue: { score: 98, autoPoints: 28, teleopPoints: 70 },
+        red: { score: 123, autoPoints: 40, teleopPoints: 93 },
+        blue: { score: 98, autoPoints: 30, teleopPoints: 72 },
       },
     }]);
     expect(requests).toHaveLength(4);

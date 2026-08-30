@@ -17,7 +17,7 @@ export function AppFooter({
           loading="lazy"
         />
         <p className="text-[11px] text-[var(--muted)]">
-          Copyright © 2026 {companyName}. All rights reserved.
+          Copyright © {new Date().getFullYear()} {companyName}. All rights reserved.
         </p>
         <p className="text-[11px] text-[var(--muted)] sm:justify-self-end">v{version}</p>
       </div>

@@ -14,11 +14,15 @@ describe("scouting data processing", () => {
       avgTotal: 30,
       avgAuto: 6.3,
       avgTele: 23.7,
-      avgAccuracy: 77.5,
+      metrics: {
+        accuracy: 77.5,
+        bps: 0,
+        climbPoints: 0,
+        fuelRating: 3,
+        transferPieces: 0,
+      },
       avgDriver: 3.5,
       avgDefense: 2,
-      avgFuel: 3,
-      avgBps: 0,
       malfunctions: 1,
       commsIssues: 1,
       disabledEvents: 2,
@@ -37,7 +41,7 @@ describe("scouting data processing", () => {
     const data = processCsvRows([
       row("8214", 1, 10, 4, 6, 3, 1, 1, false, 3, 2),
       row("8214", 2, 30, 5, 25, 8, 2, 2, true, 4, 3),
-      row("8214", 3, 50, 10, 40, 0, 0, 4, true, 0, 4),
+      row("8214", 3, 50, 10, 40, 10, 0, 4, true, 0, 4),
     ]);
 
     const filtered = applyIgnoredMatchesToTeamData(data, [matchIgnoreKey("8214", 3, 2)]);
@@ -46,6 +50,7 @@ describe("scouting data processing", () => {
       avgTotal: 20,
       avgAuto: 4.5,
       avgTele: 15.5,
+      metrics: { accuracy: 77.5 },
       matchCount: 2,
       maxPts: 30,
     });

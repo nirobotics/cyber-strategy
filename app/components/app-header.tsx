@@ -14,7 +14,6 @@ export function AppHeader({
   allowGuest,
   onLogin,
   Icon = Boxes,
-  demoHref,
 }: {
   appName: string;
   appSubtitle: string;
@@ -24,12 +23,11 @@ export function AppHeader({
   allowGuest: boolean;
   onLogin: () => void;
   Icon?: LucideIcon;
-  demoHref?: string;
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-[var(--border)] bg-[var(--panel)]">
       <div className="mx-auto grid w-full max-w-[1500px] gap-2 px-3 py-2 sm:px-4">
-        <div className="relative flex min-w-0 items-center gap-3">
+        <div className="relative flex min-w-0 flex-wrap items-center gap-3 md:flex-nowrap">
           <NavLink
             to="/"
             className="flex w-fit shrink-0 items-center gap-3 rounded-md transition hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
@@ -45,25 +43,12 @@ export function AppHeader({
           <div className="pointer-events-none absolute left-1/2 top-1/2 hidden w-[min(38vw,34rem)] -translate-x-1/2 -translate-y-1/2 text-center md:block">
             {centerTitle ? <p className="truncate text-base font-semibold">{centerTitle}</p> : null}
           </div>
-          <div className="flex h-10 min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="order-3 flex h-10 w-full min-w-0 flex-none items-center overflow-x-auto [scrollbar-width:none] md:order-none md:w-auto md:flex-1 [&::-webkit-scrollbar]:hidden">
             <div className="mx-auto flex h-full min-w-max items-center gap-2">
               <div id="app-header-navigation" className="shrink-0" />
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {demoHref ? (
-              <NavLink
-                to={demoHref}
-                className={({ isActive }) => [
-                  "inline-flex h-9 shrink-0 items-center rounded-md border px-3 text-xs font-black tracking-wider transition focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]",
-                  isActive
-                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                    : "border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:bg-[var(--background)] hover:text-[var(--foreground)]",
-                ].join(" ")}
-              >
-                DEMO
-              </NavLink>
-            ) : null}
             <ThemeToggle className="shrink-0" />
             <UserStatus user={user} loading={authLoading} allowGuest={allowGuest} onLogin={onLogin} />
           </div>

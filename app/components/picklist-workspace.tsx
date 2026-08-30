@@ -33,7 +33,6 @@ export function PicklistWorkspace({
   tierByTeam,
   onOpenTeam,
   resource,
-  demoMode = false,
 }: {
   datasetId: string;
   eventKey: string;
@@ -41,15 +40,12 @@ export function PicklistWorkspace({
   tierByTeam: Map<string, TierInfo>;
   onOpenTeam: (team: string) => void;
   resource: PicklistResource;
-  demoMode?: boolean;
 }) {
   const commandFetcher = useFetcher<PicklistActionData>();
   const saveFetcher = useFetcher<PicklistActionData>();
   const personalKey = personalListsKey(datasetId, resource.userOpenId);
-  const demoListsKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists`;
   const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, datasetId);
   const [sharedLists, setSharedLists] = useState(resource.lists);
-  const [demoMainLoaded, setDemoMainLoaded] = useState(false);
   const [active, setActive] = useState<ActiveList | null>(null);
   const [activeBoard, setActiveBoard] = useState<PicklistBoardState | null>(null);
   const [personalName, setPersonalName] = useState("");
@@ -94,13 +90,10 @@ export function PicklistWorkspace({
     restoringBoard.current = false;
     currentBoard.current = board;
     setActiveBoard(board);
-    if (demoMode && active?.kind === "main") {
-      setSharedLists((current) => current.map((list) => list.id === active.remote.id ? { ...list, board, updatedAt: new Date().toISOString() } : list));
-    }
     if (active?.kind === "personal" && active.remote) {
       setStalePersonalIds((current) => updateSet(current, active.local.id, !samePicklistBoard(board, active.remote!.board)));
     }
-  }, [active, demoMode]);
+  }, [active]);
   const clearUndo = useCallback(() => {
     currentBoard.current = null;
     previousBoard.current = null;
@@ -117,25 +110,8 @@ export function PicklistWorkspace({
   }, [datasetId, setPersonalLists]);
 
   useEffect(() => {
-    if (demoMode) return;
     queueMicrotask(() => setSharedLists(resource.lists));
-  }, [demoMode, resource.lists]);
-
-  useEffect(() => {
-    if (!demoMode) return;
-    queueMicrotask(() => {
-      try {
-        setSharedLists(normalizeDemoLists(JSON.parse(localStorage.getItem(demoListsKey) ?? "[]"), eventKey));
-      } catch {
-        setSharedLists([]);
-      }
-      setDemoMainLoaded(true);
-    });
-  }, [demoListsKey, demoMode, eventKey]);
-
-  useEffect(() => {
-    if (demoMode && demoMainLoaded) localStorage.setItem(demoListsKey, JSON.stringify(sharedLists));
-  }, [demoListsKey, demoMainLoaded, demoMode, sharedLists]);
+  }, [resource.lists]);
 
   useEffect(() => {
     const stale = new Set<string>();
@@ -215,7 +191,7 @@ export function PicklistWorkspace({
   }, [saveFetcher.data]);
 
   useEffect(() => {
-    if (!activeBoard || active?.kind !== "main" || !resource.isAdmin || demoMode) return;
+    if (!activeBoard || active?.kind !== "main" || !resource.isAdmin) return;
     const timeout = window.setTimeout(() => {
       submitMain({
         intent: "save-main",
@@ -224,7 +200,7 @@ export function PicklistWorkspace({
       }, { method: "post", action: "/picklists" });
     }, 600);
     return () => window.clearTimeout(timeout);
-  }, [active, activeBoard, demoMode, resource.isAdmin, submitMain]);
+  }, [active, activeBoard, resource.isAdmin, submitMain]);
 
   function createPersonal() {
     const name = personalName.trim();
@@ -239,51 +215,12 @@ export function PicklistWorkspace({
   function createMain() {
     const name = mainName.trim();
     if (!name || !resource.isAdmin) return;
-    if (demoMode) {
-      const now = new Date().toISOString();
-      const list: SharedPicklist = {
-        id: `demo-main-${crypto.randomUUID()}`,
-        clientId: null,
-        eventKey,
-        name: name.slice(0, 80),
-        kind: "main",
-        board: emptyPicklistBoard(),
-        createdBy: resource.userOpenId,
-        createdByName: "Demo Admin",
-        submittedAt: null,
-        updatedAt: now,
-      };
-      setSharedLists((current) => [list, ...current]);
-      setMainName("");
-      clearUndo();
-      setActive({ kind: "main", remote: list });
-      return;
-    }
     setPendingCommand("create-main");
     commandFetcher.submit({ intent: "create-main", eventKey, name }, { method: "post", action: "/picklists" });
   }
 
   function submitPersonal() {
     if (active?.kind !== "personal" || !activeBoard) return;
-    if (demoMode) {
-      const now = new Date().toISOString();
-      const submission: SharedPicklist = {
-        id: `demo-personal-${active.local.id}`,
-        clientId: active.local.id,
-        eventKey,
-        name: active.local.name,
-        kind: "personal",
-        board: activeBoard,
-        createdBy: resource.userOpenId,
-        createdByName: "Demo Admin",
-        submittedAt: now,
-        updatedAt: now,
-      };
-      setSharedLists((current) => [submission, ...current.filter((list) => list.id !== submission.id)]);
-      setActive({ kind: "personal", local: active.local, remote: submission });
-      setStalePersonalIds((current) => updateSet(current, active.local.id, false));
-      return;
-    }
     setPendingCommand("submit-personal");
     commandFetcher.submit({
       intent: "submit-personal",
@@ -302,8 +239,8 @@ export function PicklistWorkspace({
 
   function deletePersonal(local: LocalPersonalList) {
     const remote = ownSubmissions.get(local.id);
-    if (demoMode || !remote) {
-      removeLocalPersonal(local, remote?.id);
+    if (!remote) {
+      removeLocalPersonal(local);
       return;
     }
     setPendingDelete(local);
@@ -313,12 +250,6 @@ export function PicklistWorkspace({
 
   function deleteMain(list: SharedPicklist) {
     if (!resource.isAdmin) return;
-    if (demoMode) {
-      localStorage.removeItem(`cyber-strategy:picklist:${datasetId}:main:${list.id}:board`);
-      setSharedLists((current) => current.filter((item) => item.id !== list.id));
-      setMergeMainId((current) => current === list.id ? "" : current);
-      return;
-    }
     setPendingCommand("delete-main");
     commandFetcher.submit({ intent: "delete-main", id: list.id }, { method: "post", action: "/picklists" });
   }
@@ -355,7 +286,7 @@ export function PicklistWorkspace({
         {resource.error ? <Badge className="w-fit border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
 
         <div className="grid min-h-0 min-w-0 gap-3 lg:grid-cols-2">
-          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} /> : null}>
+          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={commandFetcher.state !== "idle"} /> : null}>
             {mainLists.map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <ListButton list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} embedded />
@@ -515,7 +446,7 @@ export function PicklistWorkspace({
             </Button>
           ) : null}
           {!isMain ? (
-            <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || (!demoMode && commandFetcher.state !== "idle")}>
+            <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || commandFetcher.state !== "idle"}>
               <Send className="size-4" />提交
             </Button>
           ) : null}
@@ -645,13 +576,6 @@ function normalizeLocalLists(value: unknown): LocalPersonalList[] {
     seen.add(id);
     return [{ id, name, createdAt: String(source.createdAt ?? "") || new Date().toISOString() }];
   });
-}
-
-function normalizeDemoLists(value: unknown, eventKey: string): SharedPicklist[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((list): list is SharedPicklist => Boolean(
-    list && typeof list === "object" && (list.kind === "main" || list.kind === "personal") && list.eventKey === eventKey && typeof list.id === "string" && typeof list.name === "string",
-  ));
 }
 
 function toggleId(values: string[], id: string) {

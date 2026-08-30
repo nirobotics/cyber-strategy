@@ -8,11 +8,14 @@ import {
   compactRoutePoints,
   ensureStrategyBoardTeams,
   eraseStrategyStrokes,
+  isConfiguredOwnTeam,
   normalizeOwnTeam,
   normalizeProposalPayload,
   proposalMatchesOwnTeamQuery,
   proposalMatchesSnapshot,
   shouldFinishRouteStroke,
+  strategyBoardPhaseLabel,
+  strategyBoardPhases,
   strategyBoardStations,
   strategyProposalTitle,
   type StrategyProposal,
@@ -53,21 +56,26 @@ describe("strategy proposal helpers", () => {
     });
   });
 
-  it("adds six independent robot models to every match phase", () => {
+  it("creates new match boards from the configured season phases", () => {
+    const payload = normalizeProposalPayload("auto", {}) as Extract<ReturnType<typeof normalizeProposalPayload>, { kind: "match_strategy" }>;
+
+    expect(Object.keys(payload.phases)).toEqual(strategyBoardPhases);
+    expect(strategyBoardPhaseLabel(strategyBoardPhases[0])).toBe("STRATEGY");
+  });
+
+  it("adds six robot models using the generic field layout", () => {
     const payload = ensureStrategyBoardTeams(
       normalizeProposalPayload("auto", {}) as Extract<ReturnType<typeof normalizeProposalPayload>, { kind: "match_strategy" }>,
       ["8214", "9992", "6399"],
       ["11019", "9995", "10016"],
     );
 
-    expect(payload.phases.auto.robots).toHaveLength(6);
-    expect(payload.phases.transition.robots).toHaveLength(6);
-    expect(payload.phases.auto.robots[0]).toEqual({ team: "8214", x: 2680 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
-    expect(payload.phases.auto.robots[3]).toEqual({ team: "11019", x: 830 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
-    expect(payload.phases.auto.robots).not.toBe(payload.phases.transition.robots);
+    expect(payload.phases.strategy.robots).toHaveLength(6);
+    expect(payload.phases.strategy.robots[0]).toEqual({ team: "8214", x: 80, y: 25, rotation: 0 });
+    expect(payload.phases.strategy.robots[3]).toEqual({ team: "11019", x: 20, y: 25, rotation: 0 });
   });
 
-  it("migrates only untouched legacy robot positions", () => {
+  it("preserves saved robot positions in legacy phases", () => {
     const payload = normalizeProposalPayload("auto", {
       phases: {
         auto: {
@@ -82,9 +90,9 @@ describe("strategy proposal helpers", () => {
 
     const migrated = ensureStrategyBoardTeams(payload, ["8214", "9992"], ["11019"]);
 
-    expect(migrated.phases.auto.robots[0]).toEqual({ team: "8214", x: 2680 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
+    expect(migrated.phases.auto.robots[0]).toEqual({ team: "8214", x: 20, y: 20, rotation: 0 });
     expect(migrated.phases.auto.robots[1]).toEqual({ team: "9992", x: 42, y: 44, rotation: 25 });
-    expect(migrated.phases.auto.robots[2]).toEqual({ team: "11019", x: 830 / 3510 * 100, y: 205 / 1610 * 100, rotation: 0 });
+    expect(migrated.phases.auto.robots[2]).toEqual({ team: "11019", x: 80, y: 20, rotation: 180 });
   });
 
   it("places alliance station numbers on the field edges in schedule order", () => {
@@ -94,9 +102,9 @@ describe("strategy proposal helpers", () => {
       ["11256", "blue"], ["9995", "blue"], ["10016", "blue"],
       ["8214", "red"], ["9992", "red"], ["6399", "red"],
     ]);
-    expect(stations[0]).toMatchObject({ x: 37 / 3510 * 100, y: 455 / 1610 * 100 });
-    expect(stations[2]).toMatchObject({ x: 37 / 3510 * 100, y: 1155 / 1610 * 100 });
-    expect(stations[3]).toMatchObject({ x: 3473 / 3510 * 100, y: 455 / 1610 * 100 });
+    expect(stations[0]).toMatchObject({ x: 3, y: 25 });
+    expect(stations[2]).toMatchObject({ x: 3, y: 75 });
+    expect(stations[3]).toMatchObject({ x: 97, y: 25 });
   });
 
   it("eraser removes the whole stroke it touches", () => {
@@ -187,9 +195,10 @@ describe("strategy proposal helpers", () => {
     expect(shouldFinishRouteStroke("pointercancel", "pen")).toBe(true);
   });
 
-  it("locks own team choices and permissions", () => {
-    expect(normalizeOwnTeam("9635")).toBe("9635");
-    expect(normalizeOwnTeam("6328")).toBe("8214");
+  it("normalizes historical teams but only accepts configured own teams", () => {
+    expect(normalizeOwnTeam("frc9635")).toBe("9635");
+    expect(normalizeOwnTeam("6328")).toBe("6328");
+    expect(isConfiguredOwnTeam("8214")).toBe(false);
     expect(canEditProposal(proposal("draft"), "u1")).toBe(true);
     expect(canEditProposal(proposal("rejected"), "u1")).toBe(true);
     expect(canEditProposal(proposal("submitted"), "u1")).toBe(false);

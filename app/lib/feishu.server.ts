@@ -27,7 +27,7 @@ function appSecret(): string {
 
 /** 规范回调地址：canonical-origin redirect（模式 13）。 */
 export function redirectUri(): string {
-  const base = process.env.APP_BASE_URL || "http://localhost:3000";
+  const base = process.env.APP_BASE_URL || "http://localhost:5173";
   return `${base.replace(/\/$/, "")}/auth/feishu/callback`;
 }
 

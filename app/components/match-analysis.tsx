@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ChartConfiguration } from "chart.js";
-import { ArrowLeft, BarChart3, ExternalLink, Minus, Pencil, PlayCircle, Plus, RefreshCw, Search, Target, Trophy, X } from "lucide-react";
+import { ArrowLeft, BarChart3, ExternalLink, Minus, Pencil, PlayCircle, Plus, RefreshCw, Search, Trophy, X } from "lucide-react";
 import { ChartCanvas } from "./chart-canvas";
 import { Button, Card, Input, cn } from "./ui";
 import {
@@ -28,7 +28,8 @@ import {
 } from "../lib/match-analysis";
 import { summarizeTeamMatches, type TeamData, type TeamSummary } from "../lib/scouting";
 import { matchTypeFromTbaCompLevel } from "../lib/data-range";
-import type { EditableScoutingRecord, EditableScoutingResponse } from "../lib/editable-scouting";
+import { editableFieldsFor, type EditableScoutingRecord, type EditableScoutingResponse, type EditableScoutingValues } from "../lib/editable-scouting";
+import { formatSeasonMetric, seasonConfig } from "../season/config";
 
 type LoadState =
   | { status: "idle" | "loading" }
@@ -501,9 +502,9 @@ function MatchDetail({
             buildConfig={(palette) => allianceContributionConfig(redMetrics, blueMetrics, palette)}
           />
         </ChartCard>
-        <ChartCard title="命中率 / 可靠性" icon={<Target className="size-4" />}>
+        <ChartCard title="可靠性" icon={<RefreshCw className="size-4" />}>
           <ChartCanvas
-            label="六队命中率和可靠性"
+            label="六队可靠性"
             configKey={`match-health:${matchIdentity(match)}:${metricKey(allMetrics)}`}
             buildConfig={(palette) => healthConfig(allMetrics, palette)}
           />
@@ -624,6 +625,7 @@ function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam, onEdit 
   const scoutingAuto = scoutingTotal == null ? null : metric.scoutMatch?.autoPts ?? 0;
   const scoutingTele = scoutingTotal == null ? null : Math.max(0, scoutingTotal - (scoutingAuto ?? 0));
   const reviewRecommended = needsScoutingReview(allianceDifferenceIsLarge, metric.rating, scoutingTotal);
+  const configuredMetrics = seasonConfig.metrics.filter((item) => item.summary);
   return (
     <div className="rounded-md border border-line bg-surface p-3">
       <div className="mb-2 flex items-start justify-between gap-2">
@@ -649,7 +651,7 @@ function TeamMetricCard({ metric, allianceDifferenceIsLarge, onOpenTeam, onEdit 
       <div className="grid grid-cols-2 gap-2 text-xs text-ink-dim">
         <span>Auto {fmt(metric.auto)}</span>
         <span>Tele {fmt(metric.tele)}</span>
-        <span>命中率 {metric.accuracy == null ? "-" : `${Math.round(metric.accuracy)}%`}</span>
+        {configuredMetrics.map((item) => <span key={item.key}>{item.label} {formatSeasonMetric(metric.metrics[item.key], item)}</span>)}
         <span>可靠性 {metric.reliability == null ? "-" : `${metric.reliability}%`}</span>
         <span>趋势 {trendLabel(metric.trend)}</span>
         <span>范围 {metric.min == null || metric.max == null ? "-" : `${Math.round(metric.min)}-${Math.round(metric.max)}`}</span>
@@ -683,10 +685,12 @@ function ScoutingRecordEditor({
   onClose: () => void;
 }) {
   const [record, setRecord] = useState<EditableScoutingRecord | null>(null);
-  const [normal, setNormal] = useState({ shootingSeconds: 0, transferSeconds: 0 });
-  const [superValues, setSuperValues] = useState({ driveScore: 0, defenseScore: 0, accuracy: 0, bps: 0 });
+  const [normalValues, setNormalValues] = useState<EditableScoutingValues>({});
+  const [superValues, setSuperValues] = useState<EditableScoutingValues>({});
   const [status, setStatus] = useState<"loading" | "ready" | "saving">("loading");
   const [error, setError] = useState("");
+  const normalFields = editableFieldsFor("normal");
+  const superFields = editableFieldsFor("super");
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -704,8 +708,8 @@ function ScoutingRecordEditor({
         const data = await response.json() as EditableScoutingResponse;
         if (!response.ok || !data.ok) throw new Error(data.ok ? "读取失败" : data.error);
         setRecord(data.record);
-        if (data.record.normal) setNormal(data.record.normal);
-        if (data.record.super) setSuperValues(data.record.super);
+        if (data.record.normal) setNormalValues(data.record.normal.values);
+        if (data.record.super) setSuperValues(data.record.super.values);
         setStatus("ready");
       })
       .catch((reason: Error) => {
@@ -724,7 +728,7 @@ function ScoutingRecordEditor({
       const response = await fetch("/scouting-record", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventKey, team, alliance, matchType, matchNumber, normal: record?.normal ? normal : null, super: record?.super ? superValues : null }),
+        body: JSON.stringify({ eventKey, team, alliance, matchType, matchNumber, normal: record?.normal ? normalValues : null, super: record?.super ? superValues : null }),
       });
       const data = await response.json() as EditableScoutingResponse;
       if (!response.ok || !data.ok) throw new Error(data.ok ? "保存失败" : data.error);
@@ -758,22 +762,37 @@ function ScoutingRecordEditor({
                   <div className="grid gap-3">
                     {record.normal.recordCount > 1 ? <p className="text-xs text-warning">保存后将覆盖本队本场全部 {record.normal.recordCount} 条 Normal Scout 的计算值。</p> : null}
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <NumberField label="射击时间（秒）" value={normal.shootingSeconds} min={0} max={150} onChange={(shootingSeconds) => setNormal({ ...normal, shootingSeconds })} />
-                      <NumberField label="Transfer 时间（秒）" value={normal.transferSeconds} min={0} max={150} onChange={(transferSeconds) => setNormal({ ...normal, transferSeconds })} />
+                      {normalFields.map((field) => (
+                        <NumberField
+                          key={field.key}
+                          label={field.label}
+                          value={normalValues[field.key] ?? 0}
+                          min={field.min}
+                          max={field.max}
+                          onChange={(value) => setNormalValues({ ...normalValues, [field.key]: value })}
+                        />
+                      ))}
                     </div>
                   </div>
-                ) : <p className="text-sm text-ink-dim">本场没有 Normal Scout 记录。</p>}
+                ) : <p className="text-sm text-ink-dim">当前赛季没有可编辑的 Normal Scout 字段。</p>}
               </section>
               <section className="rounded-md border border-line bg-surface-2 p-3">
                 <h3 className="mb-3 font-semibold text-ink">Super Scout</h3>
                 {record.super ? (
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <StepField label="Drive Score" value={superValues.driveScore} min={0} max={5} onChange={(driveScore) => setSuperValues({ ...superValues, driveScore })} />
-                    <StepField label="Defense Score" value={superValues.defenseScore} min={0} max={5} onChange={(defenseScore) => setSuperValues({ ...superValues, defenseScore })} />
-                    <StepField label="准确度（%）" value={superValues.accuracy} min={0} max={100} step={25} onChange={(accuracy) => setSuperValues({ ...superValues, accuracy })} />
-                    <StepField label="BPS" value={superValues.bps} min={0} max={35} step={5} onChange={(bps) => setSuperValues({ ...superValues, bps })} />
+                    {superFields.map((field) => (
+                      <StepField
+                        key={field.key}
+                        label={field.label}
+                        value={superValues[field.key] ?? 0}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        onChange={(value) => setSuperValues({ ...superValues, [field.key]: value })}
+                      />
+                    ))}
                   </div>
-                ) : <p className="text-sm text-ink-dim">本场没有 Super Scout 记录。</p>}
+                ) : <p className="text-sm text-ink-dim">本场没有可编辑的 Super Scout 记录。</p>}
               </section>
             </>
           ) : null}
@@ -909,7 +928,7 @@ function trendLabel(trend: TeamMetric["trend"]) {
 }
 
 function metricKey(metrics: TeamMetric[]) {
-  return metrics.map((metric) => `${metric.team}:${metric.rating}:${metric.auto}:${metric.tele}:${metric.accuracy}:${metric.reliability}`).join("|");
+  return metrics.map((metric) => `${metric.team}:${metric.rating}:${metric.auto}:${metric.tele}:${JSON.stringify(metric.metrics)}:${metric.reliability}`).join("|");
 }
 
 function sumMetric(metrics: TeamMetric[], key: "auto" | "tele" | "rating") {
@@ -936,7 +955,6 @@ function healthConfig(metrics: TeamMetric[], palette: ChartPaletteLike): ChartCo
     data: {
       labels: metrics.map((metric) => metric.team),
       datasets: [
-        { label: "命中率", data: metrics.map((metric) => metric.accuracy ?? 0), backgroundColor: palette.colors[0] },
         { label: "可靠性", data: metrics.map((metric) => metric.reliability ?? 0), backgroundColor: palette.colors[2] },
       ],
     },

@@ -117,7 +117,7 @@ export type TeamMetric = {
   ratingLabel: "综合评分" | "EPA" | "暂无";
   auto: number | null;
   tele: number | null;
-  accuracy: number | null;
+  metrics: Record<string, number>;
   reliability: number | null;
   trend: TeamSummary["trend"] | null;
   min: number | null;
@@ -412,7 +412,7 @@ export function resolveTeamMetric({
       ratingLabel: "综合评分",
       auto: summary.avgAuto,
       tele: summary.avgTele,
-      accuracy: summary.avgAccuracy > 0 ? summary.avgAccuracy : null,
+      metrics: summary.metrics,
       reliability: reliability(summary),
       trend: summary.trend,
       min: summary.minPts,
@@ -430,7 +430,7 @@ export function resolveTeamMetric({
     ratingLabel: total == null ? "暂无" : "EPA",
     auto: event ? epaAuto(event) : null,
     tele: event ? epaTele(event) : null,
-    accuracy: null,
+    metrics: {},
     reliability: null,
     trend: null,
     min: null,

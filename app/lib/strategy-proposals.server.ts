@@ -7,6 +7,7 @@ import {
   canReviewProposal,
   isProposalStatus,
   isProposalType,
+  isConfiguredOwnTeam,
   normalizeOwnTeam,
   normalizeProposalPayload,
   normalizeProposalSnapshot,
@@ -70,6 +71,8 @@ export async function saveStrategyProposal(opts: {
   if (!sb) throw new Response("Supabase 未配置", { status: 503 });
   if (!isProposalType(opts.proposalType)) throw new Response("Proposal 类型无效", { status: 400 });
   if (!cleanText(opts.eventKey) || !cleanText(opts.matchKey)) throw new Response("请选择赛事和比赛", { status: 400 });
+  const ownTeam = normalizeOwnTeam(opts.ownTeam);
+  if (!isConfiguredOwnTeam(ownTeam)) throw new Response("己方队伍未在当前赛季配置中", { status: 400 });
 
   const existing = opts.id ? await getStrategyProposal(opts.id) : null;
   if (!canEditProposalAs(existing, opts.actorOpenId, opts.isAdmin)) throw new Response("当前状态不允许编辑或提交", { status: 403 });
@@ -79,7 +82,7 @@ export async function saveStrategyProposal(opts: {
   const normalizedValues = {
     matchKey: cleanText(opts.matchKey),
     matchLabel: cleanText(opts.matchLabel) || cleanText(opts.matchKey),
-    ownTeam: normalizeOwnTeam(opts.ownTeam),
+    ownTeam,
     proposalType: normalizedType,
     title: strategyProposalTitle(normalizedType, cleanText(opts.matchLabel) || cleanText(opts.matchKey)),
     payload: normalizeProposalPayload(normalizedType, opts.payload),
@@ -175,6 +178,7 @@ export async function restoreApprovedStrategyProposal(opts: {
   if (!canRestoreApprovedSnapshot(proposal, opts.actorOpenId, opts.isAdmin)) throw new Response("没有可恢复的已通过版本", { status: 403 });
   const snapshot = proposal.lastApprovedSnapshot;
   if (!snapshot) throw new Response("没有可恢复的已通过版本", { status: 400 });
+  if (!isConfiguredOwnTeam(snapshot.ownTeam)) throw new Response("已通过版本的己方队伍未在当前赛季配置中", { status: 400 });
   const sb = getClient();
   if (!sb) throw new Response("Supabase 未配置", { status: 503 });
 

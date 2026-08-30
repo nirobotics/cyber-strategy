@@ -64,6 +64,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [35, 20, 5],
           accuracy: [80, 50, 0],
           comments: ["clean", "fine", ""],
+          autoScore: 20,
+          teleopScore: 69,
         }, "2026-07-04T00:10:00.000Z"),
         pit(8214, ["event-1/pit-8214/1.jpg"], {
           drivetrain: "Swerve",
@@ -78,21 +80,20 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.updatedAt).toBe("2026-07-04T00:10:00.000Z");
     expect(dataset.teamPhotos["8214"]).toEqual(["/api/cyber-scout/photos?path=event-1%2Fpit-8214%2F1.jpg"]);
     expect(dataset.teamPitData?.["8214"]).toMatchObject({
-      canCrossTrench: true,
-      isSwerve: true,
-      drivetrain: "Swerve",
-      swerveModule: "SDS MK5i",
+      attributes: [
+        { key: "drivetrain", label: "底盘", value: "Swerve" },
+        { key: "swerveModule", label: "Swerve 模块", value: "SDS MK5i" },
+        { key: "canCrossTrench", label: "可穿越 Trench", value: "是" },
+      ],
       autoRoutes: [{ id: "route-a", points: [{ x: 10, y: 20 }, { x: 90, y: 80 }] }],
     });
     expect(dataset.teamData["8214"]).toMatchObject({
       avgTotal: 84,
       avgAuto: 10,
       avgTele: 74,
-      avgAccuracy: 80,
+      metrics: { accuracy: 80, bps: 35, climbPoints: 5, fuelRating: 5 },
       avgDriver: 5,
       avgDefense: 4,
-      avgFuel: 5,
-      avgBps: 35,
       malfunctions: 0,
       disabledEvents: 0,
       matchCount: 1,
@@ -101,8 +102,7 @@ describe("cyber-scout dataset conversion", () => {
       totalPts: 84,
       autoPts: 10,
       telePts: 74,
-      bps: 35,
-      climbPts: 5,
+      metrics: { bps: 35, climbPoints: 5 },
       comment: "clean",
       startPos: "hub-front",
       scoutName: "Super Scout",
@@ -197,7 +197,7 @@ describe("cyber-scout dataset conversion", () => {
 
     expect(dataset.teamData["8214"].matches[0]).toMatchObject({
       telePts: 37.5,
-      transferPieces: 0,
+      metrics: { transferPieces: 0 },
       startPos: "late",
       autoScoutName: "Late Scout",
     });
@@ -261,7 +261,7 @@ describe("cyber-scout dataset conversion", () => {
       ],
     });
 
-    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 15, telePts: 45, totalPts: 60, climbPts: 5 });
+    expect(dataset.teamData["8214"].matches[0]).toMatchObject({ autoPts: 15, telePts: 45, totalPts: 60, metrics: { climbPoints: 5 } });
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({ autoPts: 9, telePts: 40, totalPts: 49 });
     expect(dataset.teamData["157"].matches[0]).toMatchObject({ autoPts: 6, telePts: 0, totalPts: 6 });
     expect(dataset.scoringFallbackMatches).toBe(3);
@@ -427,7 +427,7 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.scoringZeroMatches).toBe(1);
   });
 
-  it("uses TBA hubScore auto and teleop totals with scout contribution ratios", () => {
+  it("falls back to Super Scout when the template has no TBA annual breakdown mapping", () => {
     const dataset = buildCyberScoutDataset({
       event,
       tbaMatches: [{
@@ -468,8 +468,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [2, 1, 4],
           accuracy: [50, 100, 0],
           comments: ["", "", ""],
-          autoScore: 999,
-          teleopScore: 999,
+          autoScore: 30,
+          teleopScore: 80,
         }),
       ],
     });
@@ -478,7 +478,7 @@ describe("cyber-scout dataset conversion", () => {
       autoPts: 15,
       telePts: 45,
       totalPts: 60,
-      climbPts: 5,
+      metrics: { climbPoints: 5 },
     });
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({
       autoPts: 9,
@@ -490,7 +490,7 @@ describe("cyber-scout dataset conversion", () => {
       telePts: 0,
       totalPts: 6,
     });
-    expect(dataset.scoringFallbackMatches).toBe(0);
+    expect(dataset.scoringFallbackMatches).toBe(3);
   });
 
   it("does not let playoff matches with the same match number override qualification scout records", () => {
@@ -549,6 +549,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [10, 5, 20],
           accuracy: [60, 70, 70],
           comments: ["", "", ""],
+          autoScore: 57,
+          teleopScore: 142,
         }),
       ],
     });
@@ -609,6 +611,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [10],
           accuracy: [100],
           comments: [""],
+          autoScore: 10,
+          teleopScore: 20,
         }),
         normal(8214, 2, {
           matchType: "P",
@@ -624,6 +628,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [10],
           accuracy: [100],
           comments: [""],
+          autoScore: 100,
+          teleopScore: 200,
         }),
       ],
     });
@@ -673,6 +679,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [10],
           accuracy: [100],
           comments: [""],
+          autoScore: 80,
+          teleopScore: 282,
         }),
       ],
     });
@@ -721,6 +729,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [10],
           accuracy: [100],
           comments: [""],
+          autoScore: 40,
+          teleopScore: 120,
         }),
       ],
     });
@@ -767,6 +777,8 @@ describe("cyber-scout dataset conversion", () => {
           bps: [2, 2, 0],
           accuracy: [50, 50, 0],
           comments: ["", "", ""],
+          autoScore: 10,
+          teleopScore: 40,
         }),
       ],
     });
@@ -774,17 +786,17 @@ describe("cyber-scout dataset conversion", () => {
     expect(dataset.teamData["8214"].matches[0]).toMatchObject({
       autoPts: 10,
       telePts: 40,
-      transferPieces: 10,
+      metrics: { transferPieces: 10 },
       totalPts: 50,
     });
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({
       autoPts: 0,
       telePts: 0,
-      transferPieces: 20,
+      metrics: { transferPieces: 20 },
       totalPts: 0,
     });
-    expect(dataset.teamData["8214"].avgTransferPieces).toBe(10);
-    expect(dataset.teamData["6328"].avgTransferPieces).toBe(20);
+    expect(dataset.teamData["8214"].metrics.transferPieces).toBe(10);
+    expect(dataset.teamData["6328"].metrics.transferPieces).toBe(20);
   });
 
   it("applies no-show, incap, and climb failure rules", () => {
@@ -822,20 +834,22 @@ describe("cyber-scout dataset conversion", () => {
           bps: [35, 35, 0],
           accuracy: [100, 100, 0],
           comments: ["", "", ""],
+          autoScore: 60,
+          teleopScore: 20,
         }),
       ],
     });
 
     expect(dataset.teamData["6328"].matches[0]).toMatchObject({
       totalPts: 0,
-      botState: 4,
+      status: "no_show",
       disabled: true,
     });
     expect(reliability(dataset.teamData["6328"])).toBe(0);
     expect(dataset.teamData["157"].matches[0]).toMatchObject({
       totalPts: 80,
-      climbPts: 0,
-      botState: 3,
+      metrics: { climbPoints: 0 },
+      status: "incap",
       disabled: false,
       downtimeMs: 150_000,
     });
