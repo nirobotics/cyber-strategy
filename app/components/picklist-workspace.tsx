@@ -589,7 +589,7 @@ function ListButton({ list, onClick, readOnly, embedded = false }: { list: Share
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy, error }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean; error?: string }) {
-  return <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className={cn("min-w-0 font-sans", error && "border-danger")} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !error) onCreate(); }} placeholder={placeholder} maxLength={80} aria-invalid={Boolean(error)} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy || Boolean(error)}><Plus className="size-4" />创建</Button>{error ? <p className="text-xs text-danger sm:col-span-2">{error}</p> : null}</div>;
+  return <div className="grid min-w-0 gap-1.5 sm:grid-cols-[minmax(0,1fr)_auto]"><Input className={cn("min-w-0 font-sans", error && "border-danger")} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} maxLength={80} aria-invalid={Boolean(error)} /><Button type="button" variant="primary" onClick={onCreate} disabled={!value.trim() || busy || Boolean(error)}><Plus className="size-4" />创建</Button>{error ? <p className="text-xs text-danger sm:col-span-2">{error}</p> : null}</div>;
 }
 
 function EmptyCollection({ text }: { text: string }) {
