@@ -1,7 +1,7 @@
 {
   "name": "cyber-strategy",
   "private": true,
-  "version": "2026.1.63",
+  "version": "2026.1.64",
   "type": "module",
   "scripts": {
     "dev": "react-router dev",

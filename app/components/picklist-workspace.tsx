@@ -567,8 +567,7 @@ function DeletePicklistDialog({ list, name = list?.name ?? "", kind = "Personal"
           <Button type="button" className="shrink-0 px-2" onClick={onCancel} disabled={busy} title="关闭"><X className="size-4" /></Button>
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-sm text-ink-dim">确定删除 <strong className="font-semibold text-ink">{name}</strong>？</p>
-          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">{kind === "Main" ? "所有人将无法继续查看此 Main Picklist。" : "本机草稿和已提交版本都会被删除，"}此操作无法撤销。</p>
+          <p className="text-sm text-ink-dim">确定删除 <strong className="font-semibold text-ink">{name}</strong> ？</p>
         </div>
         <div className="flex justify-end gap-2 border-t border-line bg-surface-2 p-3">
           <Button type="button" onClick={onCancel} disabled={busy}>取消</Button>
