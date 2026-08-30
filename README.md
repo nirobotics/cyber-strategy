@@ -22,7 +22,8 @@ Cyber Strategy 面向 FRC 队伍的侦查分析、选队和比赛策略工作：
 - `strategy-template` 是长期维护的通用模板分支，只保留跨年度能力。
 - 每年从最新模板创建独立年度分支，例如 `strategy-2027`；一个分支只配置一个赛季，不在运行时切换赛季。
 - 年度差异集中在 `app/season/` 和年度场地资源，不建设动态插件系统。
-- 新赛季开始前按 [`SEASON_CUSTOMIZATION.md`](./SEASON_CUSTOMIZATION.md) 完成配置、映射和验证。
+
+创建年度分支前，先通过 [`SEASON_REQUIREMENTS.md`](./SEASON_REQUIREMENTS.md) 收集并确认当年需求，再按 [`SEASON_CUSTOMIZATION.md`](./SEASON_CUSTOMIZATION.md) 完成实现和验收。需求未明确或标记为 `TBD` 的内容不得由 AI 猜测。
 
 ## 技术栈
 
@@ -102,7 +103,7 @@ pnpm test
 pnpm build
 ```
 
-数据库结构变化必须新增迁移，不直接改写已部署迁移。部署前确认 Vercel 中已配置 `.env.example` 列出的必需变量。年度定制完成后执行 `SEASON_CUSTOMIZATION.md` 的验收清单。
+数据库结构变化必须新增迁移，不直接改写已部署迁移。部署前确认 Vercel 中已配置 `.env.example` 列出的必需变量。年度定制前先完成 `SEASON_REQUIREMENTS.md`，实施后执行 `SEASON_CUSTOMIZATION.md` 的验收清单。
 
 ## 维护规则
 

@@ -9,14 +9,7 @@ import {
 
 export type MatchAutoPathPoint = { node: string; atMs: number; x?: number; y?: number };
 
-export type RobotStatus =
-  | "normal"
-  | "comms_issue"
-  | "minor_fault"
-  | "major_fault"
-  | "no_show"
-  | "incap"
-  | "unknown";
+export type RobotStatus = "normal" | "no_show" | "incap";
 
 export type ScoutingMatch = {
   match: number;
@@ -143,8 +136,8 @@ export function summarizeTeamMatches(team: string, matches: ScoutingMatch[]): Te
     metrics: summarizeMetrics(matchList),
     avgDriver: avg(matchList.map((match) => match.driverRating).filter((value) => value > 0)),
     avgDefense: avg(matchList.map((match) => match.defenseRating).filter((value) => value > 0)),
-    malfunctions: matchList.filter((match) => ["minor_fault", "major_fault", "incap"].includes(match.status)).length,
-    commsIssues: matchList.filter((match) => match.status === "comms_issue").length,
+    malfunctions: matchList.filter((match) => match.status === "incap").length,
+    commsIssues: 0,
     disabledEvents: matchList.filter((match) => match.disabled).length,
     matchCount: matchList.length,
     trend: secondHalfAvg > firstHalfAvg + 5 ? "up" : secondHalfAvg < firstHalfAvg - 5 ? "down" : "stable",
@@ -184,11 +177,13 @@ export function reliability(team: TeamSummary): number {
 }
 
 export function scoutingMatchStatus(match: ScoutingMatch): RobotStatus {
-  if (["normal", "comms_issue", "minor_fault", "major_fault", "no_show", "incap", "unknown"].includes(match.status)) return match.status;
-  const legacy = match as unknown as { botState?: number; botStateText?: string };
+  if (match.status === "no_show") return "no_show";
+  if (match.disabled) return "incap";
+  if (match.status === "normal" || match.status === "incap") return match.status;
+  const legacy = match as unknown as { status?: string; botState?: number; botStateText?: string };
   return normalizeRobotStatus({
     code: legacy.botState,
-    text: legacy.botStateText,
+    text: legacy.botStateText || legacy.status,
     disabled: match.disabled,
     downtimeMs: match.downtimeMs,
   });

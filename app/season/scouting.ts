@@ -291,6 +291,7 @@ export function seasonCsvScoutingMatch(row: Record<string, unknown>): ScoutingMa
 export function normalizeRobotStatus({
   code,
   text,
+  disabled = false,
   downtimeMs = 0,
   noShow = false,
 }: {
@@ -303,14 +304,13 @@ export function normalizeRobotStatus({
   if (noShow) return "no_show";
   const normalized = stringValue(text).toLowerCase();
   if (["no show", "no_show", "未到场"].includes(normalized)) return "no_show";
+  if (disabled) return "incap";
   if (["incap", "down", "宕机"].includes(normalized)) {
     return downtimeMs <= seasonConfig.incapNormalThresholdMs ? "normal" : "incap";
   }
   if (["no issue", "normal", "正常"].includes(normalized)) return "normal";
-  if (["comms issue", "communication issue", "通信问题"].includes(normalized)) return "comms_issue";
-  if (["minor malfunction", "minor fault", "轻微故障"].includes(normalized)) return "minor_fault";
-  if (["major malfunction", "major fault", "严重故障"].includes(normalized)) return "major_fault";
-  return ({ 1: "normal", 2: "comms_issue", 3: "minor_fault", 4: "major_fault" } as const)[code ?? 0] ?? "unknown";
+  if (["comms issue", "communication issue", "通信问题", "minor malfunction", "minor fault", "轻微故障", "major malfunction", "major fault", "严重故障"].includes(normalized)) return "incap";
+  return code != null && code > 1 ? "incap" : "normal";
 }
 
 export function readSeasonEditableValues(payload: unknown, team: string, recordType: "normal" | "super") {

@@ -32,7 +32,7 @@ git switch -c strategy-2027
 - `matchDurationMs` 和 `incapNormalThresholdMs` 分别控制比赛时长与宕机判定，不在组件中复制固定值。
 - `metrics` 的 key 必须稳定且唯一；`label`、格式、小数位以及摘要、逐场表格、对比页的展示开关均由定义控制。
 - 逐场通用数据固定保留比赛、Total、Auto、Tele、状态、备注和记录员；年度字段放入 `metrics`，忽略比赛后所有统计都从剩余场次重算。
-- 机器人状态统一为正常、通信问题、轻微故障、严重故障、未到场、宕机、未知；`disabled` 与 `downtimeMs` 独立保存。
+- 机器人状态只允许正常、未到场、宕机；旧状态读取时统一映射到这三种状态，`disabled` 与 `downtimeMs` 仍独立保存。
 - Proposal 阶段使用赛季配置中的稳定 ID。旧 `auto`、`self_strategy`、`partner_strategy` payload 必须继续可读，新数据使用当前统一比赛策略流程。
 
 ## 数据与计分适配

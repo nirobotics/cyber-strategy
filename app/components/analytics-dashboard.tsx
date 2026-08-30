@@ -1216,17 +1216,12 @@ function PointsBar({ value, max }: { value: number; max: number }) {
 function StatePill({ match }: { match: ScoutingMatch }) {
   const status = scoutingMatchStatus(match);
   const className =
-    status === "comms_issue"
-      ? "border-warn/40 bg-warn/10 text-warn"
-      : status === "minor_fault" || status === "incap"
-        ? "border-orange-500/40 bg-orange-500/10 text-orange-600 dark:text-orange-300"
-        : status === "major_fault" || status === "no_show"
-          ? "border-danger/40 bg-danger/10 text-danger"
-          : status === "unknown" ? "border-line bg-surface-2 text-ink-dim" : "border-ok/40 bg-ok/10 text-ok";
+    status === "normal"
+      ? "border-ok/40 bg-ok/10 text-ok"
+      : "border-danger/40 bg-danger/10 text-danger";
   return (
     <span className={cn("inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold", className)}>
       {robotStatusLabel(status)}
-      {match.disabled ? <span className="text-danger">已禁用</span> : null}
     </span>
   );
 }
@@ -1234,12 +1229,8 @@ function StatePill({ match }: { match: ScoutingMatch }) {
 function robotStatusLabel(status: ScoutingMatch["status"]) {
   return {
     normal: "正常",
-    comms_issue: "通信问题",
-    minor_fault: "轻微故障",
-    major_fault: "严重故障",
     no_show: "未到场",
     incap: "宕机",
-    unknown: "未知",
   }[status];
 }
 
@@ -1319,9 +1310,7 @@ function teamLineConfig(matches: ScoutingMatch[], palette: { accent: string; mut
           borderColor: palette.accent,
           backgroundColor: `${palette.accent}18`,
           pointBackgroundColor: matches.map((match) =>
-            ["major_fault", "no_show"].includes(scoutingMatchStatus(match))
-              ? "#dc2626"
-              : scoutingMatchStatus(match) === "comms_issue" ? "#f97316" : palette.accent,
+            scoutingMatchStatus(match) === "normal" ? palette.accent : "#dc2626",
           ),
           pointRadius: 5,
           borderWidth: 2,
