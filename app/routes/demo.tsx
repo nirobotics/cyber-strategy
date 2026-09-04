@@ -35,7 +35,7 @@ export async function loader() {
   try {
     const [scoutingLead, picklists] = await Promise.all([
       loadScoutConfidenceReport(DEMO_EVENT_KEY, { tbaMatches: source.matches }),
-      listPicklists("2026txcmp1", "demo", true).catch(() => []),
+      listPicklists(DEMO_EVENT_KEY, "demo", true).catch(() => []),
     ]);
     const matches = enrichScheduledMatches(source.matches, [], mergeMatchResults(results, toTbaMatchResults(source.matches)));
     return {
@@ -54,7 +54,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.69"
+      version="2026.1.70"
       user={null}
       authLoading={false}
       allowGuest
