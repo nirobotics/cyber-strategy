@@ -270,6 +270,13 @@ export function StrategyProposalPanel({
               {selected.reviewedAt ? <span className="text-ink-dim">{new Date(selected.reviewedAt).toLocaleString()}</span> : null}
             </div>
           ) : null}
+          {demoMode && selected?.status === "approved" && selected.reviewNote ? (
+            <div className="flex flex-wrap gap-x-2 gap-y-1 border-b border-ok/30 bg-ok/10 px-3 py-2 text-sm md:px-4">
+              <span className="font-semibold text-ok">审核批注</span>
+              <span className="text-ink">{selected.reviewNote}</span>
+              {selected.reviewedAt ? <span className="text-ink-dim">{new Date(selected.reviewedAt).toLocaleString()}</span> : null}
+            </div>
+          ) : null}
 
           <proposalFetcher.Form
             method="post"
@@ -384,13 +391,13 @@ export function StrategyProposalPanel({
           </proposalFetcher.Form>
 
           {reviewer && selected ? (
-            <proposalFetcher.Form method="post" action="/strategy-proposal" className="grid gap-3 border-t border-line bg-surface-2 p-3 md:p-4">
+            <proposalFetcher.Form method="post" action="/strategy-proposal" className="grid gap-3 border-t border-line bg-surface-2 p-3 md:p-4" onSubmit={demoMode ? (event) => event.preventDefault() : undefined}>
               <input type="hidden" name="intent" value="review" />
               <input type="hidden" name="id" value={selected.id} />
               <input type="hidden" name="eventKey" value={data.selectedEventKey} />
               <label className="grid gap-1">
                 <span className="section-label">审核备注</span>
-                <textarea name="reviewNote" className="input min-h-20 font-sans" placeholder="退回时建议填写原因" />
+                <textarea name="reviewNote" className="input min-h-20 font-sans" placeholder="退回时建议填写原因" defaultValue={demoMode ? "请确认自动阶段路线是否需要避让。" : undefined} />
               </label>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button type="submit" name="decision" value="rejected" disabled={busy}>
