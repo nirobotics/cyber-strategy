@@ -185,16 +185,6 @@ export function reliability(team: TeamSummary): number {
   }));
 }
 
-export function normalizeTeamPhotos(raw: unknown): TeamPhotos {
-  if (!raw || typeof raw !== "object") return {};
-  const photos: TeamPhotos = {};
-  for (const [team, values] of Object.entries(raw)) {
-    if (!Array.isArray(values)) continue;
-    photos[team] = values.filter((value): value is string => typeof value === "string" && value.length > 0);
-  }
-  return photos;
-}
-
 function toMatch(row: CsvRow): ScoutingMatch {
   const hubSuccess = number(row.TotalHubFuelSuccess);
   const hubFail = number(row.TotalHubFuelFail);

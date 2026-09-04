@@ -454,11 +454,6 @@ export function epaTele(team: TeamEvent): number | null {
   return finiteOrNull(value);
 }
 
-export function epaEndgame(team: TeamEvent): number | null {
-  const value = typeof team.epa === "number" ? null : team.epa?.endgame_points?.mean ?? team.epa?.endgame ?? null;
-  return finiteOrNull(value);
-}
-
 export function teamNumber(team: TeamEvent) {
   return String(team.team ?? team.team_number ?? team.team_key ?? "").replace(/^frc/, "");
 }

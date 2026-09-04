@@ -4,5 +4,3 @@ export type SessionUser = {
   displayName: string;
   avatarUrl: string | null;
 };
-
-export type AuthMode = "guest-compatible" | "login-required";

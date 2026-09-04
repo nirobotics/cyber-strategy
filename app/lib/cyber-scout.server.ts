@@ -287,14 +287,6 @@ export async function loadCyberScoutProposalMatches(eventKey: string, includedMa
   return toCyberScoutProposalMatches(config.matches, includedMatchTypes);
 }
 
-export async function loadCyberScoutMatches(eventKey: string, includedMatchTypes?: DataRange[]): Promise<CombinedMatch[]> {
-  const db = getCyberScoutClient();
-  if (!db) return [];
-  const config = await fetchScoutEventConfig(db);
-  if (config.tbaEventKey !== eventKey) return [];
-  return toCyberScoutMatches(config.matches, includedMatchTypes);
-}
-
 export async function loadSuperScoutMatchResults(eventKey: string): Promise<MatchResult[]> {
   const db = getCyberScoutClient();
   if (!db) return [];

@@ -298,10 +298,6 @@ export function canEditProposalAs(
   return proposal.createdBy === openId && (proposal.status === "draft" || proposal.status === "rejected" || proposal.status === "approved");
 }
 
-export function canSubmitProposal(proposal: Pick<StrategyProposal, "createdBy" | "status"> | null, openId: string) {
-  return canEditProposal(proposal, openId);
-}
-
 export function canReviewProposal(proposal: Pick<StrategyProposal, "status"> | null, isAdmin: boolean) {
   return Boolean(isAdmin && proposal?.status === "submitted");
 }
