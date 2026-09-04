@@ -16,6 +16,7 @@ import { getDataRange } from "./settings.server";
 import { matchLabel, mergeMatchResults, toCyberScoutMatches, toTbaMatchResults, type CombinedMatch, type MatchResult } from "./match-analysis";
 import { toCyberScoutProposalMatches, type ProposalMatch } from "./strategy-proposal-matches";
 import { fetchTbaMatches, type TbaMatch } from "./tba.server";
+import { appendAudit } from "./audit.server";
 
 type CyberScoutLoadResult = {
   dataset: ScoutingDataset | null;
@@ -412,7 +413,7 @@ export async function loadScoutConfidenceReport(
   }
 }
 
-export async function deleteCyberScoutRecord(recordId: string) {
+export async function deleteCyberScoutRecord(recordId: string, actorOpenId: string) {
   const id = cleanUuid(recordId);
   if (!id) throw new Error("记录 ID 无效。");
   const db = getCyberScoutClient();
@@ -430,6 +431,12 @@ export async function deleteCyberScoutRecord(recordId: string) {
 
   const deleted = await db.from("scouting_records").delete().eq("id", id);
   if (deleted.error) throw deleted.error;
+  await appendAudit("cyber_scout.record.delete", {
+    actorOpenId,
+    changedFields: ["record"],
+    targetType: "cyber_scout_record",
+    targetId: id,
+  });
   return true;
 }
 
@@ -440,6 +447,7 @@ export async function saveCyberScoutAssignment(input: {
   endMatch: number;
   position: string;
   userName: string;
+  actorOpenId: string;
 }) {
   const db = getCyberScoutClient();
   if (!db) throw new Error("cyber-scout 数据源未配置。");
@@ -460,15 +468,27 @@ export async function saveCyberScoutAssignment(input: {
     assignments: [...config.assignments.filter((item) => item.id !== assignment.id), assignment].sort(compareAssignments),
   };
   await saveScoutEventConfig(db, next);
+  await appendAudit("cyber_scout.assignment.save", {
+    actorOpenId: input.actorOpenId,
+    changedFields: ["event_key", "start_match", "end_match", "position", "user_name"],
+    targetType: "cyber_scout_assignment",
+    targetId: assignment.id,
+  });
 }
 
-export async function deleteCyberScoutAssignment(id: string) {
+export async function deleteCyberScoutAssignment(id: string, actorOpenId: string) {
   const db = getCyberScoutClient();
   if (!db) throw new Error("cyber-scout 数据源未配置。");
   const config = await fetchScoutEventConfig(db);
   await saveScoutEventConfig(db, {
     ...config,
     assignments: config.assignments.filter((assignment) => assignment.id !== id),
+  });
+  await appendAudit("cyber_scout.assignment.delete", {
+    actorOpenId,
+    changedFields: ["assignment"],
+    targetType: "cyber_scout_assignment",
+    targetId: id,
   });
 }
 

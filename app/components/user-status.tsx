@@ -1,5 +1,5 @@
 import { LogIn, LogOut } from "lucide-react";
-import { NavLink } from "react-router";
+import { Form } from "react-router";
 import type { SessionUser } from "../lib/auth-types";
 
 export function UserStatus({
@@ -53,14 +53,16 @@ export function UserStatus({
         )}
         <span className="hidden max-w-32 truncate sm:inline">{user.displayName}</span>
       </div>
-      <NavLink
-        to={logoutHref}
-        className="grid size-9 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
-        aria-label="退出登录"
-        title="退出登录"
-      >
-        <LogOut className="size-4" aria-hidden />
-      </NavLink>
+      <Form method="post" action={logoutHref}>
+        <button
+          type="submit"
+          className="grid size-9 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--background)] hover:text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--panel)]"
+          aria-label="退出登录"
+          title="退出登录"
+        >
+          <LogOut className="size-4" aria-hidden />
+        </button>
+      </Form>
     </>
   );
 }

@@ -6,7 +6,7 @@ import { requireUser } from "../lib/auth.server";
 import { startFeishuLogin } from "../lib/feishu";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  return { user: requireUser(request, { redirectToLogin: true }) };
+  return { user: await requireUser(request, { redirectToLogin: true }) };
 }
 
 export default function AppLayout({ loaderData }: Route.ComponentProps) {
@@ -18,7 +18,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="0.0.8"
+      version="0.0.9"
       user={loaderData.user}
       authLoading={false}
       allowGuest={false}

@@ -1440,3 +1440,23 @@
 **验证**：`pnpm typecheck`、`pnpm lint`、22 个测试文件 / 145 项测试、`pnpm build`、版本一致性和 `git diff --check` 全部通过。
 
 **风险 / 待办**：无新增风险；当前改动未提交、未推送。
+
+---
+
+## 2026-09-04 · 深度安全加固
+
+**当前状态**：`strategy-template` 已完成认证、会话、CSRF、审计、响应头和依赖供应链加固，版本升级为 `0.0.9`；改动尚未提交、推送或部署。
+
+**本轮完成**：
+- 所有 Cookie 认证写操作统一校验 POST 与同源 Origin；登出改为 POST，异常方法返回 405。
+- 修复反斜杠开放重定向；OAuth state 与短时 `__Host-` HttpOnly Cookie 绑定，PKCE verifier 不再放入 state。
+- 飞书租户 allow-list 改为失败关闭，并通过飞书官方接口确认租户 key；本地和 Vercel 三套环境均已配置。
+- Session 加入签发时间、租户绑定、账号停用和服务端撤销；身份数据库不可用时拒绝认证。
+- 增加不可变审计迁移、操作目标字段，以及 Cyber Scout 记录编辑/删除和分配变更审计。
+- 增加 CSP、no-store、nosniff、Referrer-Policy、Permissions-Policy；补齐纯资源 401/403/405 响应头。
+- React Router 升级到 7.18.3，清除全部已知依赖漏洞；新增锁定 Action SHA 的 CI 和 Dependabot。
+- GitHub 仓库漏洞告警已启用。
+
+**验证**：`pnpm audit` 为 0 个已知漏洞；`pnpm lint`、`pnpm typecheck`、24 个测试文件 / 158 项测试、`pnpm build`、版本一致性和 `git diff --check` 通过。真实 HTTP 验证登录页安全头、资源 401、跨源 Action 403、异常方法 405、OAuth `__Host-` Cookie 和 GET 登出无副作用。
+
+**风险 / 待办**：部署新代码前必须先将 `supabase/migrations/0006_security_hardening.sql` 应用到生产数据库；本机无 Supabase CLI 登录态，未执行远端迁移。GitHub 当前套餐不支持私有仓库分支保护或 ruleset。`strategy-2026` 未同步本轮改动。

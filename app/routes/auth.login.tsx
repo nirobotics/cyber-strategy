@@ -3,8 +3,11 @@ import { Route as StrategyIcon } from "lucide-react";
 import type { Route } from "./+types/auth.login";
 import { AppFooter } from "../components/app-footer";
 import { ThemeToggle } from "../components/theme-toggle";
+import { requireMethod, requireSameOrigin } from "../lib/request-security.server";
 
 export async function action({ request }: Route.ActionArgs) {
+  requireMethod(request, "POST");
+  requireSameOrigin(request);
   const formData = await request.formData();
   const returnTo = String(formData.get("returnTo") || "/");
   throw redirect(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
@@ -51,7 +54,7 @@ export default function LoginPage() {
           </button>
         </Form>
       </main>
-      <AppFooter version="0.0.8" />
+      <AppFooter version="0.0.9" />
     </>
   );
 }

@@ -8,7 +8,7 @@ import { isAdmin } from "../lib/profiles.server";
 import { getDataRange, getTierPercentages } from "../lib/settings.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = requireUser(request, { redirectToLogin: true });
+  const user = await requireUser(request, { redirectToLogin: true });
   const [admin, tierPercentages, dataRange] = await Promise.all([
     isAdmin(user.feishuOpenId),
     getTierPercentages(),

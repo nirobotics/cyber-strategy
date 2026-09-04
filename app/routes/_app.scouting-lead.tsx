@@ -7,6 +7,7 @@ import {
   loadScoutConfidenceForRequest,
   saveCyberScoutAssignment,
 } from "../lib/cyber-scout.server";
+import { requireMethod } from "../lib/request-security.server";
 
 type ScoutingLeadActionData = { error?: string; ok?: boolean; view?: "confidence" | "records" | "assignments" };
 
@@ -16,14 +17,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<ScoutingLeadActionData> {
-  await requireAdmin(request);
+  requireMethod(request, "POST");
+  const user = await requireAdmin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
   const event = String(formData.get("event") || "");
 
   try {
     if (intent === "delete-record") {
-      await deleteCyberScoutRecord(String(formData.get("recordId") || ""));
+      await deleteCyberScoutRecord(String(formData.get("recordId") || ""), user.feishuOpenId);
       return { ok: true, view: "records" };
     }
 
@@ -35,12 +37,13 @@ export async function action({ request }: Route.ActionArgs): Promise<ScoutingLea
         endMatch: Number(formData.get("endMatch") || 0),
         position: String(formData.get("position") || ""),
         userName: String(formData.get("userName") || ""),
+        actorOpenId: user.feishuOpenId,
       });
       return { ok: true, view: "assignments" };
     }
 
     if (intent === "delete-assignment") {
-      await deleteCyberScoutAssignment(String(formData.get("assignmentId") || ""));
+      await deleteCyberScoutAssignment(String(formData.get("assignmentId") || ""), user.feishuOpenId);
       return { ok: true, view: "assignments" };
     }
   } catch (error) {

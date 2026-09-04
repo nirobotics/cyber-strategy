@@ -98,10 +98,10 @@ async function fetchUserInfo(accessToken: string): Promise<FeishuUser | null> {
   }
 }
 
-/** 组织 allow-list：FEISHU_ALLOWED_TENANT_KEYS 为空时不校验（模式 13）。 */
+/** 组织 allow-list：未配置或无法识别租户时拒绝登录。 */
 export function isTenantAllowed(tenantKey: string | null): boolean {
   const raw = process.env.FEISHU_ALLOWED_TENANT_KEYS;
-  if (!raw || !raw.trim()) return true;
+  if (!raw || !raw.trim()) return false;
   const allow = raw.split(",").map((s) => s.trim()).filter(Boolean);
   return tenantKey != null && allow.includes(tenantKey);
 }

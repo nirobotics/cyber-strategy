@@ -3,7 +3,7 @@ import { requireUser } from "../lib/auth.server";
 import { loadMatchVideosForEvent } from "../lib/feishu-videos.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  requireUser(request);
+  await requireUser(request);
   const eventKey = new URL(request.url).searchParams.get("event");
   const result = await loadMatchVideosForEvent(eventKey);
   return Response.json(result, {

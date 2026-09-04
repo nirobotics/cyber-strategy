@@ -5,6 +5,8 @@ export type ProfileRow = {
   name: string;
   avatar_url: string | null;
   is_admin: boolean;
+  is_active: boolean;
+  session_valid_after: string;
   created_at: string;
 };
 

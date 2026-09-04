@@ -8,6 +8,7 @@ import {
   parseTierPercentages,
   validateTierPercentages,
 } from "../lib/tier-settings";
+import { requireMethod } from "../lib/request-security.server";
 
 type ActionData = { error?: string; ok?: boolean };
 
@@ -17,6 +18,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<Response | ActionData> {
+  requireMethod(request, "POST");
   const user = await requireAdmin(request);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");

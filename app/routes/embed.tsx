@@ -14,8 +14,22 @@ export const meta = () => [{ title: "Cyber Strategy 分析" }];
 export function headers() {
   return {
     "Cache-Control": "private, no-store",
-    "Content-Security-Policy": "frame-ancestors https://pit.team8214.com http://localhost:*",
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "connect-src 'self' https://api.statbotics.io",
+      "font-src 'self' data:",
+      "form-action 'none'",
+      "frame-ancestors https://pit.team8214.com http://localhost:*",
+      "frame-src 'none'",
+      "img-src 'self' data: https:",
+      "object-src 'none'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+    ].join("; "),
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
   };
 }
 
