@@ -6,6 +6,7 @@ import { AppShell } from "../components/app-shell";
 import { Card } from "../components/ui";
 import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
 import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
+import { listPicklists } from "../lib/picklists.server";
 import { startFeishuLogin } from "../lib/feishu";
 import { enrichScheduledMatches, mergeMatchResults, toTbaMatchResults } from "../lib/match-analysis";
 import { fetchMatchResults } from "../lib/match-results.server";
@@ -33,10 +34,13 @@ export async function loader() {
   if (!source.dataset) return { demo: null, error: "Demo 数据源暂不可用。" };
 
   try {
-    const scoutingLead = await loadScoutConfidenceReport(DEMO_EVENT_KEY, { tbaMatches: source.matches });
+    const [scoutingLead, picklists] = await Promise.all([
+      loadScoutConfidenceReport(DEMO_EVENT_KEY, { tbaMatches: source.matches }),
+      listPicklists("2026txcmp1", "demo", true).catch(() => []),
+    ]);
     const matches = enrichScheduledMatches(source.matches, [], mergeMatchResults(results, toTbaMatchResults(source.matches)));
     return {
-      demo: buildDemoData(source.dataset, matches, scoutingLead),
+      demo: buildDemoData(source.dataset, matches, scoutingLead, picklists),
       error: null,
     };
   } catch (error) {
@@ -51,7 +55,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.67"
+      version="2026.1.68"
       user={null}
       authLoading={false}
       allowGuest
@@ -72,7 +76,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           matchSchedule={loaderData.demo.matches}
           strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS), loaded: true }}
           scoutingLead={loaderData.demo.scoutingLead}
-          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"] }}
+          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"], picklists: loaderData.demo.picklists }}
         />
       ) : (
         <Card className="mx-auto max-w-2xl p-6 text-sm text-ink-dim">{loaderData.error}</Card>

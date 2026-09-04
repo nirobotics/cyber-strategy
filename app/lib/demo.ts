@@ -1,12 +1,13 @@
 import { matchTeams, type CombinedMatch } from "./match-analysis";
 import type { ScoutConfidenceResult } from "./cyber-scout.server";
 import type { ScoutingDataset, TeamPitData } from "./scouting";
+import type { PicklistBoard, SharedPicklist } from "./picklist";
 
 export const DEMO_EVENT_KEY = "2026txcmp2";
 export const DEMO_EVENT_NAME = "Event 1";
 export const DEMO_OWN_TEAMS = ["1000"] as const;
 
-export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[], scoutingLead: ScoutConfidenceResult) {
+export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[], scoutingLead: ScoutConfidenceResult, picklists: SharedPicklist[] = []) {
   const originalTeams = [...new Set([
     ...Object.keys(dataset.teamData),
     ...matches.flatMap((match) => [...matchTeams(match, "red"), ...matchTeams(match, "blue")]),
@@ -50,7 +51,12 @@ export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[]
     },
     matches: matches.map((match) => anonymizeMatch(match, teamMap)),
     scoutingLead: anonymizeScoutingLead(scoutingLead, teamMap, scoutMap),
+    picklists: picklists.map((list) => ({ ...list, eventKey: DEMO_EVENT_KEY, board: mapPicklistBoard(list.board, teamMap), createdBy: list.kind === "personal" && list.name.toLowerCase().includes("scout 1") ? "demo" : list.createdBy })),
   };
+}
+
+function mapPicklistBoard(board: PicklistBoard, teamMap: Map<string, string>): PicklistBoard {
+  return Object.fromEntries(Object.entries(board).map(([column, teams]) => [column, teams.map((team) => teamMap.get(team) ?? String(1000 + (Number(team) % 45)))])) as PicklistBoard;
 }
 
 function buildScoutMap(dataset: ScoutingDataset, scoutingLead: ScoutConfidenceResult) {

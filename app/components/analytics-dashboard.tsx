@@ -40,7 +40,7 @@ import { analyzeRouteRepetition, buildMatchAutoRoutes, MATCH_AUTO_NODE_LABELS } 
 import type { CombinedMatch } from "../lib/match-analysis";
 import type { DataRange } from "../lib/data-range";
 import { dashboardResourcePath } from "../lib/dashboard-performance";
-import type { PicklistResource } from "../lib/picklist";
+import type { PicklistResource, SharedPicklist } from "../lib/picklist";
 
 type Tab = "browser" | "compare" | "match" | "picklist" | "proposal" | "lead" | "settings";
 
@@ -82,7 +82,7 @@ export function AnalyticsDashboard({
   matchSchedule: CombinedMatch[];
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
   scoutingLead: ScoutingLeadPanelData | null;
-  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[] };
+  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[]; picklists: SharedPicklist[] };
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -127,7 +127,7 @@ export function AnalyticsDashboard({
     ? scoutingLead
     : scoutingLeadFetcher.data?.selectedEventKey === resolvedEventKey ? scoutingLeadFetcher.data : null;
   const resolvedPicklists: PicklistResource | null = demoMode
-    ? { selectedEventKey: resolvedEventKey, isAdmin: true, userOpenId: user.feishuOpenId, lists: [], error: null }
+    ? { selectedEventKey: resolvedEventKey, isAdmin: true, userOpenId: user.feishuOpenId, lists: demo!.picklists, error: null }
     : picklistFetcher.data?.selectedEventKey === resolvedEventKey ? picklistFetcher.data : null;
 
   const prepareTab = useCallback((next: Tab) => {
