@@ -18,7 +18,7 @@ export default function AppLayout({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.70"
+      version="2026.1.71"
       user={loaderData.user}
       authLoading={false}
       allowGuest={false}

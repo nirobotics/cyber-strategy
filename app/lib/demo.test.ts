@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDemoData, DEMO_OWN_TEAMS } from "./demo";
+import { buildDemoData, buildDemoStrategyProposals, DEMO_OWN_TEAMS } from "./demo";
 import type { ScoutConfidenceResult } from "./cyber-scout.server";
 import type { CombinedMatch } from "./match-analysis";
 import type { ScoutingDataset, TeamSummary } from "./scouting";
@@ -7,6 +7,20 @@ import { emptyScoutConfidenceReport } from "./scout-confidence";
 import { toProposalMatches } from "./strategy-proposal-matches";
 
 describe("Apollo demo data", () => {
+  it("shows three strategy proposals across the review workflow", () => {
+    const proposals = buildDemoStrategyProposals([
+      { key: "qm1", label: "Q1", redTeams: ["1000", "1001", "1002"], blueTeams: ["1003", "1004", "1005"] },
+      { key: "qm2", label: "Q2", redTeams: ["1003", "1004", "1005"], blueTeams: ["1000", "1001", "1002"] },
+      { key: "qm3", label: "Q3", redTeams: ["1000", "1002", "1004"], blueTeams: ["1001", "1003", "1005"] },
+    ]);
+
+    expect(proposals.map((proposal) => proposal.status)).toEqual(["approved", "submitted", "rejected"]);
+    expect(proposals.every((proposal) => proposal.payload.kind === "match_strategy" && Boolean(proposal.payload.note))).toBe(true);
+    expect(proposals[0].reviewNote).toBeTruthy();
+    expect(proposals[1].reviewedAt).toBeNull();
+    expect(proposals[2].reviewNote).toBeTruthy();
+  });
+
   it("maps 45 teams, anonymizes scouts, and removes comments and photos", () => {
     const dataset: ScoutingDataset = {
       id: "source",

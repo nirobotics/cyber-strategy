@@ -2,10 +2,39 @@ import { matchTeams, type CombinedMatch } from "./match-analysis";
 import type { ScoutConfidenceResult } from "./cyber-scout.server";
 import type { ScoutingDataset, TeamPitData } from "./scouting";
 import type { PicklistBoard, SharedPicklist } from "./picklist";
+import type { ProposalMatch } from "./strategy-proposal-matches";
+import { normalizeProposalPayload, strategyProposalTitle, type StrategyProposal, type StrategyProposalStatus } from "./strategy-proposals";
 
 export const DEMO_EVENT_KEY = "2026txcmp2";
 export const DEMO_EVENT_NAME = "Event 1";
 export const DEMO_OWN_TEAMS = ["1000"] as const;
+
+export function buildDemoStrategyProposals(matches: ProposalMatch[]): StrategyProposal[] {
+  const statuses: StrategyProposalStatus[] = ["approved", "submitted", "rejected"];
+  const notes = ["优先执行中路自动路线，主动阶段保持分散。", "开局避让队友，主动阶段集中进攻。", "自动阶段保守运行，末段提前准备爬升。"];
+  const reviewNotes = ["方案清晰，可以按此执行。", null, "请补充与队友发生路线冲突时的备用方案。"];
+
+  return matches.slice(0, 3).map((match, index) => ({
+    id: `demo-proposal-${index + 1}`,
+    eventKey: DEMO_EVENT_KEY,
+    matchKey: match.key,
+    matchLabel: match.label,
+    ownTeam: DEMO_OWN_TEAMS[0] as StrategyProposal["ownTeam"],
+    proposalType: "auto",
+    status: statuses[index],
+    title: strategyProposalTitle("auto", match.label),
+    payload: normalizeProposalPayload("auto", { note: notes[index] }),
+    createdBy: "demo",
+    createdByName: `scout ${index + 1}`,
+    reviewedBy: index === 1 ? null : "demo-admin",
+    reviewNote: reviewNotes[index],
+    submittedAt: "2026-04-04T08:00:00.000Z",
+    reviewedAt: index === 1 ? null : "2026-04-04T08:30:00.000Z",
+    lastApprovedSnapshot: null,
+    createdAt: "2026-04-04T08:00:00.000Z",
+    updatedAt: `2026-04-04T0${9 - index}:00:00.000Z`,
+  }));
+}
 
 export function buildDemoData(dataset: ScoutingDataset, matches: CombinedMatch[], scoutingLead: ScoutConfidenceResult, picklists: SharedPicklist[] = []) {
   const originalTeams = [...new Set([

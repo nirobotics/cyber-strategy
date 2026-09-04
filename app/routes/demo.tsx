@@ -5,7 +5,7 @@ import { AnalyticsDashboard } from "../components/analytics-dashboard";
 import { AppShell } from "../components/app-shell";
 import { Card } from "../components/ui";
 import { loadCyberScoutDataset, loadScoutConfidenceReport } from "../lib/cyber-scout.server";
-import { buildDemoData, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
+import { buildDemoData, buildDemoStrategyProposals, DEMO_EVENT_KEY, DEMO_EVENT_NAME, DEMO_OWN_TEAMS } from "../lib/demo";
 import { listPicklists } from "../lib/picklists.server";
 import { startFeishuLogin } from "../lib/feishu";
 import { enrichScheduledMatches, mergeMatchResults, toTbaMatchResults } from "../lib/match-analysis";
@@ -49,12 +49,13 @@ export async function loader() {
 
 export default function DemoRoute({ loaderData }: Route.ComponentProps) {
   const navigation = useNavigation();
+  const proposalMatches = loaderData.demo ? toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS) : [];
 
   return (
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.70"
+      version="2026.1.71"
       user={null}
       authLoading={false}
       allowGuest
@@ -73,7 +74,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           dataRange={["qualification"]}
           user={DEMO_USER}
           matchSchedule={loaderData.demo.matches}
-          strategyProposal={{ proposals: [], proposalError: null, matches: toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS), loaded: true }}
+          strategyProposal={{ proposals: buildDemoStrategyProposals(proposalMatches), proposalError: null, matches: proposalMatches, loaded: true }}
           scoutingLead={loaderData.demo.scoutingLead}
           demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"], picklists: loaderData.demo.picklists }}
         />
