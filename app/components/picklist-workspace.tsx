@@ -46,7 +46,7 @@ export function PicklistWorkspace({
   const commandFetcher = useFetcher<PicklistActionData>();
   const saveFetcher = useFetcher<PicklistActionData>();
   const personalKey = personalListsKey(datasetId, resource.userOpenId);
-  const demoListsKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists`;
+  const demoListsKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists:v2`;
   const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, datasetId);
   const [sharedLists, setSharedLists] = useState(resource.lists);
   const [demoMainLoaded, setDemoMainLoaded] = useState(false);
