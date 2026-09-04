@@ -55,7 +55,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.68"
+      version="2026.1.69"
       user={null}
       authLoading={false}
       allowGuest
