@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { appendAudit } from "./audit.server";
 import type { CyberScoutRecordRow } from "./cyber-scout";
 import { getCyberScoutClient } from "./cyber-scout.server";
 import { matchTypeFromValue, type DataRange } from "./data-range";
@@ -53,9 +54,22 @@ export async function saveEditableScoutingRecord({
     ? updatePayload(db, row.id, patchNormalTimeOverride(row.payload, normal, { updatedAt, updatedBy }))
     : Promise.resolve());
   if (superValues && rows.superRow) {
-    updates.push(updatePayload(db, rows.superRow.id, patchSuperValues(rows.superRow.payload, query.team, superValues)));
+    updates.push(updatePayload(db, rows.superRow.id, {
+      ...patchSuperValues(rows.superRow.payload, query.team, superValues),
+      strategyUpdatedAt: updatedAt,
+      strategyUpdatedBy: updatedBy,
+    }));
   }
   await Promise.all(updates);
+  await appendAudit("cyber_scout.record.edit", {
+    actorOpenId: updatedBy,
+    changedFields: [
+      ...(normal ? ["shootingSeconds", "transferSeconds"] : []),
+      ...(superValues ? ["driveScore", "defenseScore", "accuracy", "bps"] : []),
+    ],
+    targetType: "cyber_scout_match_team",
+    targetId: `${query.eventKey}:${query.matchType}:${query.matchNumber}:${query.team}`,
+  });
   return loadEditableScoutingRecord(query);
 }
 

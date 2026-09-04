@@ -21,6 +21,28 @@ export const meta = () => [
   { title: "数据分析 | cyber-strategy" },
 ];
 
+export function headers() {
+  return {
+    "Cache-Control": "private, no-store",
+    "Content-Security-Policy": [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "connect-src 'self' https://api.statbotics.io https://vitals.vercel-insights.com",
+      "font-src 'self' data:",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+      "frame-src 'none'",
+      "img-src 'self' data: https:",
+      "object-src 'none'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+    ].join("; "),
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>

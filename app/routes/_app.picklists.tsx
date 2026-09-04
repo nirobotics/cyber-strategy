@@ -5,11 +5,12 @@ import { isAdmin } from "../lib/profiles.server";
 import { cleanTbaEventKey } from "../lib/tba.server";
 import { createMainPicklist, deleteMainPicklist, deletePersonalPicklist, listPicklists, saveMainPicklist, submitPersonalPicklist } from "../lib/picklists.server";
 import type { SharedPicklist } from "../lib/picklist";
+import { requireMethod } from "../lib/request-security.server";
 
 export type PicklistActionData = { error?: string; ok?: boolean; picklist?: SharedPicklist; deletedId?: string };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = requireUser(request, { redirectToLogin: true });
+  const user = await requireUser(request, { redirectToLogin: true });
   const eventKey = cleanTbaEventKey(new URL(request.url).searchParams.get("event"));
   const admin = await isAdmin(user.feishuOpenId);
   if (!eventKey) return { selectedEventKey: "", isAdmin: admin, userOpenId: user.feishuOpenId, lists: [], error: null };
@@ -33,7 +34,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<PicklistActionData> {
-  const user = requireUser(request);
+  requireMethod(request, "POST");
+  const user = await requireUser(request);
   const admin = await isAdmin(user.feishuOpenId);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");

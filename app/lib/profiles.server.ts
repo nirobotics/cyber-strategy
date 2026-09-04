@@ -10,36 +10,26 @@ export function toSessionUser(u: FeishuUser): SessionUser {
     feishuOpenId: u.openId,
     displayName: u.name,
     avatarUrl: u.avatarUrl,
+    tenantKey: u.tenantKey ?? "",
   };
 }
 
 /**
- * 登录时 upsert 身份档案。best-effort：DB 缺失/失败也让登录成功（模式 16），
- * 这种情况下 is_admin 视为 false。
+ * 登录时 upsert 身份档案。身份数据库是认证硬依赖，失败时拒绝登录。
  */
-export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean }> {
+export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean; isActive: boolean }> {
   const sb = getClient();
-  if (!sb) return { isAdmin: false };
-  try {
-    // 先读旧档案：避免覆盖 is_admin（is_admin 由管理操作单独设置）
-    const { data: existing } = await sb
-      .from("profiles")
-      .select("is_admin")
-      .eq("open_id", u.openId)
-      .maybeSingle();
-
-    await sb.from("profiles").upsert(
-      {
-        open_id: u.openId,
-        name: u.name,
-        avatar_url: u.avatarUrl,
-      },
-      { onConflict: "open_id" },
-    );
-    return { isAdmin: Boolean(existing?.is_admin) };
-  } catch {
-    return { isAdmin: false };
-  }
+  if (!sb) throw new Error("Supabase 未配置");
+  const { data, error } = await sb.from("profiles").upsert(
+    {
+      open_id: u.openId,
+      name: u.name,
+      avatar_url: u.avatarUrl,
+    },
+    { onConflict: "open_id" },
+  ).select("is_admin,is_active").single();
+  if (error) throw error;
+  return { isAdmin: Boolean(data?.is_admin), isActive: data?.is_active !== false };
 }
 
 export async function getProfile(openId: string): Promise<ProfileRow | null> {
@@ -56,4 +46,21 @@ export async function getProfile(openId: string): Promise<ProfileRow | null> {
 export async function isAdmin(openId: string): Promise<boolean> {
   const profile = await getProfile(openId);
   return Boolean(profile?.is_admin);
+}
+
+export async function isSessionAllowed(openId: string, issuedAt: number): Promise<boolean> {
+  const profile = await getProfile(openId);
+  if (!profile?.is_active) return false;
+  const validAfter = Date.parse(profile.session_valid_after);
+  return Number.isFinite(validAfter) && issuedAt >= validAfter;
+}
+
+export async function revokeSessions(openId: string): Promise<void> {
+  const sb = getClient();
+  if (!sb) throw new Error("Supabase 未配置");
+  const { error } = await sb
+    .from("profiles")
+    .update({ session_valid_after: new Date().toISOString() })
+    .eq("open_id", openId);
+  if (error) throw error;
 }

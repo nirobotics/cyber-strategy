@@ -17,6 +17,7 @@ const DEMO_USER = {
   feishuOpenId: "demo",
   displayName: "scout 1",
   avatarUrl: null,
+  tenantKey: "demo",
 };
 
 export function headers() {
@@ -50,7 +51,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.65"
+      version="2026.1.66"
       user={null}
       authLoading={false}
       allowGuest

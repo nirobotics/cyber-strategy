@@ -3,6 +3,7 @@ import {
   createDecipheriv,
   createHash,
   randomBytes,
+  timingSafeEqual,
 } from "node:crypto";
 
 /**
@@ -51,4 +52,10 @@ export function randomVerifier(): string {
 /** PKCE: S256 challenge = base64url(sha256(verifier))。 */
 export function codeChallengeS256(verifier: string): string {
   return createHash("sha256").update(verifier).digest("base64url");
+}
+
+export function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }

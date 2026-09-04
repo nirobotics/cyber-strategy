@@ -4,6 +4,7 @@ import { loadEditableScoutingRecord, saveEditableScoutingRecord } from "../lib/e
 import { loadCyberScoutDataset } from "../lib/cyber-scout.server";
 import type { EditableNormalValues, EditableSuperValues } from "../lib/editable-scouting";
 import { matchTypeFromValue, type DataRange } from "../lib/data-range";
+import { requireMethod } from "../lib/request-security.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -16,6 +17,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  requireMethod(request, "POST");
   const user = await requireAdmin(request);
   try {
     const body = await request.json() as Record<string, unknown>;

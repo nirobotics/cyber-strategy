@@ -1334,3 +1334,20 @@
 **回退更新（2026-08-16 19:48:54 +08:00）**：按用户要求取消方案 1、3。已通过反向提交移除所有 `Server-Timing`，恢复 `/embed` 的完整 dataset/赛程响应和原胜率计算路径，并将版本恢复为 `2026.1.59`。typecheck、20 files / 137 tests、全仓 lint、build、`git diff --check` 均通过。
 
 **生产验收更新（2026-08-16 19:55:00 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已恢复显示 `v2026.1.59`。
+
+---
+
+## 2026-09-04 · 同步深度安全加固
+
+**当前状态**：`strategy-2026` 已同步认证、会话、CSRF、审计、响应头和依赖安全加固，版本升级为 `2026.1.66`；改动尚未提交、推送或部署。
+
+**本轮完成**：
+- 同步同源请求校验、POST 写操作、OAuth 浏览器绑定、反斜杠开放重定向拦截和 `__Host-` Cookie。
+- Session 增加租户绑定、签发时间、账号停用和服务端撤销；飞书租户 allow-list 失败关闭。
+- 同步审计目标字段、Cyber Scout 记录/分配变更审计和不可变审计迁移。
+- 同步 CSP、no-store、nosniff、Referrer/Permissions Policy、Dependabot 和锁定 SHA 的 CI。
+- React Router 及依赖更新，完整审计目标为 0 个已知漏洞。
+
+**验证**：22 个测试文件 / 151 项测试、typecheck、lint、build 和 `git diff --check` 通过；生产数据库迁移尚未执行。
+
+**风险 / 待办**：部署前必须应用 `supabase/migrations/0006_security_hardening.sql`；`strategy-2026` 的年度编辑器已保留其专有字段逻辑，仅补充安全审计元数据。

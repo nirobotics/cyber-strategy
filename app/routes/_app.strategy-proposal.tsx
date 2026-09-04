@@ -12,11 +12,12 @@ import {
   restoreApprovedStrategyProposal,
   saveStrategyProposal,
 } from "../lib/strategy-proposals.server";
+import { requireMethod } from "../lib/request-security.server";
 
 type StrategyProposalActionData = { error?: string; ok?: boolean; proposalId?: string; deleted?: boolean };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  requireUser(request, { redirectToLogin: true });
+  await requireUser(request, { redirectToLogin: true });
   const selectedEventKey = cleanTbaEventKey(new URL(request.url).searchParams.get("event"));
   if (!selectedEventKey) {
     return {
@@ -45,7 +46,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs): Promise<StrategyProposalActionData> {
-  const user = requireUser(request);
+  requireMethod(request, "POST");
+  const user = await requireUser(request);
   const admin = await isAdmin(user.feishuOpenId);
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");

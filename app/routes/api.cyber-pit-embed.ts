@@ -6,8 +6,10 @@ import {
   type CyberPitEmbedTheme,
 } from "../lib/cyber-pit-embed.server";
 import { canResolveCyberPitEmbed } from "../lib/cyber-pit-integration.server";
+import { requireMethod } from "../lib/request-security.server";
 
 export async function action({ request }: Route.ActionArgs) {
+  requireMethod(request, "POST");
   const secret = process.env.CYBER_STRATEGY_EMBED_SECRET?.trim() ?? "";
   if (!isCyberPitEmbedRequestAuthorized(request, secret)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });

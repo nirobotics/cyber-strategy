@@ -1,10 +1,13 @@
-import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { Form, redirect, useSearchParams } from "react-router";
 import { Route as StrategyIcon } from "lucide-react";
 import type { Route } from "./+types/auth.login";
 import { AppFooter } from "../components/app-footer";
 import { ThemeToggle } from "../components/theme-toggle";
+import { requireMethod, requireSameOrigin } from "../lib/request-security.server";
 
 export async function action({ request }: Route.ActionArgs) {
+  requireMethod(request, "POST");
+  requireSameOrigin(request);
   const formData = await request.formData();
   const returnTo = String(formData.get("returnTo") || "/");
   throw redirect(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
@@ -12,10 +15,8 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function LoginPage() {
   const [params] = useSearchParams();
-  const navigation = useNavigation();
   const returnTo = params.get("returnTo") || "/";
   const signedOut = params.get("signedOut") === "1";
-  const demoLoading = navigation.location?.pathname === "/demo";
 
   return (
     <>
@@ -52,16 +53,8 @@ export default function LoginPage() {
             飞书登录
           </button>
         </Form>
-        <Link
-          to="/demo"
-          prefetch="intent"
-          aria-disabled={demoLoading}
-          className="mt-3 inline-flex w-full items-center justify-center rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-2 text-base font-medium text-[var(--foreground)] transition hover:bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--background)] aria-disabled:pointer-events-none aria-disabled:opacity-60"
-        >
-          {demoLoading ? "Demo 加载中…" : "进入 Demo"}
-        </Link>
       </main>
-      <AppFooter version="2026.1.65" />
+      <AppFooter version="2026.1.66" />
     </>
   );
 }

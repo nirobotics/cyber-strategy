@@ -3,6 +3,7 @@ export type SessionUser = {
   feishuOpenId: string;
   displayName: string;
   avatarUrl: string | null;
+  tenantKey: string;
 };
 
 export type AuthMode = "guest-compatible" | "login-required";
