@@ -125,13 +125,14 @@ export function PicklistWorkspace({
     if (!demoMode) return;
     queueMicrotask(() => {
       try {
-        setSharedLists(normalizeDemoLists(JSON.parse(localStorage.getItem(demoListsKey) ?? "[]"), eventKey));
+        const stored = localStorage.getItem(demoListsKey);
+        setSharedLists(normalizeDemoLists(JSON.parse(stored ?? JSON.stringify(resource.lists)), eventKey));
       } catch {
         setSharedLists([]);
       }
       setDemoMainLoaded(true);
     });
-  }, [demoListsKey, demoMode, eventKey]);
+  }, [demoListsKey, demoMode, eventKey, resource.lists]);
 
   useEffect(() => {
     if (demoMode && demoMainLoaded) localStorage.setItem(demoListsKey, JSON.stringify(sharedLists));
@@ -366,11 +367,11 @@ export function PicklistWorkspace({
           </PicklistCollection>
 
           <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length} footer={<CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />}>
-            {personalLists.map((list) => (
+            {personalLists.filter((list) => !demoMode || /scout 1/i.test(list.name)).map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <button type="button" onClick={() => openPersonal(list)} className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 text-left">
                   <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
-                  {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
+                  {ownSubmissions.has(list.id) && !stalePersonalIds.has(list.id) ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已上传</Badge> : null}
                 </button>
                 <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => setDeleteTarget(list)} disabled={pendingCommand === "delete-personal"} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}>
                   <Trash2 className="size-4" />
@@ -409,6 +410,7 @@ export function PicklistWorkspace({
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
                       <input className="accent-brand" type="checkbox" checked={mergePersonalIds.includes(list.id)} onChange={() => setMergePersonalIds((current) => toggleId(current, list.id))} />
                       <span className="min-w-0 truncate">{list.name}</span>
+                      <Badge className="ml-auto shrink-0 border-success/40 bg-success/10 text-success"><Check className="size-3" />已上传</Badge>
                     </label>
                   ))}
                   {!mergeablePersonal.length ? <div className="px-3 py-2 text-ink-faint">暂无提交</div> : null}
@@ -467,7 +469,7 @@ export function PicklistWorkspace({
           </Button>
           <h2 className="truncate font-semibold text-ink">{listName}</h2>
           <Badge className={isMain ? "border-brand/40 bg-brand/10 text-brand" : "border-line bg-surface-2 text-ink-dim"}>{isMain ? "Main" : "Personal"}</Badge>
-          {personalSubmission ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已提交</Badge> : null}
+          {personalSubmission ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已上传</Badge> : null}
           {!editable ? <LockKeyhole className="size-4 text-ink-faint" aria-label="只读" /> : null}
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
         </div>
