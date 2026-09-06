@@ -70,7 +70,6 @@ describe("cyber-scout dataset conversion", () => {
         pit(8214, ["event-1/pit-8214/1.jpg"], {
           drivetrain: "Swerve",
           swerveModule: "SDS MK5i",
-          canCrossTrench: true,
           autoRoutes: [{ id: "route-a", points: [{ x: 10, y: 20 }, { x: 90, y: 80 }] }],
         }),
       ],
@@ -83,7 +82,6 @@ describe("cyber-scout dataset conversion", () => {
       attributes: [
         { key: "drivetrain", label: "底盘", value: "Swerve" },
         { key: "swerveModule", label: "Swerve 模块", value: "SDS MK5i" },
-        { key: "canCrossTrench", label: "可穿越 Trench", value: "是" },
       ],
       autoRoutes: [{ id: "route-a", points: [{ x: 10, y: 20 }, { x: 90, y: 80 }] }],
     });

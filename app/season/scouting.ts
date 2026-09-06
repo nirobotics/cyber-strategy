@@ -161,11 +161,9 @@ export function parseSeasonPitRecord(row: CyberScoutPayloadRow): SeasonPitRecord
   const photoPaths = arrayValue(payload.photoPaths).filter((value): value is string => typeof value === "string");
   const drivetrain = drivetrainValue(payload.drivetrain ?? payload.dt);
   const swerveModule = stringValue(payload.swerveModule ?? payload.sm);
-  const canCrossTrench = booleanValue(payload.canCrossTrench ?? payload.ct);
   const attributes = [
     drivetrain ? { key: "drivetrain", label: "底盘", value: drivetrain } : null,
     swerveModule ? { key: "swerveModule", label: "Swerve 模块", value: swerveModule } : null,
-    canCrossTrench ? { key: "canCrossTrench", label: "可穿越 Trench", value: "是" } : null,
   ].filter((value): value is TeamPitInfo["attributes"][number] => Boolean(value));
   const autoRoutes = autoRouteArray(payload.autoRoutes ?? payload.ar);
   if (!photoPaths.length && !attributes.length && !autoRoutes.length) return null;
