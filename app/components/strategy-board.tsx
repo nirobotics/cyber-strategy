@@ -131,15 +131,13 @@ export function StrategyBoard({
       eraseChangedRef.current = false;
       return;
     }
-    setDraftStroke((points) => {
-      if (points.length > 1) {
-        const compacted = compactRoutePoints(points).map(({ x, y }) => ({ x, y }));
-        const stroke: StrategyBoardStroke = { id: strokeId(), color, points: compacted };
-        pushHistory(phaseRef.current);
-        updatePhase({ ...phaseRef.current, strokes: [...phaseRef.current.strokes, stroke] });
-      }
-      return [];
-    });
+    if (draftStroke.length > 1) {
+      const compacted = compactRoutePoints(draftStroke).map(({ x, y }) => ({ x, y }));
+      const stroke: StrategyBoardStroke = { id: strokeId(), color, points: compacted };
+      pushHistory(phaseRef.current);
+      updatePhase({ ...phaseRef.current, strokes: [...phaseRef.current.strokes, stroke] });
+    }
+    setDraftStroke([]);
   }
 
   function eraseAt(point: RoutePoint) {
@@ -231,7 +229,7 @@ export function StrategyBoard({
 
   return (
     <div className="grid gap-3">
-      <Card className="overflow-hidden p-0">
+      <Card className="select-none overflow-hidden p-0 [-webkit-touch-callout:none]">
         <div className="grid gap-3 border-b border-line p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2" aria-label="比赛阶段">

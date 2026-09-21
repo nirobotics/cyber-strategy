@@ -1351,3 +1351,16 @@
 **验证**：22 个测试文件 / 151 项测试、typecheck、lint、build 和 `git diff --check` 通过；生产数据库迁移尚未执行。
 
 **风险 / 待办**：部署前必须应用 `supabase/migrations/0006_security_hardening.sql`；`strategy-2026` 的年度编辑器已保留其专有字段逻辑，仅补充安全审计元数据。
+
+
+---
+
+## 2026-09-21 · 策略板防误选中修复审查与双分支同步
+
+**当前状态**：本次修复已完成 skill 审查和本地验证，版本为 `2026.1.72`；交付目标为 `strategy-template` 与 `strategy-2026`，两分支分别提交并推送，保留各自赛季实现。
+
+**本轮完成**：策略板卡片增加 `select-none` 与 `-webkit-touch-callout: none`，防止绘制、拖动时误选文字或弹出长按菜单；队伍备注与整场备注位于卡片之外，保持可编辑。同步 package.json、应用页脚与登录页页脚版本。浏览器复测发现原有绘制结束回调在 setState updater 内更新父组件，已将提交笔迹移出 updater，消除 React 渲染阶段更新错误。
+
+**验证**：typecheck、lint、152 项测试、build、git diff --check 和三处版本一致性检查通过。使用真实 StrategyBoard 组件和构建 CSS 的隔离页面，在 Chrome 与 WebKit、1280/390px、浅色/深色下验证绘制、撤销、机器人拖动、备注输入和无横向溢出；无页面脚本错误；本地登录页 WebKit 会记录 Vercel Analytics debug 脚本被既有 CSP 拦截，未放宽 CSP。模板未登录跳转和登录页版本检查通过。构建 CSS 包含 user-select 与 -webkit-touch-callout 声明。
+
+**风险 / 未完成**：未验证 iOS 真机长按，也未验证真实飞书会话下的完整业务流程；隔离页面不替代认证集成测试。仓库既有名称 `cyber-strategy` 不符合 ni-github-repo 的下划线命名要求，本次未改名。生产部署 Ready、域名 alias 与 error logs 需在推送后单独确认，不能用本地构建通过代替。
