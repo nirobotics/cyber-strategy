@@ -48,7 +48,7 @@ export function buildAuthorizeUrl(opts: { state: string; codeChallenge: string }
 /** 用 code + PKCE verifier 换 user_access_token。失败返回 null（不抛进 UI）。 */
 async function exchangeCodeForToken(code: string, codeVerifier: string): Promise<string | null> {
   try {
-    const res = await fetch(`${AUTHORIZE_BASE}/oauth/v3/token`, {
+    const res = await fetch(`${API_BASE}/open-apis/authen/v2/oauth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -61,7 +61,7 @@ async function exchangeCodeForToken(code: string, codeVerifier: string): Promise
       }),
     });
     const json = (await res.json()) as Record<string, unknown>;
-    // v3 顶层返回 access_token；兼容 data 包裹
+    // v2 顶层返回 access_token；兼容 data 包裹
     const data = (json.data as Record<string, unknown>) ?? json;
     const token = data.access_token;
     return typeof token === "string" && token ? token : null;

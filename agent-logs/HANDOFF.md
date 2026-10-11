@@ -1334,3 +1334,8 @@
 **回退更新（2026-08-16 19:48:54 +08:00）**：按用户要求取消方案 1、3。已通过反向提交移除所有 `Server-Timing`，恢复 `/embed` 的完整 dataset/赛程响应和原胜率计算路径，并将版本恢复为 `2026.1.59`。typecheck、20 files / 137 tests、全仓 lint、build、`git diff --check` 均通过。
 
 **生产验收更新（2026-08-16 19:55:00 +08:00）**：`https://strategy.team8214.com/demo?tab=match` 已恢复显示 `v2026.1.59`。
+
+
+## 2026-10-11 15:06:27 +0800 · 同步 Pit 登录兼容修复
+
+恢复飞书 v2 token endpoint 与现有 JSON 请求，保留 PKCE/state 和各项目回调地址；同一 Cyber Apps App ID/Secret 的生产密钥已在此前同步，不更改本轮密钥。Pit 恢复相同换票方式后用户确认登录成功。139 tests、typecheck、build、修改文件 lint、diff check 通过（本地 Node 24，生产 Node 22）。本项目真实授权复测尚未完成；v3 PKCE 20049 根因未确认，不能据接口废弃断言 v2 已停用。
