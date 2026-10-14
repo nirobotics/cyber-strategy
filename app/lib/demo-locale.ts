@@ -4,6 +4,9 @@ export type DemoLocale = "zh" | "en";
 const translations: Record<string, string> = {
   "中文": "中文",
   "关闭": "Close",
+  "查看队伍详情": "View team details",
+  "清空": "Clear",
+  "机器人": "robot",
   "红方": "Red Alliance",
   "蓝方": "Blue Alliance",
   "自动贡献": "AUTO contribution",

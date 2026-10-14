@@ -9,5 +9,7 @@ describe("Demo English translations", () => {
     expect(translateDemoText("Team 1036 自动和手动贡献拆分")).toBe("Team 1036 AUTO and TELEOP contribution breakdown");
     expect(translateDemoText("忽略 Team 1036 M23")).toBe("Ignore Team 1036 M23");
     expect(translateDemoText("FRC比赛数据查看")).toBe("FRC match data viewer");
+    expect(translateDemoText("Team 1024 机器人")).toBe("Team 1024 robot");
+    expect(translateDemoText("查看队伍详情")).toBe("View team details");
   });
 });
