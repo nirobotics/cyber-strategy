@@ -53,9 +53,12 @@ export function DemoLanguage({ locale, children }: { locale: DemoLocale; childre
         attributeFilter: ["title", "aria-label", "placeholder"],
       });
     }
-    apply();
-    observe();
+    const timer = window.setTimeout(() => {
+      apply();
+      observe();
+    }, 500);
     return () => {
+      window.clearTimeout(timer);
       observer.disconnect();
       for (const [node, original] of originals) {
         if (node.isConnected) node.textContent = original;
