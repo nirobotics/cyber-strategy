@@ -15,6 +15,8 @@ export function AppHeader({
   onLogin,
   Icon = Boxes,
   demoHref,
+  demoLocale,
+  onDemoLocaleChange,
 }: {
   appName: string;
   appSubtitle: string;
@@ -25,6 +27,8 @@ export function AppHeader({
   onLogin: () => void;
   Icon?: LucideIcon;
   demoHref?: string;
+  demoLocale?: "zh" | "en";
+  onDemoLocaleChange?: () => void;
 }) {
   return (
     <header className="sticky top-0 z-40 shrink-0 border-b border-[var(--border)] bg-[var(--panel)]">
@@ -51,6 +55,11 @@ export function AppHeader({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            {demoHref && onDemoLocaleChange ? (
+              <button type="button" onClick={onDemoLocaleChange} aria-label={demoLocale === "en" ? "Switch Demo to Chinese" : "Switch Demo to English"} className="inline-flex h-9 shrink-0 items-center rounded-md border border-[var(--border)] bg-[var(--panel)] px-3 text-xs font-bold text-[var(--foreground)] transition hover:bg-[var(--background)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
+                {demoLocale === "en" ? "中文" : "EN"}
+              </button>
+            ) : null}
             {demoHref ? (
               <NavLink
                 to={demoHref}
