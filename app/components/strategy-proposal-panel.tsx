@@ -72,12 +72,14 @@ export function StrategyProposalPanel({
   data,
   initialSelectedId,
   demoMode = false,
+  demoLocale = "zh",
   ownTeams = ownStrategyTeams,
   routeBase = "/",
 }: {
   data: StrategyProposalPanelData;
   initialSelectedId: string | null;
   demoMode?: boolean;
+  demoLocale?: "zh" | "en";
   ownTeams?: readonly string[];
   routeBase?: string;
 }) {
@@ -397,7 +399,7 @@ export function StrategyProposalPanel({
               <input type="hidden" name="eventKey" value={data.selectedEventKey} />
               <label className="grid gap-1">
                 <span className="section-label">审核备注</span>
-                <textarea name="reviewNote" className="input min-h-20 font-sans" placeholder="退回时建议填写原因" defaultValue={demoMode ? "请确认自动阶段路线是否需要避让。" : undefined} />
+                <textarea name="reviewNote" className="input min-h-20 font-sans" placeholder="退回时建议填写原因" defaultValue={demoMode ? (demoLocale === "en" ? "Confirm whether the AUTO route needs to avoid alliance partners." : "请确认自动阶段路线是否需要避让。") : undefined} />
               </label>
               <div className="flex flex-wrap justify-end gap-2">
                 <Button type="submit" name="decision" value="rejected" disabled={busy}>
@@ -422,6 +424,7 @@ export function StrategyProposalPanel({
           onOpenPhoto={(index) => setLightbox({ team: teamDetail.team, index })}
           onClose={() => setDetailTeam(null)}
           hideComments={demoMode}
+          hideMatchAuto={demoMode}
         />
       ) : null}
       {detailTeam && !teamDetail ? <MissingTeamDetailModal team={detailTeam} onClose={() => setDetailTeam(null)} /> : null}

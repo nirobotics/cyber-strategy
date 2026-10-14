@@ -21,6 +21,7 @@ import {
 import { useFetcher, useNavigate, useSearchParams } from "react-router";
 import { Badge, Button, Card, Input, cn } from "./ui";
 import { ChartCanvas } from "./chart-canvas";
+import { useDemoLanguage } from "./demo-language";
 import type { ScoutingLeadPanelData } from "./scouting-lead-panel";
 import type { StrategyProposalPanelData } from "./strategy-proposal-panel";
 import type { SessionUser } from "../lib/auth-types";
@@ -82,7 +83,7 @@ export function AnalyticsDashboard({
   matchSchedule: CombinedMatch[];
   strategyProposal: Pick<StrategyProposalPanelData, "proposals" | "proposalError" | "matches"> & { loaded?: boolean };
   scoutingLead: ScoutingLeadPanelData | null;
-  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[]; picklists: SharedPicklist[] };
+  demo?: { matches: CombinedMatch[]; ownTeams: readonly string[]; routeBase: string; dataRange: DataRange[]; picklists: SharedPicklist[]; locale?: "zh" | "en" };
 }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -388,6 +389,7 @@ export function AnalyticsDashboard({
         <div className="xl:min-h-0 xl:flex-1" hidden={activeTab !== "proposal"}>
           {resolvedStrategyProposal ? (
             <StrategyProposalPanel
+              key={`${resolvedEventKey}:${demo?.locale ?? "zh"}`}
               data={{
                 dataset: analysisDataset,
                 selectedEventKey: resolvedEventKey,
@@ -397,6 +399,7 @@ export function AnalyticsDashboard({
               }}
               initialSelectedId={searchParams.get("proposal")}
               demoMode={demoMode}
+              demoLocale={demo?.locale}
               ownTeams={demo?.ownTeams}
               routeBase={routeBase}
             />
@@ -437,6 +440,7 @@ export function AnalyticsDashboard({
           onOpenPhoto={(index) => setLightbox({ team: detail.team, index })}
           onClose={() => setDetailTeam(null)}
           hideComments={demoMode}
+          hideMatchAuto={demoMode}
           showMatchTypes={showMatchTypes}
         />
       ) : null}
@@ -810,15 +814,16 @@ function TeamSearchSelect({
   onClose: () => void;
   onChange: (team: string) => void;
 }) {
+  const locale = useDemoLanguage();
   const selected = teams.find((team) => team.team === selectedTeam);
-  const selectedLabel = selected ? `Team ${selected.team}（${selected.avgTotal} 综合均分）` : "";
+  const selectedLabel = selected ? compareTeamLabel(selected, locale) : "";
   const [query, setQuery] = useState(selectedLabel);
   const inputRef = useRef<HTMLInputElement>(null);
   const visibleTeams = useMemo(() => filterCompareTeams(teams, query), [query, teams]);
 
   function choose(team: TeamSummary) {
     onChange(team.team);
-    setQuery(`Team ${team.team}（${team.avgTotal} 综合均分）`);
+    setQuery(compareTeamLabel(team, locale));
     onClose();
   }
 
@@ -838,7 +843,7 @@ function TeamSearchSelect({
           ref={inputRef}
           id={`compare-team-${index}`}
           className="input h-10 pr-9 font-sans"
-          value={query}
+          value={open ? query : selectedLabel}
           placeholder="输入队号查找 / 选择队伍"
           autoComplete="off"
           onFocus={() => {
@@ -896,8 +901,14 @@ function TeamSearchSelect({
 }
 
 export function filterCompareTeams(teams: TeamSummary[], query: string) {
-  const teamNumber = query.trim().replace(/^team\s*/i, "").split(/\s|（/)[0];
+  const teamNumber = query.trim().replace(/^team\s*/i, "").split(/\s|（|\(/)[0];
   return teamNumber ? teams.filter((team) => team.team.includes(teamNumber)) : teams;
+}
+
+function compareTeamLabel(team: TeamSummary, locale: "zh" | "en") {
+  return locale === "en"
+    ? `Team ${team.team} (${team.avgTotal} Average overall score)`
+    : `Team ${team.team}（${team.avgTotal} 综合均分）`;
 }
 
 export function TeamDetailModal({
@@ -911,6 +922,7 @@ export function TeamDetailModal({
   onOpenPhoto,
   onClose,
   hideComments = false,
+  hideMatchAuto = false,
   showMatchTypes = false,
 }: {
   team: TeamSummary;
@@ -923,6 +935,7 @@ export function TeamDetailModal({
   onOpenPhoto: (index: number) => void;
   onClose: () => void;
   hideComments?: boolean;
+  hideMatchAuto?: boolean;
   showMatchTypes?: boolean;
 }) {
   useEffect(() => {
@@ -958,6 +971,7 @@ export function TeamDetailModal({
             onToggleIgnoreMatch={onToggleIgnoreMatch}
             onOpenPhoto={onOpenPhoto}
             hideComments={hideComments}
+            hideMatchAuto={hideMatchAuto}
             showMatchTypes={showMatchTypes}
           />
         </div>

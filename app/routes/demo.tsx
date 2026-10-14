@@ -72,7 +72,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle={locale === "en" ? "FRC match data viewer" : "FRC比赛数据查看"}
-      version="2026.1.76"
+      version="2026.1.77"
       user={null}
       authLoading={false}
       allowGuest
@@ -94,9 +94,9 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
           dataRange={["qualification"]}
           user={DEMO_USER}
           matchSchedule={loaderData.demo.matches}
-          strategyProposal={{ proposals: buildDemoStrategyProposals(proposalMatches), proposalError: null, matches: proposalMatches, loaded: true }}
+          strategyProposal={{ proposals: buildDemoStrategyProposals(proposalMatches, locale), proposalError: null, matches: proposalMatches, loaded: true }}
           scoutingLead={loaderData.demo.scoutingLead}
-          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"], picklists: loaderData.demo.picklists }}
+          demo={{ matches: loaderData.demo.matches, ownTeams: DEMO_OWN_TEAMS, routeBase: "/demo", dataRange: ["qualification"], picklists: loaderData.demo.picklists, locale }}
         />
       ) : (
         <Card className="mx-auto max-w-2xl p-6 text-sm text-ink-dim">{loaderData.error}</Card>

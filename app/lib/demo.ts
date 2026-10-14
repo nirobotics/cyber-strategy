@@ -2,6 +2,7 @@ import { matchTeams, type CombinedMatch } from "./match-analysis";
 import type { ScoutConfidenceResult } from "./cyber-scout.server";
 import type { ScoutingDataset, TeamPitData } from "./scouting";
 import type { PicklistBoard, SharedPicklist } from "./picklist";
+import type { DemoLocale } from "./demo-locale";
 import type { ProposalMatch } from "./strategy-proposal-matches";
 import { normalizeProposalPayload, strategyProposalTitle, type StrategyProposal, type StrategyProposalStatus } from "./strategy-proposals";
 
@@ -9,10 +10,18 @@ export const DEMO_EVENT_KEY = "2026txcmp2";
 export const DEMO_EVENT_NAME = "Event 1";
 export const DEMO_OWN_TEAMS = ["1000"] as const;
 
-export function buildDemoStrategyProposals(matches: ProposalMatch[]): StrategyProposal[] {
+export function buildDemoStrategyProposals(matches: ProposalMatch[], locale: DemoLocale = "zh"): StrategyProposal[] {
   const statuses: StrategyProposalStatus[] = ["approved", "submitted", "rejected"];
-  const notes = ["优先执行中路自动路线，主动阶段保持分散。", "开局避让队友，主动阶段集中进攻。", "自动阶段保守运行，末段提前准备爬升。"];
-  const reviewNotes = ["方案清晰，可以按此执行。", null, "请补充与队友发生路线冲突时的备用方案。"];
+  const notes = locale === "en"
+    ? [
+        "Prioritize the center AUTO route; spread out while our HUB is active.",
+        "Avoid alliance partners at the start; coordinate offense while our HUB is active.",
+        "Take a conservative AUTO route; prepare early to climb the TOWER in END GAME.",
+      ]
+    : ["优先执行中路自动路线，主动阶段保持分散。", "开局避让队友，主动阶段集中进攻。", "自动阶段保守运行，末段提前准备爬升。"];
+  const reviewNotes = locale === "en"
+    ? ["The plan is clear and ready to execute.", null, "Add a fallback plan for route conflicts with alliance partners."]
+    : ["方案清晰，可以按此执行。", null, "请补充与队友发生路线冲突时的备用方案。"];
 
   return matches.slice(0, 3).map((match, index) => ({
     id: `demo-proposal-${index + 1}`,

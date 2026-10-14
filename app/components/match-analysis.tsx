@@ -236,7 +236,7 @@ function MatchSchedule({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         {rows[0] ? <h3 className="section-label">{rows[0].group}</h3> : <span />}
-        <label className="relative w-full sm:w-72">
+        <label className="relative w-full sm:w-80 lg:w-96">
           <span className="sr-only">查找队伍</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-faint" />
           <Input
@@ -244,7 +244,7 @@ function MatchSchedule({
             onChange={(event) => setTeamQuery(event.target.value.replace(/\D/g, ""))}
             inputMode="numeric"
             placeholder="输入队号查找比赛"
-            className="h-10 pl-9"
+            className="h-10 pl-9 font-sans"
           />
         </label>
       </div>

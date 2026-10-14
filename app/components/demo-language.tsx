@@ -1,5 +1,11 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { translateDemoText, type DemoLocale } from "../lib/demo-locale";
+
+const DemoLanguageContext = createContext<DemoLocale>("zh");
+
+export function useDemoLanguage() {
+  return useContext(DemoLanguageContext);
+}
 
 export function DemoLanguage({ locale, children }: { locale: DemoLocale; children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
@@ -23,8 +29,10 @@ export function DemoLanguage({ locale, children }: { locale: DemoLocale; childre
         while ((node = walker.nextNode())) {
           if (!node.parentElement || ["SCRIPT", "STYLE", "TEXTAREA", "OPTION"].includes(node.parentElement.tagName)) continue;
           const text = node as Text;
-          const original = originals.get(text) ?? text.textContent ?? "";
-          if (!originals.has(text)) originals.set(text, original);
+          const current = text.textContent ?? "";
+          const stored = originals.get(text);
+          const original = stored !== undefined && current !== stored && current !== translateDemoText(stored) ? current : stored ?? current;
+          originals.set(text, original);
           const translated = translateDemoText(original);
           if (translated !== text.textContent) text.textContent = translated;
         }
@@ -69,5 +77,9 @@ export function DemoLanguage({ locale, children }: { locale: DemoLocale; childre
     };
   }, [locale]);
 
-  return <div ref={root} className="contents">{children}</div>;
+  return (
+    <DemoLanguageContext.Provider value={locale}>
+      <div ref={root} className="contents">{children}</div>
+    </DemoLanguageContext.Provider>
+  );
 }

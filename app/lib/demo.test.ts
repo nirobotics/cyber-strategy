@@ -21,6 +21,17 @@ describe("Apollo demo data", () => {
     expect(proposals[2].reviewNote).toBeTruthy();
   });
 
+  it("builds English proposal form values for the English demo", () => {
+    const [proposal] = buildDemoStrategyProposals([
+      { key: "qm1", label: "Q1", redTeams: ["1000", "1001", "1002"], blueTeams: ["1003", "1004", "1005"] },
+    ], "en");
+
+    expect(proposal.payload.kind).toBe("match_strategy");
+    if (proposal.payload.kind !== "match_strategy") throw new Error("Expected a match strategy proposal");
+    expect(proposal.payload.note).toBe("Prioritize the center AUTO route; spread out while our HUB is active.");
+    expect(proposal.reviewNote).toBe("The plan is clear and ready to execute.");
+  });
+
   it("maps 45 teams, anonymizes scouts, and removes comments and photos", () => {
     const dataset: ScoutingDataset = {
       id: "source",
