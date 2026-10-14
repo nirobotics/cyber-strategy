@@ -285,7 +285,7 @@ export function AnalyticsDashboard({
 
       {teams.length && activeTab === "browser" && selected ? (
         <div className="grid min-h-0 gap-3 lg:flex-1 lg:grid-cols-[340px_minmax(0,1fr)]">
-          <Card className="overflow-hidden p-0 lg:flex lg:min-h-0 lg:flex-col">
+          <Card className="min-w-0 overflow-hidden p-0 lg:flex lg:min-h-0 lg:flex-col">
             <div className="flex shrink-0 items-center gap-2 border-b border-line p-3">
               <Search className="size-4 text-ink-faint" />
               <Input
@@ -296,14 +296,14 @@ export function AnalyticsDashboard({
                 className="h-9 font-sans"
               />
             </div>
-            <div className="max-h-[460px] overflow-y-auto lg:min-h-0 lg:max-h-none lg:flex-1">
+            <div className="max-h-[460px] overflow-x-hidden overflow-y-auto lg:min-h-0 lg:max-h-none lg:flex-1">
               {visibleTeams.map((team) => (
                 <button
                   key={team.team}
                   type="button"
                   onClick={() => setSelectedTeam(team.team)}
                   className={cn(
-                    "grid w-full grid-cols-[2rem_minmax(3.5rem,1fr)_auto_auto_auto] items-center gap-1.5 border-l-2 border-transparent px-2.5 py-2 text-left text-sm transition hover:bg-surface-2",
+                    "grid w-full min-w-0 grid-cols-[1.5rem_3rem_minmax(0,1fr)_auto_auto] items-center gap-1.5 border-l-2 border-transparent px-2.5 py-2 text-left text-sm transition hover:bg-surface-2",
                     selected.team === team.team && "border-brand bg-brand/10 text-brand",
                     hiddenSet.has(team.team) && "opacity-40",
                   )}
@@ -314,7 +314,7 @@ export function AnalyticsDashboard({
                   <span className="min-w-0 whitespace-nowrap font-semibold tabular-nums">
                     {team.team}
                   </span>
-                  <span className="whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-ink-dim">
+                  <span className="min-w-0 truncate whitespace-nowrap rounded-full bg-surface-2 px-2 py-0.5 text-xs tabular-nums text-ink-dim">
                     {team.avgTotal} 综合均分
                   </span>
                   <TierBadge tier={tierByTeam.get(team.team)} />
@@ -353,6 +353,7 @@ export function AnalyticsDashboard({
               onToggleIgnoreMatch={toggleIgnoredMatch}
               onOpenPhoto={(index) => setLightbox({ team: selected.team, index })}
               hideComments={demoMode}
+              hideMatchAuto={demoMode}
               showMatchTypes={showMatchTypes}
             />
           </div>
@@ -481,6 +482,7 @@ export function TeamDetail({
   onToggleIgnoreMatch,
   onOpenPhoto,
   hideComments = false,
+  hideMatchAuto = false,
   showMatchTypes = false,
 }: {
   team: TeamSummary;
@@ -492,6 +494,7 @@ export function TeamDetail({
   onToggleIgnoreMatch?: (team: string, match: number, matchIndex: number) => void;
   onOpenPhoto: (index: number) => void;
   hideComments?: boolean;
+  hideMatchAuto?: boolean;
   showMatchTypes?: boolean;
 }) {
   const [routeOpen, setRouteOpen] = useState(false);
@@ -563,7 +566,7 @@ export function TeamDetail({
         </Card>
       ) : null}
 
-      {matchAutoRoutes.length ? (
+      {!hideMatchAuto && matchAutoRoutes.length ? (
         <Card className="p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="section-label">比赛自动</h3>

@@ -14,7 +14,7 @@ export function DemoLanguage({ locale, children }: { locale: DemoLocale; childre
       apply();
       observe();
     });
-    const regions = [element, document.getElementById("app-header-navigation")].filter((node): node is HTMLElement => Boolean(node));
+    const regions = [document.body];
 
     function apply() {
       for (const region of regions) {

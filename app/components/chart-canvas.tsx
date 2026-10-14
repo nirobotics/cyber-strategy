@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChartConfiguration } from "chart.js";
+import { translateDemoText } from "../lib/demo-locale";
 
 let chartPromise: Promise<typeof import("chart.js")["Chart"]> | null = null;
 
@@ -26,6 +27,7 @@ export function ChartCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const buildRef = useRef(buildConfig);
   const themeRevision = useThemeRevision();
+  const languageRevision = useLanguageRevision();
   const visible = useVisible(canvasRef);
 
   useEffect(() => {
@@ -39,14 +41,16 @@ export function ChartCanvas({
 
     loadChart().then((Chart) => {
       if (cancelled || !canvasRef.current) return;
-      chart = new Chart(canvasRef.current, buildRef.current(readPalette()));
+      const config = buildRef.current(readPalette());
+      if (document.documentElement.lang === "en") translateChartStrings(config);
+      chart = new Chart(canvasRef.current, config);
     });
 
     return () => {
       cancelled = true;
       chart?.destroy();
     };
-  }, [configKey, themeRevision, visible]);
+  }, [configKey, languageRevision, themeRevision, visible]);
 
   return (
     <div className={className}>
@@ -123,6 +127,29 @@ function useThemeRevision() {
   }, []);
 
   return revision;
+}
+
+function useLanguageRevision() {
+  const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setRevision((value) => value + 1);
+    window.addEventListener("cyber-strategy-demo-language-change", bump);
+    return () => window.removeEventListener("cyber-strategy-demo-language-change", bump);
+  }, []);
+
+  return revision;
+}
+
+function translateChartStrings(value: unknown) {
+  if (!value || typeof value !== "object") return;
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string") {
+      (value as Record<string, unknown>)[key] = translateDemoText(entry);
+    } else if (entry && typeof entry === "object") {
+      translateChartStrings(entry);
+    }
+  }
 }
 
 function readPalette(): ChartPalette {

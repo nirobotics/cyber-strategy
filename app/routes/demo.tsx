@@ -51,13 +51,14 @@ export async function loader() {
 
 export default function DemoRoute({ loaderData }: Route.ComponentProps) {
   const navigation = useNavigation();
-  const [locale, setLocale] = useState<"zh" | "en">("zh");
+  const [locale, setLocale] = useState<"zh" | "en">("en");
   useEffect(() => {
     const preferred = window.localStorage.getItem("cyber-strategy:demo-language");
-    if (preferred === "en") queueMicrotask(() => setLocale("en"));
+    if (preferred === "zh") queueMicrotask(() => setLocale("zh"));
   }, []);
   useEffect(() => {
     document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+    window.dispatchEvent(new Event("cyber-strategy-demo-language-change"));
     return () => { document.documentElement.lang = "zh-CN"; };
   }, [locale]);
   const changeLocale = () => {
@@ -70,8 +71,8 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
   return (
     <AppShell
       appName="Cyber Strategy"
-      appSubtitle="FRC比赛数据查看"
-      version="2026.1.75"
+      appSubtitle={locale === "en" ? "FRC match data viewer" : "FRC比赛数据查看"}
+      version="2026.1.76"
       user={null}
       authLoading={false}
       allowGuest
