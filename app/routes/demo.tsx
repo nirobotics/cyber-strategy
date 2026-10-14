@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { DemoLanguage } from "../components/demo-language";
 import { Route as StrategyIcon } from "lucide-react";
 import { useNavigation } from "react-router";
 import type { Route } from "./+types/demo";
@@ -49,13 +51,27 @@ export async function loader() {
 
 export default function DemoRoute({ loaderData }: Route.ComponentProps) {
   const navigation = useNavigation();
+  const [locale, setLocale] = useState<"zh" | "en">("zh");
+  useEffect(() => {
+    const preferred = window.localStorage.getItem("cyber-strategy:demo-language");
+    if (preferred === "en") queueMicrotask(() => setLocale("en"));
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+    return () => { document.documentElement.lang = "zh-CN"; };
+  }, [locale]);
+  const changeLocale = () => {
+    const next = locale === "zh" ? "en" : "zh";
+    window.localStorage.setItem("cyber-strategy:demo-language", next);
+    setLocale(next);
+  };
   const proposalMatches = loaderData.demo ? toProposalMatches(loaderData.demo.matches, DEMO_OWN_TEAMS) : [];
 
   return (
     <AppShell
       appName="Cyber Strategy"
       appSubtitle="FRC比赛数据查看"
-      version="2026.1.74"
+      version="2026.1.75"
       user={null}
       authLoading={false}
       allowGuest
@@ -63,7 +79,10 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
       onLogin={() => startFeishuLogin("/")}
       Icon={StrategyIcon}
       demoHref="/demo"
+      demoLocale={locale}
+      onDemoLocaleChange={changeLocale}
     >
+      <DemoLanguage locale={locale}>
       {loaderData.demo ? (
         <AnalyticsDashboard
           dataset={loaderData.demo.dataset}
@@ -81,6 +100,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
       ) : (
         <Card className="mx-auto max-w-2xl p-6 text-sm text-ink-dim">{loaderData.error}</Card>
       )}
+      </DemoLanguage>
     </AppShell>
   );
 }

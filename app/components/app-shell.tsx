@@ -17,6 +17,8 @@ export function AppShell({
   children,
   Icon,
   demoHref,
+  demoLocale,
+  onDemoLocaleChange,
 }: {
   appName: string;
   appSubtitle: string;
@@ -30,6 +32,8 @@ export function AppShell({
   children: ReactNode;
   Icon?: LucideIcon;
   demoHref?: string;
+  demoLocale?: "zh" | "en";
+  onDemoLocaleChange?: () => void;
 }) {
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--background)] text-[var(--foreground)] has-[[data-fixed-page]]:h-dvh has-[[data-fixed-page]]:overflow-hidden has-[[data-fixed-browser]]:lg:h-dvh has-[[data-fixed-browser]]:lg:overflow-hidden has-[[data-fixed-picklist]]:sm:h-dvh has-[[data-fixed-picklist]]:sm:overflow-hidden has-[[data-fixed-desktop]]:xl:h-dvh has-[[data-fixed-desktop]]:xl:overflow-hidden">
@@ -44,6 +48,8 @@ export function AppShell({
         onLogin={onLogin}
         Icon={Icon}
         demoHref={demoHref}
+        demoLocale={demoLocale}
+        onDemoLocaleChange={onDemoLocaleChange}
       />
       <main className="flex-1 p-2.5 has-[[data-fixed-page]]:min-h-0 has-[[data-fixed-page]]:overflow-hidden has-[[data-fixed-browser]]:lg:min-h-0 has-[[data-fixed-browser]]:lg:overflow-hidden has-[[data-fixed-picklist]]:sm:min-h-0 has-[[data-fixed-picklist]]:sm:overflow-hidden has-[[data-fixed-desktop]]:xl:min-h-0 has-[[data-fixed-desktop]]:xl:overflow-hidden">
         {children}
