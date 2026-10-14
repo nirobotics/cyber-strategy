@@ -2,6 +2,7 @@
 export type DemoLocale = "zh" | "en";
 
 const translations: Record<string, string> = {
+  "中文": "中文",
   "关闭": "Close",
   "红方": "Red Alliance",
   "蓝方": "Blue Alliance",
@@ -313,6 +314,7 @@ const sortedWords = Object.keys(translations).sort((a, b) => b.length - a.length
 
 export function translateDemoText(value: string): string {
   if (!/[\u3400-\u9fff]/u.test(value)) return value;
+  if (translations[value]) return translations[value];
   let result = value;
   for (const word of sortedWords) result = result.replaceAll(word, translations[word]);
   return result;
