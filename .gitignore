@@ -8,3 +8,6 @@ supabase/.temp/
 .env.*.local
 *.log
 .DS_Store
+
+# Isolated Cloudflare preview: source deliverables are individually force-tracked.
+/cloudflare/

@@ -1339,3 +1339,19 @@
 ## 2026-10-11 15:06:27 +0800 · 同步 Pit 登录兼容修复
 
 恢复飞书 v2 token endpoint 与现有 JSON 请求，保留 PKCE/state 和各项目回调地址；同一 Cyber Apps App ID/Secret 的生产密钥已在此前同步，不更改本轮密钥。Pit 恢复相同换票方式后用户确认登录成功。139 tests、typecheck、build、修改文件 lint、diff check 通过（本地 Node 24，生产 Node 22）。本项目真实授权复测尚未完成；v3 PKCE 20049 根因未确认，不能据接口废弃断言 v2 已停用。
+
+---
+
+## 2026-11-15 · Cloudflare 独立动态 Worker 本地适配（不部署）
+
+**当前状态**：`local-runtime-prepared-blocked-config-and-data`。分支 `migration/cloudflare-preview`，原始 HEAD `2282230eb02ec40208681968ab1617855fb18ece`；仅准备独立 `cyber-strategy-preview` / `strategy-cf.team8214.com` / account `2ca8df5c9754fb7e3f37d08c597535e0`，未做云部署、DNS、push 或真实 Feishu/Supabase/存储访问。生产、旧 DB、Companion 均保留。
+
+**变更**：新增全 ignore、逐项 force-track 的 `cloudflare/` 独立 workspace，cf 1.0.0-beta.31 + 委托 Wrangler 4.161.0 / pnpm 11.7.0；Node 22.23.4。隔离 scratch 镜像保留全部原业务，去 Vercel preset 但保持 SSR + initial discovery，完整 createRequestHandler，显式 ASSETS/nodejs_compat、Node streaming renderer alias、仅镜像 analytics noop。根 TS/lint/Vitest 只排 sidecar；按本任务明确授权保留产品版本 2026.1.77（不按常规产品改动递增），根 package/lock、业务源码、Vercel/RR/Vite 配置、root README 不改。
+
+**字节/边界**：147 个来源文件锁，四个 public 图片不变；Tailwind 显式原输入维持 CSS 53251 bytes / SHA256 `ab90e2b0855e32eb4bcbae696f0318f37934006075445cdfc0013f0d5afb3e24`。52 个最终资产完整长度/MIME/SHA 锁；55 个最终包文件，无 .env/raw map/私有文件混入。源码/CSS/release contract 不自动刷新。Worker 1226326 bytes / gzip 376013。
+
+**验证**：根 pnpm 11.5.0 frozen install；原基线与最终 typecheck、lint、21 files / 141 tests、build 全部串行通过。sidecar strict TS、实际 cf deploy --dry-run --mode preview --no-provision、全包边界与 16 项检查通过；Miniflare 5/workerd 运行实际 bundle，全 outboundService mock，无真实请求。覆盖缺配置/独立 data 与 integration gate 503、unknown/private 404/精确 host、SSR、真实 PKCE/tenant/cookie 合同、匿名/过期/篡改 session 拒绝、nonadmin/审批拒绝、非空 Scout 读、FRC/TBA/Wiki、Pit HMAC/5min/CSP、管理员修改 Scout payload/assignments 与删照片/记录、全部资产 GET SHA/HEAD。
+
+**失败轮与修复**：strict TS R1 的 tuple/route-map undefined 已用 const tuple/type guard 修复；runtime R1 测试 fixture 括号修复，R2 mock 缺 PostgREST limit=1 与 Scout user_profiles 修复，R3 16/16 通过。没有放宽断言或刷新来源合同。保留原 Vercel envFile deprecation / SSR Navigate 提示。
+
+**阻塞/交接**：见 `cloudflare/README.md` 与 `.memory/cloudflare-preview.md`。缺独立 preview secret、Feishu 非空租户 allowlist/callback/管理员配置、自有五表真实 schema/data/RLS/审计/审批快照迁移、Scout 四表与 pit-photos 的隔离迁移/读写验收，以及 Pit/Scout preview 域名/共享签名配置确认。两道门禁默认 blocked，不能接 Scout 生产库冒充预览。原 HTTPS Supabase 访问层作为兼容准备保留，退出旧 DB **未完成**；无共享 DB/gateway。生产 CSP 不改，preview embed 仅允许 pit-cf.team8214.com。真实登录、数据/照片迁移、跨应用及浏览器视觉验收未做。回滚仅需丢弃/反向本地适配提交，无线上资源待回滚。

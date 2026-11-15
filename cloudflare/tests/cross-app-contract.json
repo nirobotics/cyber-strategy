@@ -1,0 +1,14 @@
+{
+  "sourceBase": "2282230eb02ec40208681968ab1617855fb18ece",
+  "originalPitOrigin": "https://pit.team8214.com",
+  "previewPitOrigin": "https://pit-cf.team8214.com",
+  "previewScoutOrigin": "https://scout-cf.team8214.com",
+  "lifetimeMs": 300000,
+  "signing": "HMAC-SHA256/base64url",
+  "signingOrder": ["eventKey", "kind", "target", "theme", "expires"],
+  "separator": "\n",
+  "input": { "eventKey": "2026test", "kind": "team", "target": "8214", "theme": "dark" },
+  "sharedSecretBinding": "CYBER_STRATEGY_EMBED_SECRET",
+  "scoutTables": ["scouting_events", "scouting_records", "user_profiles", "app_settings"],
+  "scoutBucket": "pit-photos"
+}
