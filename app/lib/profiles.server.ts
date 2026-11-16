@@ -1,3 +1,4 @@
+import { hasNative, nativeProfile, nativeLogin } from "./native-repository.server";
 import { getClient } from "./supabase.server";
 import type { FeishuUser } from "./feishu.server";
 import type { ProfileRow } from "./db-types";
@@ -18,6 +19,7 @@ export function toSessionUser(u: FeishuUser): SessionUser {
  * 这种情况下 is_admin 视为 false。
  */
 export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean }> {
+  if (hasNative()) return nativeLogin(u);
   const sb = getClient();
   if (!sb) return { isAdmin: false };
   try {
@@ -43,6 +45,7 @@ export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean }
 }
 
 export async function getProfile(openId: string): Promise<ProfileRow | null> {
+  if (hasNative()) return (await nativeProfile(openId)).data;
   const sb = getClient();
   if (!sb) return null;
   try {

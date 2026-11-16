@@ -1,3 +1,4 @@
+import { hasNative, nativePicklists, nativePicklist, nativeSaveSetting, nativeDeleteSetting, nativeNames } from "./native-repository.server";
 import { appendAudit } from "./audit.server";
 import { getClient } from "./supabase.server";
 import {
@@ -13,10 +14,10 @@ type PicklistSettingRow = { key: string; value: unknown; updated_by: string | nu
 type StoredPicklist = Omit<SharedPicklist, "createdByName" | "updatedAt">;
 
 export async function listPicklists(eventKey: string, actorOpenId: string, admin: boolean): Promise<SharedPicklist[]> {
-  const sb = getClient();
-  if (!sb) return [];
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return [];
   const cleanedEventKey = cleanEventKey(eventKey);
-  const { data, error } = await sb.from("app_settings")
+  const { data, error } = hasNative() ? await nativePicklists(cleanedEventKey) : await sb!.from("app_settings")
     .select("key,value,updated_by,updated_at")
     .like("key", `picklist:%:${cleanedEventKey}:%`)
     .order("updated_at", { ascending: false });
@@ -34,7 +35,7 @@ export async function createMainPicklist(opts: { eventKey: string; name: string;
   if (!canCreateMainPicklist(opts.isAdmin)) throw new Response("只有管理员可以创建 Main Picklist", { status: 403 });
   const eventKey = cleanEventKey(opts.eventKey);
   const name = requireName(opts.name);
-  const sb = requireClient();
+  const sb = hasNative() ? null : requireClient();
   const now = new Date().toISOString();
   const list: StoredPicklist = {
     id: crypto.randomUUID(),
@@ -46,13 +47,13 @@ export async function createMainPicklist(opts: { eventKey: string; name: string;
     createdBy: opts.actorOpenId,
     submittedAt: null,
   };
-  const { data, error } = await sb.from("app_settings").insert({
+  const { data, error } = hasNative() ? await nativeSaveSetting(settingKey(list), list, opts.actorOpenId, "picklist.main.create") : await sb!.from("app_settings").insert({
     key: settingKey(list),
     value: list,
     updated_by: opts.actorOpenId,
   }).select("key,value,updated_by,updated_at").single();
   if (error || !data) throw new Response("创建 Main Picklist 失败", { status: 500 });
-  await appendAudit("picklist.main.create", { actorOpenId: opts.actorOpenId, changedFields: ["event_key", "name", "kind"] });
+  if (!hasNative()) await appendAudit("picklist.main.create", { actorOpenId: opts.actorOpenId, changedFields: ["event_key", "name", "kind"] });
   return rowToPicklist(data as PicklistSettingRow) ?? { ...list, createdByName: opts.actorOpenId, updatedAt: now };
 }
 
@@ -61,11 +62,11 @@ export async function saveMainPicklist(opts: { id: string; board: unknown; actor
   if (!stored) throw new Response("Main Picklist 不存在", { status: 404 });
   const { row, list } = stored;
   if (list.kind !== "main" || !canEditSharedPicklist(list, opts.actorOpenId, opts.isAdmin)) throw new Response("无权修改 Main Picklist", { status: 403 });
-  const sb = requireClient();
+  const sb = hasNative() ? null : requireClient();
   const value: StoredPicklist = { ...toStored(list), board: normalizePicklistBoard(opts.board) };
-  const { data, error } = await sb.from("app_settings").update({ value, updated_by: opts.actorOpenId }).eq("key", row.key).select("key,value,updated_by,updated_at").single();
+  const { data, error } = hasNative() ? await nativeSaveSetting(row.key, value, opts.actorOpenId, "picklist.main.save") : await sb!.from("app_settings").update({ value, updated_by: opts.actorOpenId }).eq("key", row.key).select("key,value,updated_by,updated_at").single();
   if (error || !data) throw new Response("保存 Main Picklist 失败", { status: 500 });
-  await appendAudit("picklist.main.save", { actorOpenId: opts.actorOpenId, changedFields: ["board"] });
+  if (!hasNative()) await appendAudit("picklist.main.save", { actorOpenId: opts.actorOpenId, changedFields: ["board"] });
   return rowToPicklist(data as PicklistSettingRow)!;
 }
 
@@ -79,8 +80,8 @@ export async function submitPersonalPicklist(opts: {
   const eventKey = cleanEventKey(opts.eventKey);
   const clientId = cleanClientId(opts.clientId);
   const name = requireName(opts.name);
-  const sb = requireClient();
-  const { data: rows, error: readError } = await sb.from("app_settings")
+  const sb = hasNative() ? null : requireClient();
+  const { data: rows, error: readError } = hasNative() ? await nativePicklists(eventKey, true) : await sb!.from("app_settings")
     .select("key,value,updated_by,updated_at")
     .like("key", `picklist:personal:${eventKey}:%`);
   if (readError) throw new Response("提交 Personal Picklist 失败", { status: 500 });
@@ -98,12 +99,12 @@ export async function submitPersonalPicklist(opts: {
     submittedAt: new Date().toISOString(),
   };
   const values = { key: settingKey(list), value: list, updated_by: opts.actorOpenId };
-  const request = existing
-    ? sb.from("app_settings").update(values).eq("key", existing.row.key).select("key,value,updated_by,updated_at").single()
-    : sb.from("app_settings").insert(values).select("key,value,updated_by,updated_at").single();
+  const request = hasNative() ? nativeSaveSetting(values.key, values.value, opts.actorOpenId, "picklist.personal.submit") : existing
+    ? sb!.from("app_settings").update(values).eq("key", existing.row.key).select("key,value,updated_by,updated_at").single()
+    : sb!.from("app_settings").insert(values).select("key,value,updated_by,updated_at").single();
   const { data, error } = await request;
   if (error || !data) throw new Response("提交 Personal Picklist 失败", { status: 500 });
-  await appendAudit("picklist.personal.submit", { actorOpenId: opts.actorOpenId, changedFields: ["event_key", "client_id", "name", "board", "submitted_at"] });
+  if (!hasNative()) await appendAudit("picklist.personal.submit", { actorOpenId: opts.actorOpenId, changedFields: ["event_key", "client_id", "name", "board", "submitted_at"] });
   return rowToPicklist(data as PicklistSettingRow)!;
 }
 
@@ -111,9 +112,9 @@ export async function deletePersonalPicklist(opts: { id: string; actorOpenId: st
   const stored = await getPicklist(opts.id);
   if (!stored) throw new Response("Personal Picklist 不存在", { status: 404 });
   if (stored.list.kind !== "personal" || stored.list.createdBy !== opts.actorOpenId) throw new Response("无权删除 Personal Picklist", { status: 403 });
-  const { error } = await requireClient().from("app_settings").delete().eq("key", stored.row.key);
+  const { error } = hasNative() ? await nativeDeleteSetting(stored.row.key, opts.actorOpenId, "picklist.personal.delete") : await requireClient()!.from("app_settings").delete().eq("key", stored.row.key);
   if (error) throw new Response("删除 Personal Picklist 失败", { status: 500 });
-  await appendAudit("picklist.personal.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
+  if (!hasNative()) await appendAudit("picklist.personal.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
   return stored.list.id;
 }
 
@@ -122,17 +123,17 @@ export async function deleteMainPicklist(opts: { id: string; actorOpenId: string
   const stored = await getPicklist(opts.id);
   if (!stored) throw new Response("Main Picklist 不存在", { status: 404 });
   if (stored.list.kind !== "main") throw new Response("无权删除 Main Picklist", { status: 403 });
-  const { error } = await requireClient().from("app_settings").delete().eq("key", stored.row.key);
+  const { error } = hasNative() ? await nativeDeleteSetting(stored.row.key, opts.actorOpenId, "picklist.main.delete") : await requireClient()!.from("app_settings").delete().eq("key", stored.row.key);
   if (error) throw new Response("删除 Main Picklist 失败", { status: 500 });
-  await appendAudit("picklist.main.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
+  if (!hasNative()) await appendAudit("picklist.main.delete", { actorOpenId: opts.actorOpenId, changedFields: ["picklist"] });
   return stored.list.id;
 }
 
 async function getPicklist(id: string): Promise<{ row: PicklistSettingRow; list: SharedPicklist } | null> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const sb = getClient();
-  if (!sb) return null;
-  const { data, error } = await sb.from("app_settings")
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return null;
+  const { data, error } = hasNative() ? await nativePicklist(id) : await sb!.from("app_settings")
     .select("key,value,updated_by,updated_at")
     .like("key", `picklist:%:%:${id}`)
     .maybeSingle();
@@ -168,10 +169,10 @@ function rowToPicklist(row: PicklistSettingRow): SharedPicklist | null {
 }
 
 async function hydrateCreatorNames(lists: SharedPicklist[]) {
-  const sb = getClient();
+  const sb = hasNative() ? null : getClient();
   const ids = [...new Set(lists.map((list) => list.createdBy).filter((id): id is string => Boolean(id)))];
-  if (!sb || !ids.length) return lists;
-  const { data } = await sb.from("profiles").select("open_id,name").in("open_id", ids);
+  if ((!sb && !hasNative()) || !ids.length) return lists;
+  const { data } = hasNative() ? await nativeNames(ids) : await sb!.from("profiles").select("open_id,name").in("open_id", ids);
   const names = new Map(((data as Array<{ open_id: string; name: string }> | null) ?? []).map((row) => [row.open_id, row.name]));
   return lists.map((list) => ({ ...list, createdByName: list.createdBy ? names.get(list.createdBy) || list.createdBy : "未知" }));
 }
@@ -186,8 +187,8 @@ function toStored(list: SharedPicklist): StoredPicklist {
 }
 
 function requireClient() {
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
   return sb;
 }
 

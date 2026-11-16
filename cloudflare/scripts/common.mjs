@@ -10,6 +10,8 @@ export const repo = resolve(sidecar, "..");
 export const input = resolve(sidecar, ".build-input");
 export const output = resolve(sidecar, ".cloudflare/output");
 export const lock = JSON.parse(readFileSync(resolve(sidecar, "source-lock.json")));
+export const review = JSON.parse(readFileSync(resolve(sidecar, "source-review.json")));
+export const sourcePaths = [...new Set([...Object.keys(lock.files), ...Object.keys(review.files)])];
 export const hash = (data) => createHash("sha256").update(data).digest("hex");
 export const json = (path) => JSON.parse(readFileSync(path));
 export function walk(dir) {
@@ -47,20 +49,35 @@ export function checkSources() {
   toolchain();
   assert.equal(lock.base, "2282230eb02ec40208681968ab1617855fb18ece");
   for (const [path, record] of Object.entries(lock.files)) {
-    if (!record.preserve) continue;
+    if (!record.preserve || review.files[path]) continue;
     const absolute = resolve(repo, path);
     assert(!lstatSync(absolute).isSymbolicLink(), `Symlink source: ${path}`);
     const data = readFileSync(absolute);
     assert.equal(hash(data), record.sha256, `Source gate: ${path}`);
     assert.equal(data.length, record.bytes, `Source byte gate: ${path}`);
   }
+  assert.equal(review.base, lock.base);
+  for (const [path, record] of Object.entries(review.files)) {
+    assert.equal(record.baselineSha256, lock.files[path]?.sha256 ?? null, `Reviewed original pin: ${path}`);
+    assert(record.reason.length > 30, `Review rationale: ${path}`);
+    assert.equal(hash(readFileSync(resolve(repo, path))), record.sha256, `Reviewed native source: ${path}`);
+  }
   for (const dir of ["app", "public", "supabase"])
-    for (const path of walk(resolve(repo, dir))) assert(lock.files[relative(repo, path)], `Unapproved source: ${path}`);
+    for (const path of walk(resolve(repo, dir))) assert(lock.files[relative(repo, path)] || review.files[relative(repo, path)], `Unapproved source: ${path}`);
 }
 export function original(path) {
   assert(lock.files[path], `Unpinned source: ${path}`);
   assert(!path.split("/").some((part) => part.startsWith(".env")), "Environment files must never be mirrored");
   const data = execFileSync("git", ["show", `${lock.base}:${path}`], { cwd: repo, maxBuffer: 20 * 1024 * 1024 });
   assert.equal(hash(data), lock.files[path].sha256, `Baseline gate: ${path}`);
+  return data;
+}
+
+export function current(path) {
+  if (lock.files[path] && !lock.files[path].preserve && !review.files[path]) return original(path);
+  const data = readFileSync(resolve(repo, path));
+  const expected = review.files[path]?.sha256 ?? lock.files[path]?.sha256;
+  assert(expected, `Unreviewed build input: ${path}`);
+  assert.equal(hash(data), expected, `Current source review: ${path}`);
   return data;
 }

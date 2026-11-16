@@ -42,7 +42,7 @@ export default function LoginPage() {
           {signedOut ? "已退出当前应用 session。" : "请使用飞书登录继续访问。"}
         </p>
 
-        <Form method="post" className="mt-6">
+        <Form method="post" reloadDocument className="mt-6">
           <input type="hidden" name="returnTo" value={returnTo} />
           <button
             type="submit"
@@ -61,7 +61,7 @@ export default function LoginPage() {
           {demoLoading ? "Demo 加载中…" : "进入 Demo"}
         </Link>
       </main>
-      <AppFooter version="2026.1.77" />
+      <AppFooter version="2026.1.78" />
     </>
   );
 }

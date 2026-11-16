@@ -615,7 +615,7 @@ export function TeamDetail({
       ) : null}
 
       <div className="grid gap-3 xl:grid-cols-2">
-        <Card className="p-4">
+        <Card className="min-w-0 p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-dim">
             <LineChart className="size-4" />
             逐场综合分
@@ -626,7 +626,7 @@ export function TeamDetail({
             buildConfig={(palette) => teamLineConfig(chartMatches, palette, showMatchTypes)}
           />
         </Card>
-        <Card className="p-4">
+        <Card className="min-w-0 p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-dim">
             <BarChart3 className="size-4" />
             自动 / 手动贡献

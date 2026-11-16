@@ -1,3 +1,5 @@
+import { hasNative } from "./native-repository.server";
+import { scoutEvents, scoutRecords, scoutEdit } from "./scout-api.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CyberScoutRecordRow } from "./cyber-scout";
 import { getCyberScoutClient } from "./cyber-scout.server";
@@ -43,6 +45,7 @@ export async function saveEditableScoutingRecord({
 }): Promise<EditableScoutingRecord> {
   validateNormal(normal);
   validateSuper(superValues);
+  if (hasNative()) { await scoutEdit({ query, normal, superValues }); return loadEditableScoutingRecord(query); }
   const db = requireCyberScoutClient();
   const rows = await findEditableRows(db, query);
   if (normal && !rows.normalRows.length) throw new Error("这支队伍本场没有 Normal Scout 记录");
@@ -59,8 +62,14 @@ export async function saveEditableScoutingRecord({
   return loadEditableScoutingRecord(query);
 }
 
-async function findEditableRows(db: SupabaseClient, query: MatchQuery): Promise<EditableRows> {
-  const { data: event, error: eventError } = await db
+async function findEditableRows(db: SupabaseClient | null, query: MatchQuery): Promise<EditableRows> {
+  if (hasNative()) {
+    const event = (await scoutEvents()).find((row) => row.tba_event_key === query.eventKey);
+    if (!event) throw new Error(`CyberScout 中没有赛事 ${query.eventKey}`);
+    const records = (await scoutRecords(event.id)).filter((row) => row.match_number === query.matchNumber && ["normal_match", "super_match"].includes(row.record_type) && recordMatchType(row) === query.matchType);
+    return { normalRows: records.filter((row) => row.record_type === "normal_match" && recordTeam(row) === query.team), superRow: records.find((row) => row.record_type === "super_match" && readSuperValues(row.payload, query.team) && (!query.alliance || normalizeAlliance(row.alliance ?? objectValue(row.payload).alliance) === query.alliance)) ?? null };
+  }
+  const { data: event, error: eventError } = await db!
     .from("scouting_events")
     .select("id")
     .eq("tba_event_key", query.eventKey)
@@ -68,7 +77,7 @@ async function findEditableRows(db: SupabaseClient, query: MatchQuery): Promise<
   if (eventError) throw eventError;
   if (!event) throw new Error(`CyberScout 中没有赛事 ${query.eventKey}`);
 
-  const { data, error } = await db
+  const { data, error } = await db!
     .from("scouting_records")
     .select("id,record_type,match_type,match_number,alliance,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", event.id)
@@ -154,8 +163,8 @@ function zoneKind(value: unknown): "alliance" | "transfer" | null {
   return null;
 }
 
-async function updatePayload(db: SupabaseClient, id: string, payload: Record<string, unknown>) {
-  const { error } = await db.from("scouting_records").update({ payload }).eq("id", id);
+async function updatePayload(db: SupabaseClient | null, id: string, payload: Record<string, unknown>) {
+  const { error } = await db!.from("scouting_records").update({ payload }).eq("id", id);
   if (error) throw error;
 }
 
@@ -194,7 +203,7 @@ function normalizeAlliance(value: unknown) {
 
 function requireCyberScoutClient() {
   const db = getCyberScoutClient();
-  if (!db) throw new Error("未配置 CyberScout Supabase");
+  if (!db && !hasNative()) throw new Error("未配置 CyberScout Supabase");
   return db;
 }
 

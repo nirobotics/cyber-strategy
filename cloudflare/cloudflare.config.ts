@@ -1,4 +1,4 @@
-import { bindings, defineConfig } from "cf/config";
+import { bindings, defineConfig, exports } from "cf/config";
 
 export default defineConfig(({ mode, isPreview }) => {
   if (mode !== "preview" || isPreview)
@@ -29,8 +29,17 @@ export default defineConfig(({ mode, isPreview }) => {
       triggers: [],
       assets: { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: true },
       observability: { enabled: false },
+      exports: { StrategyBusiness: exports.durableObject({ storage: "sqlite" }) },
       env: {
         ASSETS: bindings.assets(),
+        DB: bindings.d1({ name: "cyber-strategy-native-preview" }),
+        FILES: bindings.r2({ name: "cyber-strategy-native-preview" }),
+        BUSINESS: bindings.durableObject({ worker: name, exportName: "StrategyBusiness" }),
+        SOURCE_CATALOG_SHA256: bindings.text("blocked"),
+        BUSINESS_WRITES: bindings.text("blocked"),
+        ORIGIN_HANDOVER: bindings.text("blocked"),
+        SCOUT_STRATEGY_SECRET: bindings.secret(),
+        SCOUT: bindings.worker({ worker: "cyber-scout-preview" }),
         STRATEGY_PREVIEW_MODE: bindings.text("preview-only"),
         STRATEGY_DATA_READY: bindings.text("blocked"),
         STRATEGY_INTEGRATIONS_READY: bindings.text("blocked"),
@@ -42,10 +51,6 @@ export default defineConfig(({ mode, isPreview }) => {
         FEISHU_APP_ID: bindings.secret(),
         FEISHU_APP_SECRET: bindings.secret(),
         FEISHU_ALLOWED_TENANT_KEYS: bindings.secret(),
-        SUPABASE_URL: bindings.secret(),
-        SUPABASE_SERVICE_ROLE_KEY: bindings.secret(),
-        CYBER_SCOUT_SUPABASE_URL: bindings.secret(),
-        CYBER_SCOUT_SUPABASE_SERVICE_ROLE_KEY: bindings.secret(),
         CYBER_STRATEGY_EMBED_SECRET: bindings.secret(),
         FRC_EVENTS_USERNAME: bindings.secret(),
         FRC_EVENTS_API_KEY: bindings.secret(),

@@ -1,3 +1,4 @@
+import { hasNative, nativeAudit } from "./native-repository.server";
 import { getClient } from "./supabase.server";
 
 /**
@@ -8,6 +9,7 @@ export async function appendAudit(
   action: string,
   opts: { actorOpenId?: string | null; changedFields?: string[] } = {},
 ): Promise<void> {
+  if (hasNative()) return nativeAudit(action, opts);
   const sb = getClient();
   if (!sb) return;
   try {

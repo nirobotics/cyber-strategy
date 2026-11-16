@@ -1,0 +1,28 @@
+{
+  "format": "native-source-catalog-review-v1",
+  "application": "cyber-strategy",
+  "sourceRef": "gxsxtwcbmfpdpcrpfdhk",
+  "schemaSha256": null,
+  "reviewRequired": true,
+  "tables": [
+    "profiles",
+    "scouting_datasets",
+    "app_settings",
+    "strategy_proposals",
+    "audit_logs",
+    "matches",
+    "match_videos",
+    "match_markings",
+    "match_notes",
+    "match_score_samples",
+    "video_processing_jobs"
+  ],
+  "publicRoutineNames": [
+    "prevent_audit_log_mutation",
+    "set_updated_at"
+  ],
+  "privateBucket": "match-videos",
+  "observedObjectCount": 1,
+  "observedObjectBytes": "10554246",
+  "status": "Safe shape inventory is not a column/constraint/catalog pin. Parent must review exact live catalog and snapshot before real import/seal. No actual rows or credentials are included."
+}
