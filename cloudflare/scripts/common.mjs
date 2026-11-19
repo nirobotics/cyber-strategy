@@ -12,6 +12,8 @@ export const input = resolve(sidecar, ".build-input");
 export const output = resolve(sidecar, ".cloudflare/output");
 // Throw-away build state lives outside the repository (PI_SCRATCH_DIR or the system temp directory).
 export const scratch = process.env.CYBER_BUILD_SCRATCH ?? resolve(process.env.PI_SCRATCH_DIR ?? tmpdir(), "cyber-strategy-cloudflare");
+// Headers of the content-hashed build files that Static Assets serves without running the Worker.
+export const assetHeaders = "/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n  X-Content-Type-Options: nosniff\n  X-Robots-Tag: noindex, nofollow, noarchive\n";
 export const hash = (data) => createHash("sha256").update(data).digest("hex");
 export const json = (path) => JSON.parse(readFileSync(path, "utf8"));
 export function walk(dir) {

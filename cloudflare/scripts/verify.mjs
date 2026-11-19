@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import { gzipSync } from "node:zlib";
 import { fileURLToPath } from "node:url";
-import { hash, json, output, sidecar, walk } from "./common.mjs";
-import { identity } from "../cloudflare.config.ts";
+import { assetHeaders, hash, json, output, sidecar, walk } from "./common.mjs";
+import { assetRouting, identity } from "../cloudflare.config.ts";
 
 export const secrets = ["SESSION_SECRET", "FEISHU_APP_ID", "FEISHU_APP_SECRET", "FEISHU_ALLOWED_TENANT_KEYS", "CYBER_STRATEGY_EMBED_SECRET", "SCOUT_STRATEGY_SECRET", "FRC_EVENTS_USERNAME", "FRC_EVENTS_API_KEY", "TBA_API_KEY"];
 export function verify() {
@@ -16,7 +16,7 @@ export function verify() {
   assert.equal(config.workersDev, false); assert.equal(config.previewUrls, false); assert.deepEqual(config.domains, []);
   assert.deepEqual(config.triggers, [{ type: "fetch", pattern: "strategy.team8214.com/*", zone: identity.zone }]);
   assert.deepEqual(config.observability, { enabled: true });
-  assert.deepEqual(config.assets, { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: true });
+  assert.deepEqual(config.assets, { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: [...assetRouting] });
   const texts = { APP_BASE_URL: identity.origin, CYBER_SCOUT_ORIGIN: identity.scout.origin, CYBER_PIT_ORIGIN: identity.pitOrigin };
   for (const [key, value] of Object.entries(texts)) assert.deepEqual(config.env[key], { type: "text", value });
   for (const key of secrets) assert.deepEqual(config.env[key], { type: "secret" });
@@ -32,7 +32,9 @@ export function verify() {
   // Browser assets: exactly what the build produced, nothing private, no server secrets or analytics.
   const assets = json(resolve(sidecar, ".required-tool-outputs/assets.json"));
   const packaged = walk(resolve(dir, "assets")).map((path) => "/" + relative(resolve(dir, "assets"), path));
-  assert.deepEqual(packaged.sort(), Object.keys(assets).sort());
+  // _headers is configuration for Static Assets (never served as a file).
+  assert.deepEqual(packaged.filter((name) => name !== "/_headers").sort(), Object.keys(assets).sort());
+  assert.equal(readFileSync(resolve(dir, "assets/_headers"), "utf8"), assetHeaders);
   for (const [name, record] of Object.entries(assets)) {
     assert(!name.split("/").some((part) => part.startsWith(".")) && !/\.map$|(?:^|\/)(?:private|tests?|supabase)(?:\/|$)/i.test(name), `Private file packaged: ${name}`);
     const bytes = readFileSync(resolve(dir, "assets", "." + name));
@@ -48,7 +50,7 @@ export function verify() {
   assert(bundle.length > 100_000, "The Worker bundle does not contain the server-rendered app"); assert(gzipSync(bundle).length < 10 * 1024 * 1024);
   for (const marker of ["routes/api.cyber-pit-embed", "routes/auth.feishu.callback", "strategy_proposals", "/_scout/v1", "StrategyBusiness"])
     assert(bundle.includes(Buffer.from(marker)), `Missing from the Worker bundle: ${marker}`);
-  console.log(`Verified ${config.name}: bundle ${bundle.length} bytes (gzip ${gzipSync(bundle).length}), ${packaged.length} assets, route ${config.triggers[0].pattern}`);
+  console.log(`Verified ${config.name}: bundle ${bundle.length} bytes (gzip ${gzipSync(bundle).length}), ${Object.keys(assets).length} assets, route ${config.triggers[0].pattern}`);
   return { config, dir, assets };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) verify();

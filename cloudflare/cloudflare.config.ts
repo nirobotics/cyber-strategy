@@ -9,14 +9,16 @@ export const identity = Object.freeze({
   zone: "rockyxrq.com",
   // D1 `cyber-strategy`: all eleven tables of the original database.
   databaseId: "79f063f0-4b36-454b-aae5-656274956d9a",
-  // The original `match-videos` bucket (one processed video of an earlier feature). The app does not read it;
-  // it is bound so the archive stays attached to its application.
-  bucket: "cyber-strategy-native-preview",
+  // R2 `cyber-strategy`: the content of the original `match-videos` bucket (one processed video of an earlier feature).
+  // The app does not read it; it is bound so the archive stays attached to its application.
+  bucket: "cyber-strategy",
   // Scouting data is read and edited through the production Scout Worker (its /_scout/v1 API, signed with SCOUT_STRATEGY_SECRET).
   scout: Object.freeze({ worker: "cyber-scout", origin: "https://scout.team8214.com" }),
   // Cyber Pit embeds /embed in an iframe.
   pitOrigin: "https://pit.team8214.com",
 });
+
+export const assetRouting = Object.freeze(["/*", "!/assets/*"]);
 
 export default defineConfig(({ mode, isPreview }) => {
   if (isPreview || mode !== "production") throw new Error("Only the production mode is configured: cf deploy --mode production");
@@ -31,7 +33,9 @@ export default defineConfig(({ mode, isPreview }) => {
       previewUrls: false,
       domains: [],
       triggers: [triggers.fetch({ pattern: new URL(identity.origin).hostname + "/*", zone: identity.zone })],
-      assets: { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: true },
+      // Content-hashed build files under /assets/ are served straight from Static Assets (headers: see scripts/build.mjs);
+      // everything else goes through the Worker.
+      assets: { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: [...assetRouting] },
       observability: { enabled: true },
       exports: { StrategyBusiness: exports.durableObject({ storage: "sqlite" }) },
       env: {

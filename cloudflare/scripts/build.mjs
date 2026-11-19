@@ -3,7 +3,7 @@
 // react-router/vite configuration, so the repository's own Vercel configuration is left alone.
 import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { extname, relative, resolve } from "node:path";
-import { hash, input, repo, run, scratch, sidecar, walk } from "./common.mjs";
+import { assetHeaders, hash, input, repo, run, scratch, sidecar, walk } from "./common.mjs";
 
 const mirror = resolve(scratch, "build-input");
 rmSync(input, { recursive: true, force: true }); rmSync(mirror, { recursive: true, force: true });
@@ -42,6 +42,8 @@ const assets = Object.fromEntries(walk(client).map((path) => {
   if (!mime) throw new Error(`No content type known for ${name}: add its extension to scripts/build.mjs`);
   return [name, { sha256: hash(bytes), bytes: bytes.length, mime }];
 }));
+// Static Assets serves /assets/* itself (cloudflare.config.ts); these are the headers it adds. Not a served file.
+writeFileSync(resolve(client, "_headers"), assetHeaders);
 mkdirSync(resolve(sidecar, ".required-tool-outputs"), { recursive: true });
 writeFileSync(resolve(sidecar, ".required-tool-outputs/assets.json"), JSON.stringify(assets, null, 2) + "\n");
 console.log(`Built: ${Object.keys(assets).length} browser assets`);
