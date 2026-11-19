@@ -79,7 +79,8 @@ function badPath(path: string): boolean {
     return decodeURIComponent(path).split("/").some((part) => part.startsWith(".") || part.includes("\\")) || /%2f|%5c/i.test(path);
   } catch { return true; }
 }
-const authRoutes = ["/api/auth/login", "/api/auth/callback", "/auth/feishu/callback"];
+// GET routes that write: OAuth start (one-time state), OAuth callback (profile, login audit), logout (logout audit).
+const writingReads = ["/api/auth/login", "/api/auth/callback", "/auth/feishu/callback", "/auth/logout"];
 async function fetchRequest(request: Request, env: Env, ctx: Context, serialized = false): Promise<Response> {
   const url = new URL(request.url), state = configuration(env);
   const finish = (response: Response, isStatic = false) => secured(response, request, isStatic, state.pitOrigin);
@@ -104,9 +105,9 @@ async function fetchRequest(request: Request, env: Env, ctx: Context, serialized
   if (!state.configured) return json({ error: "configuration_unavailable", missing: state.missing, invalid: state.invalid }, 503);
   const write = !["GET", "HEAD", "OPTIONS"].includes(request.method);
   if (write && ((request.headers.has("Origin") && request.headers.get("Origin") !== url.origin) || request.headers.get("Sec-Fetch-Site") === "cross-site")) return json({ error: "cross_origin_write_denied" }, 403);
-  // Every write, and the OAuth start/callback (one-time state, profile upsert, login audit), is serialized through
-  // one Durable Object. The Cyber Pit embed request is a POST that only reads, so it is served directly.
-  const mutable = (write && routePath !== "/api/cyber-pit-embed") || authRoutes.includes(routePath);
+  // Every write is serialized through one Durable Object. The Cyber Pit embed request is a POST that only reads,
+  // so it is served directly.
+  const mutable = (write && routePath !== "/api/cyber-pit-embed") || writingReads.includes(routePath);
   if (mutable && !serialized) return env.BUSINESS.get(env.BUSINESS.idFromName("business-v1")).fetch(request);
   try {
     return finish(await inNative(request, env, serialized, async () => {
