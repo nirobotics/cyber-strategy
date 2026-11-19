@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { setup, origin, tableNames, archivePath, archiveBytes } from "./native-fixture.mjs";
+import { setup, origin, tableNames, archivePath, archiveBytes, realScout } from "./native-fixture.mjs";
 
 const count = async (db, table) => (await db.prepare(`SELECT count(*) n FROM ${table}`).first()).n;
 
@@ -42,6 +42,7 @@ test("only the formal host is served; an external database binding or a developm
 });
 
 test("Strategy and Scout keep separate databases and buckets; Strategy reaches Scout data only through the Scout Worker", async (t) => {
+  t.diagnostic("SCOUT binding: " + (realScout ? "the packaged cyber-scout Worker" : "tests/scout-double.mjs"));
   const r = await setup(t);
   await assert.rejects(r.db.prepare("SELECT * FROM scouting_records").all(), /no such table/);
   await assert.rejects(r.scoutDB.prepare("SELECT * FROM profiles").all(), /no such table/);

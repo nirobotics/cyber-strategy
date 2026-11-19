@@ -1,11 +1,25 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { sidecar } from "../scripts/common.mjs";
-// The Scout Worker behind the SCOUT binding is the packaged cyber-scout (package it first: see README).
-import { workerOptions as scoutWorker, env as scoutEnv, seed as seedScout, assetOptions, pairSecret } from "../../../cyber-scout/migration/cloudflare-preview/tests/native-fixture.mjs";
-export { normalId, superId, pitId, photoPath, photoBytes, eventConfig } from "../../../cyber-scout/migration/cloudflare-preview/tests/native-fixture.mjs";
+// The Worker behind the SCOUT binding. When a packaged cyber-scout is at hand (checked out next to this repository,
+// or its Worker package named by CYBER_SCOUT_PACKAGE) the tests run against the real Scout Worker. Otherwise (CI:
+// cyber-scout is a private repository) they run against tests/scout-double.mjs, a small Worker that implements the same
+// /_scout/v1 contract on its own D1 and R2. SCOUT_TEST_DOUBLE=1 forces the double.
+const scoutPackage = resolve(process.env.CYBER_SCOUT_PACKAGE ?? resolve(sidecar, "../../cyber-scout/migration/cloudflare-preview"));
+export const realScout = process.env.SCOUT_TEST_DOUBLE !== "1" && existsSync(resolve(scoutPackage, ".cloudflare/output/v0/workers/default/bundle/worker.js"));
+const scout = await import(realScout ? pathToFileURL(resolve(scoutPackage, "tests/native-fixture.mjs")).href : "./scout-double.mjs");
+const { workerOptions: scoutWorker, env: scoutEnv, seed: seedScout, pairSecret } = scout;
+export const { normalId, superId, pitId, photoPath, photoBytes, eventConfig } = scout;
+// Same routing the deployed Worker gets from its assets configuration: "!" patterns go straight to Static Assets.
+function assetOptions(dir) {
+  const { assets } = JSON.parse(readFileSync(resolve(dir, "worker.config.json"))), patterns = assets.runWorkerFirst;
+  return { directory: resolve(dir, "assets"), binding: "ASSETS",
+    routerConfig: { has_user_worker: true, static_routing: { user_worker: patterns.filter((pattern) => !pattern.startsWith("!")), asset_worker: patterns.filter((pattern) => pattern.startsWith("!")).map((pattern) => pattern.slice(1)) } },
+    assetConfig: { html_handling: assets.htmlHandling, not_found_handling: assets.notFoundHandling } };
+}
 export const origin="https://strategy.team8214.com", scoutOrigin="https://scout.team8214.com", stamp="2026-01-01T00:00:00.123456Z";
 export const tableNames=["profiles","scouting_datasets","app_settings","strategy_proposals","audit_logs","matches","match_videos","match_markings","match_notes","match_score_samples","video_processing_jobs"];
 export const archivePath="historical/synthetic.mp4",archiveBytes=new Uint8Array([0,0,0,24,102,116,121,112]);
