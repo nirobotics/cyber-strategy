@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Miniflare, convertV4MiniflareOptions } from "miniflare";
 import { sidecar } from "../scripts/common.mjs";
-import { workerOptions as scoutWorker, env as scoutEnv, seed as seedScout, pairSecret } from "../../../cyber-scout/migration/cloudflare-preview/tests/native-fixture.mjs";
+// The Scout Worker behind the SCOUT binding is the packaged cyber-scout (package it first: see README).
+import { workerOptions as scoutWorker, env as scoutEnv, seed as seedScout, assetOptions, pairSecret } from "../../../cyber-scout/migration/cloudflare-preview/tests/native-fixture.mjs";
 export { normalId, superId, pitId, photoPath, photoBytes, eventConfig } from "../../../cyber-scout/migration/cloudflare-preview/tests/native-fixture.mjs";
 export const origin="https://strategy.team8214.com", scoutOrigin="https://scout.team8214.com", stamp="2026-01-01T00:00:00.123456Z";
 export const tableNames=["profiles","scouting_datasets","app_settings","strategy_proposals","audit_logs","matches","match_videos","match_markings","match_notes","match_score_samples","video_processing_jobs"];
@@ -47,11 +48,10 @@ export async function setup(t,overrides={},withAssets=true){
  }
  assert.fail("Unapproved external request BLOCKED: "+url.origin+url.pathname);
  };
- const strategy={name:"strategy",routes:["strategy.team8214.com/*"],modules:true,modulesRoot:resolve(dir,"bundle"),scriptPath:resolve(dir,"bundle/worker.js"),compatibilityDate:"2026-11-15",compatibilityFlags:["nodejs_compat"],bindings:env(overrides),outboundService:outbound,d1Databases:{DB:"strategy-synthetic-independent"},r2Buckets:{FILES:"strategy-synthetic-independent"},durableObjects:{BUSINESS:{className:"StrategyBusiness",useSQLite:true}},serviceBindings:{SCOUT:"scout"},...(withAssets?{assets:{directory:resolve(dir,"assets"),binding:"ASSETS",run_worker_first:true,routerConfig:{invoke_user_worker_ahead_of_assets:true,has_user_worker:true},assetConfig:{html_handling:"none",not_found_handling:"none"}}}:{})};
+ const strategy={name:"strategy",routes:["strategy.team8214.com/*"],modules:true,modulesRoot:resolve(dir,"bundle"),scriptPath:resolve(dir,"bundle/worker.js"),compatibilityDate:"2026-11-15",compatibilityFlags:["nodejs_compat"],bindings:env(overrides),outboundService:outbound,d1Databases:{DB:"strategy-synthetic-independent"},r2Buckets:{FILES:"strategy-synthetic-independent"},durableObjects:{BUSINESS:{className:"StrategyBusiness",useSQLite:true}},serviceBindings:{SCOUT:"scout"},...(withAssets?{assets:assetOptions(dir)}:{})};
  const mf=new Miniflare(convertV4MiniflareOptions({workers:[strategy,scoutWorker(scoutEnv(),outbound)]}));t.after(()=>mf.dispose());
  const db=await mf.getD1Database("DB","strategy"),bucket=await mf.getR2Bucket("FILES","strategy"),scoutDB=await mf.getD1Database("DB","scout"),scoutBucket=await mf.getR2Bucket("FILES","scout");
  await seedScout(scoutDB,scoutBucket);
  await seed(db,bucket);
- const worker=await mf.getWorker("strategy");
  return{mf,db,bucket,scoutDB,scoutBucket,calls,state,bindings:env(overrides),fetch:(path,init={})=>mf.dispatchFetch(origin+path,{redirect:"manual",...init})};
 }
