@@ -29,18 +29,29 @@ test("source contract pins original product, five-table schema, two HTTPS client
   assert(readFileSync(resolve(repo, "app/lib/cyber-scout.server.ts"), "utf8").includes('.storage.from("pit-photos").remove(photoPaths)'));
   assert(readFileSync(resolve(sidecar, "worker.ts"), "utf8").includes("frame-ancestors https://pit-cf.team8214.com"));
 });
-test("fixed isolated preview identity has no routes, triggers, workers.dev, preview URL or secret values", () => isolated(() => {
+test("exact preview and formal standby identities have no routes, triggers, dev/preview URLs or secret values", () => isolated(() => {
   const value = config({ mode: "preview", isPreview: false });
   assert.equal(value.accountId, "2ca8df5c9754fb7e3f37d08c597535e0"); assert.equal(value.worker.name, "cyber-strategy-preview");
   assert.deepEqual(value.worker.domains, []); assert.deepEqual(value.worker.triggers, []);
   assert.equal(value.worker.workersDev, false); assert.equal(value.worker.previewUrls, false);
-  for (const mode of [undefined, "", "production", "development", "prod"]) assert.throws(() => config({ mode, isPreview: false }), /isolated preview mode/);
-  assert.throws(() => config({ mode: "preview", isPreview: true }), /isolated preview mode/);
+  const formal = config({ mode: "production", isPreview: false });
+  assert.equal(formal.accountId, value.accountId); assert.equal(formal.worker.name, "cyber-strategy");
+  assert.deepEqual(formal.worker.domains, []); assert.deepEqual(formal.worker.triggers, []);
+  assert.equal(formal.worker.workersDev, false); assert.equal(formal.worker.previewUrls, false);
+  assert.deepEqual(formal.worker.env.AUTH_WRITES, { type: "text", value: "blocked" });
+  assert.deepEqual(formal.worker.env.BUSINESS_WRITES, { type: "text", value: "blocked" });
+  assert.deepEqual(formal.worker.env.NATIVE_HANDOVER_GENERATION, { type: "text", value: "0" });
+  assert.deepEqual(formal.worker.env.SCOUT, { type: "worker", worker: "cyber-scout", exportName: "ScoutPrivatePhoto" });
+  assert.equal(formal.worker.env.DB.id, value.worker.env.DB.id); assert.equal(formal.worker.env.FILES.name, value.worker.env.FILES.name);
+  assert.deepEqual(formal.worker.env.BUSINESS, { type: "durable-object", worker: "cyber-strategy", exportName: "StrategyBusiness" });
+  for (const mode of [undefined, "", "development", "prod"]) assert.throws(() => config({ mode, isPreview: false }), /isolated preview/);
+  for (const mode of ["preview", "production"]) assert.throws(() => config({ mode, isPreview: true }), /Generated Preview/);
 }));
 test("account/name/environment/zone override guards reject before build", () => isolated(() => {
   for (const name of variables) {
     process.env[name] = "not-authorized";
     assert.throws(() => config({ mode: "preview", isPreview: false }), /override/);
+    assert.throws(() => config({ mode: "production", isPreview: false }), /override|routes/i);
     delete process.env[name];
   }
 }));

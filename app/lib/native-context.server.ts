@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { canaryConfig, type CanaryAdmission } from "./native-canary-policy.server";
 
 export interface Statement {
   bind(...values: unknown[]): Statement;
@@ -14,7 +15,7 @@ export interface Bucket {
   delete(key: string | string[]): Promise<void>;
 }
 export type NativeEnv = Record<string, unknown> & { DB: Database; FILES: Bucket };
-export type NativeScope = { env: NativeEnv; request: Request; mutable: boolean };
+export type NativeScope = { env: NativeEnv; request: Request; mutable: boolean; canary?: CanaryAdmission };
 // Vite's SSR bundle and the Worker entry share one isolate-local, request-scoped ALS.
 // Never put a user's identity, bindings or a mutable client in a process global.
 const symbol = Symbol.for("cyber-strategy.native-context.v1");
@@ -28,10 +29,16 @@ export function requireNative() {
   if (!scope) throw new Error("Native request context required");
   return scope;
 }
-export function requireMutation() {
+export function requireMutation(kind: "business" | "auth" = "business", operation?: CanaryAdmission["operation"]) {
   const scope = requireNative();
   if (!scope.mutable) throw new Response("Serialized mutation required", { status: 409 });
-  if (scope.env.BUSINESS_WRITES !== "enabled") throw new Response("Writes blocked", { status: 503 });
+  const authCallback = ["/auth/feishu/callback", "/api/auth/callback"].includes(new URL(scope.request.url).pathname);
+  if (kind === "auth") {
+    if (!authCallback || scope.env.AUTH_WRITES !== "enabled") throw new Response("Writes blocked", { status: 503 });
+  } else if (scope.env.BUSINESS_WRITES !== "enabled") {
+    const policy = canaryConfig(scope.env);
+    if (!operation || scope.canary?.operation !== operation || scope.canary.actorOpenId !== policy.actor) throw new Response("Canary operation blocked", { status: 403 });
+  }
   return scope;
 }
 export async function selectRows<T>(sql: string, ...args: unknown[]): Promise<T[]> {

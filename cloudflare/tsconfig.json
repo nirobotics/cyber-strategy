@@ -13,6 +13,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["worker.ts", "cloudflare.config.ts", "wrangler.config.ts", "types.d.ts"],
+  "include": ["worker.ts", "cloudflare.config.ts", "wrangler.config.ts", "types.d.ts", "production/**/*.ts"],
   "exclude": ["node_modules", ".build-input", ".cloudflare", ".required-tool-outputs"]
 }

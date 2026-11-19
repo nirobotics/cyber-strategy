@@ -115,11 +115,13 @@ export async function readback(db, bucket, snapshot, pin) {
   assert.deepEqual(actualKeys.sort(), snapshot.objects.inventory.map((item) => item.path).sort(), "Exact private object inventory (no missing or unreviewed/orphan objects)");
   return { hashes, rowCount, tableCount: tableNames.length, objectCount: snapshot.objects.inventory.length, snapshotAt: snapshot.snapshotAt };
 }
-export async function sealVerified(db, bucket, snapshot, pin, { localSynthetic = false } = {}) {
+export async function sealVerified(db, bucket, snapshot, pin, { localSynthetic = false, nativeSchemaPin } = {}) {
   assert(snapshot.provenance === "actual-source" || localSynthetic, "Synthetic fixtures are LOCAL ONLY, never cloud acceptance");
+  const ddlPin = nativeSchemaPin ?? (localSynthetic && snapshot.provenance === "synthetic-local" ? pin : undefined);
+  assert(typeof ddlPin === "string" && hashPattern.test(ddlPin), "Independent reviewed native DDL pin is mandatory");
   const proof = await readback(db, bucket, snapshot, pin);
-  await db.prepare("INSERT INTO native_seal(id,schema_sha256,data_sha256,object_sha256,source_snapshot,table_count,row_count,object_count,provenance) VALUES('verified',?,?,?,?,?,?,?,?)").bind(pin, proof.hashes.data, proof.hashes.objects, snapshot.snapshotAt, proof.tableCount, proof.rowCount, proof.objectCount, snapshot.provenance).run();
-  return proof;
+  await db.prepare("INSERT INTO native_seal(id,schema_sha256,data_sha256,object_sha256,source_snapshot,table_count,row_count,object_count,provenance) VALUES('verified',?,?,?,?,?,?,?,?)").bind(ddlPin, proof.hashes.data, proof.hashes.objects, snapshot.snapshotAt, proof.tableCount, proof.rowCount, proof.objectCount, snapshot.provenance).run();
+  return { ...proof, nativeSchemaPin: ddlPin };
 }
 
 /** PURE source export contract: returns READ ONLY SQL, never opens a connection.

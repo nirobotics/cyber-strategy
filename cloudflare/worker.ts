@@ -1,8 +1,11 @@
 import { consumeState, registerState } from "./native/oauth";
+import {isFormal} from './production/policy';
 import { inNative, sealed, canonicalOrigin, type RuntimeEnv, type SerialState } from "./native/runtime";
 import { createRequestHandler, matchRoutes, type RouteObject } from "react-router";
 import * as build from "./.build-input/build/server/index.js";
 import assetManifest from "./.required-tool-outputs/assets.json";
+import { admitCanary, executeCanary } from "./native/canary";
+import { requireNative } from "../app/lib/native-context.server";
 
 const handle = createRequestHandler(build, "production");
 const assets: Record<string, { sha256: string; bytes: number; mime: string }> = assetManifest;
@@ -36,7 +39,7 @@ function secured(response: Response, request: Request, isStatic = false, env?: E
     headers.delete("ETag"); headers.delete("Last-Modified"); headers.append("Vary", "Cookie");
     // Preview-only CSP overlay: the original production Pit contract is untouched.
     if (/^\/embed(?:\.data)?$/.test(new URL(request.url).pathname)) {
-      headers.set("Content-Security-Policy", env?.ORIGIN_HANDOVER === "approved-same-origin" ? "frame-ancestors https://pit.team8214.com" : "frame-ancestors https://pit-cf.team8214.com");
+      headers.set("Content-Security-Policy", isFormal(env??{}) || env?.ORIGIN_HANDOVER === "approved-same-origin" ? "frame-ancestors https://pit.team8214.com" : "frame-ancestors https://pit-cf.team8214.com");
       headers.set("Referrer-Policy", "no-referrer");
     }
   }
@@ -46,14 +49,14 @@ async function readiness(env: Env) {
   const text = (name: string) => typeof env[name] === "string" ? env[name] as string : "";
   const missing = required.filter((name) => !text(name).trim());
   if (typeof env.ASSETS?.fetch !== "function") missing.push("ASSETS");
-  if (!text("FEISHU_VIDEO_LIBRARY_NODE_TOKEN").trim() && !text("FEISHU_VIDEO_LIBRARY_URL").trim())
-    missing.push("FEISHU_VIDEO_LIBRARY_NODE_TOKEN|FEISHU_VIDEO_LIBRARY_URL");
+  // Source treats an unconfigured optional Wiki library as no links, not total app outage.
+  const videoLibraryConfigured = Boolean(text("FEISHU_VIDEO_LIBRARY_NODE_TOKEN").trim() || text("FEISHU_VIDEO_LIBRARY_URL").trim());
   const invalid: string[] = [];
   for (const [key, expected] of [
-    ["STRATEGY_PREVIEW_MODE", "preview-only"], ["APP_BASE_URL", canonicalOrigin(env)],
-    ["CYBER_PIT_ORIGIN", env.ORIGIN_HANDOVER === "approved-same-origin" ? "https://pit.team8214.com" : "https://pit-cf.team8214.com"], ["CYBER_SCOUT_ORIGIN", env.ORIGIN_HANDOVER === "approved-same-origin" ? "https://scout.team8214.com" : "https://scout-cf.team8214.com"],
+    ["STRATEGY_PREVIEW_MODE", isFormal(env)?'production-standby':'preview-only'], ["APP_BASE_URL", canonicalOrigin(env)],
+    ["CYBER_PIT_ORIGIN", isFormal(env)||env.ORIGIN_HANDOVER === "approved-same-origin" ? "https://pit.team8214.com" : "https://pit-cf.team8214.com"], ["CYBER_SCOUT_ORIGIN", isFormal(env)||env.ORIGIN_HANDOVER === "approved-same-origin" ? "https://scout.team8214.com" : "https://scout-cf.team8214.com"],
   ] as const) if (text(key) !== expected) invalid.push(key);
-  for (const key of ["SESSION_SECRET", "CYBER_STRATEGY_EMBED_SECRET"])
+  for (const key of ["SESSION_SECRET", "CYBER_STRATEGY_EMBED_SECRET", "SCOUT_STRATEGY_SECRET"])
     if (text(key) && text(key).length < 32) invalid.push(key);
   if (text("FEISHU_ALLOWED_TENANT_KEYS") && !text("FEISHU_ALLOWED_TENANT_KEYS").split(",").some((v) => v.trim()))
     invalid.push("FEISHU_ALLOWED_TENANT_KEYS");
@@ -63,12 +66,12 @@ async function readiness(env: Env) {
   for (const key of ["FEISHU_AUTHORIZE_BASE", "FEISHU_API_BASE", "FEISHU_OAUTH_SCOPE"])
     if (env[key] !== undefined) invalid.push(key);
   const dataGate = env.STRATEGY_DATA_READY === "verified-native-data" && await sealed(env);
-  const integrationsGate = env.STRATEGY_INTEGRATIONS_READY === "approved-preview-contract";
+  const integrationsGate = env.STRATEGY_INTEGRATIONS_READY === (isFormal(env)?'approved-formal-contract':'approved-preview-contract');
   const configured = missing.length === 0 && invalid.length === 0;
   const ready = configured && dataGate && integrationsGate;
-  return { service: "cyber-strategy-preview", mode: "preview-only", configured, ready,
+  return { service:isFormal(env)?'cyber-strategy':'cyber-strategy-preview', mode:isFormal(env)?'production-standby':'preview-only', configured, ready, businessReady:false, handoverAccepted:false,
     status: !configured ? "configuration_unavailable" : !dataGate ? "data_gate_blocked" : !integrationsGate ? "integration_gate_blocked" : "ready",
-    missing, invalid, dataGate, integrationsGate, dependencyConnectivity: "not-probed" };
+    missing, invalid, dataGate, integrationsGate, authWrites: env.AUTH_WRITES === "enabled", businessWrites: env.BUSINESS_WRITES === "enabled", videoLibraryConfigured, dependencyConnectivity: "not-probed" };
 }
 function badPath(path: string): boolean {
   try {
@@ -102,9 +105,17 @@ async function fetchRequest(request: Request, env: Env, ctx: Context, serialized
     if (!["GET", "HEAD", "OPTIONS"].includes(request.method) &&
       ((request.headers.has("Origin") && request.headers.get("Origin") !== url.origin) || request.headers.get("Sec-Fetch-Site") === "cross-site")) return json({ error: "cross_origin_write_denied" }, 403);
     const mutable = !["GET", "HEAD", "OPTIONS"].includes(request.method) || ["/api/auth/login", "/api/auth/callback", "/auth/feishu/callback"].includes(routePath);
+    const authMutable = ["/api/auth/login", "/api/auth/callback", "/auth/feishu/callback"].includes(routePath) || routePath === "/auth/login" && request.method === "POST";
+    if (authMutable && env.AUTH_WRITES !== "enabled") return json({ error: "auth_writes_blocked" }, 503);
+    if (mutable && !authMutable && !["enabled", "controlled-canary"].includes(String(env.BUSINESS_WRITES))) return json({ error: "business_writes_blocked" }, 503);
     if (mutable && !serialized) return env.BUSINESS.get(env.BUSINESS.idFromName("business-v1")).fetch(request);
     try {
       return finish(await inNative(request, env, serialized, async () => {
+        if (mutable && !authMutable && env.BUSINESS_WRITES === "controlled-canary") {
+          const admission = await admitCanary(request, env);
+          requireNative().canary = admission;
+          return executeCanary(request, admission);
+        }
         if (["/api/auth/callback", "/auth/feishu/callback"].includes(routePath) && !(await consumeState(request, env))) return Response.redirect(canonicalOrigin(env) + "/auth/login?error=bad_state", 302);
         const response = await handle(request, { cloudflare: { env, ctx } });
         return routePath === "/api/auth/login" ? registerState(response, env) : response;

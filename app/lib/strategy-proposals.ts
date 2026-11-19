@@ -199,13 +199,13 @@ export function strategyBoardStations(redTeams: string[], blueTeams: string[]): 
     team,
     alliance,
     x: strategyBoardStationX[alliance] / strategyBoardFieldWidth * 100,
-    y: strategyBoardStationY[Math.min(index, strategyBoardStationY.length - 1)] / strategyBoardFieldHeight * 100,
+    y: strategyBoardStationY[Math.min(index, strategyBoardStationY.length - 1)]! / strategyBoardFieldHeight * 100,
   }));
   return [...stations(blueTeams, "blue"), ...stations(redTeams, "red")];
 }
 
 function sourceStrategyRobot(team: string, alliance: keyof typeof strategyBoardAllianceX, index: number): StrategyBoardRobot {
-  const y = strategyBoardRobotY[Math.min(index, strategyBoardRobotY.length - 1)];
+  const y = strategyBoardRobotY[Math.min(index, strategyBoardRobotY.length - 1)]!;
   return {
     team,
     x: strategyBoardAllianceX[alliance] / strategyBoardFieldWidth * 100,
@@ -264,7 +264,7 @@ export function compactRoutePoints(points: RoutePoint[]): RoutePoint[] {
   const strokes: RoutePoint[][] = [];
   for (const point of points) {
     if (point.start || !strokes.length) strokes.push([point]);
-    else strokes[strokes.length - 1].push(point);
+    else strokes[strokes.length - 1]!.push(point);
   }
   return strokes.flatMap(compactStroke);
 }
@@ -390,7 +390,7 @@ function legacyRoutesToStrokes(value: unknown, phase: StrategyBoardPhaseId) {
     const strokes: RoutePoint[][] = [];
     for (const point of points) {
       if (point.start || !strokes.length) strokes.push([{ x: point.x, y: point.y }]);
-      else strokes[strokes.length - 1].push({ x: point.x, y: point.y });
+      else strokes[strokes.length - 1]!.push({ x: point.x, y: point.y });
     }
     return strokes
       .filter((stroke) => stroke.length > 1)
@@ -404,7 +404,7 @@ function legacyRoutesToStrokes(value: unknown, phase: StrategyBoardPhaseId) {
 
 function strokeTouchesPoint(stroke: StrategyBoardStroke, point: RoutePoint, radius: number) {
   for (let index = 1; index < stroke.points.length; index += 1) {
-    if (distanceToSegment(point, stroke.points[index - 1], stroke.points[index]) <= radius) return true;
+    if (distanceToSegment(point, stroke.points[index - 1]!, stroke.points[index]!) <= radius) return true;
   }
   return false;
 }
@@ -419,29 +419,29 @@ function distanceToSegment(point: RoutePoint, start: RoutePoint, end: RoutePoint
 
 function compactStroke(points: RoutePoint[]) {
   if (points.length <= 2) return points;
-  const filtered = [points[0]];
+  const filtered: RoutePoint[] = [points[0]!];
   for (const point of points.slice(1, -1)) {
-    const previous = filtered[filtered.length - 1];
+    const previous = filtered[filtered.length - 1]!;
     if (Math.hypot(point.x - previous.x, point.y - previous.y) >= routePointMinDistance) {
       filtered.push({ x: point.x, y: point.y });
     }
   }
-  const last = points[points.length - 1];
+  const last = points[points.length - 1]!;
   const previous = filtered[filtered.length - 1];
   if (!previous || previous.x !== last.x || previous.y !== last.y) filtered.push({ x: last.x, y: last.y });
   if (filtered.length <= routeMaxPointsPerStroke) return filtered;
 
-  const capped: RoutePoint[] = [filtered[0]];
+  const capped: RoutePoint[] = [filtered[0]!];
   let lastIndex = 0;
   for (let index = 1; index < routeMaxPointsPerStroke - 1; index += 1) {
     const sourceIndex = Math.round((index * (filtered.length - 1)) / (routeMaxPointsPerStroke - 1));
     if (sourceIndex > lastIndex && sourceIndex < filtered.length - 1) {
-      const point = filtered[sourceIndex];
+      const point = filtered[sourceIndex]!;
       capped.push({ x: point.x, y: point.y });
       lastIndex = sourceIndex;
     }
   }
-  const cappedLast = filtered[filtered.length - 1];
+  const cappedLast = filtered[filtered.length - 1]!;
   capped.push({ x: cappedLast.x, y: cappedLast.y });
   return capped;
 }

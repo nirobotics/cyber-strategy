@@ -1,8 +1,10 @@
 import { bindings, defineConfig, exports } from "cf/config";
+import { productionConfig } from "./production/config.ts";
 
 export default defineConfig(({ mode, isPreview }) => {
-  if (mode !== "preview" || isPreview)
-    throw new Error("Only the isolated preview mode is configured; no production or generated Preview deployment.");
+  if (isPreview) throw new Error("Generated Preview deployments are not configured.");
+  if (mode === "production") return productionConfig();
+  if (mode !== "preview") throw new Error("Only isolated preview or closed production standby is configured.");
   const accountId = "2ca8df5c9754fb7e3f37d08c597535e0";
   const name = "cyber-strategy-preview";
   for (const [key, expected] of [
@@ -32,13 +34,17 @@ export default defineConfig(({ mode, isPreview }) => {
       exports: { StrategyBusiness: exports.durableObject({ storage: "sqlite" }) },
       env: {
         ASSETS: bindings.assets(),
-        DB: bindings.d1({ name: "cyber-strategy-native-preview" }),
+        DB: bindings.d1({ name: "cyber-strategy-native-preview", id: "c8430ab1-0fbe-424f-b329-5395f8e037ed" }),
         FILES: bindings.r2({ name: "cyber-strategy-native-preview" }),
         BUSINESS: bindings.durableObject({ worker: name, exportName: "StrategyBusiness" }),
         SOURCE_CATALOG_SHA256: bindings.text("blocked"),
+        NATIVE_SCHEMA_SHA256: bindings.text("blocked"),
         BUSINESS_WRITES: bindings.text("blocked"),
+        AUTH_WRITES: bindings.text("blocked"),
+        CANARY_EVENT_KEY: bindings.text("blocked"),
+        CANARY_STARTS_AT: bindings.text("blocked"), CANARY_EXPIRES_AT: bindings.text("blocked"),
+        MIGRATION_CANARY_ACTOR_OPEN_ID: bindings.secret(),
         ORIGIN_HANDOVER: bindings.text("blocked"),
-        SCOUT_STRATEGY_SECRET: bindings.secret(),
         SCOUT: bindings.worker({ worker: "cyber-scout-preview" }),
         STRATEGY_PREVIEW_MODE: bindings.text("preview-only"),
         STRATEGY_DATA_READY: bindings.text("blocked"),
@@ -52,11 +58,10 @@ export default defineConfig(({ mode, isPreview }) => {
         FEISHU_APP_SECRET: bindings.secret(),
         FEISHU_ALLOWED_TENANT_KEYS: bindings.secret(),
         CYBER_STRATEGY_EMBED_SECRET: bindings.secret(),
+        SCOUT_STRATEGY_SECRET: bindings.secret(),
         FRC_EVENTS_USERNAME: bindings.secret(),
         FRC_EVENTS_API_KEY: bindings.secret(),
         TBA_API_KEY: bindings.secret(),
-        FEISHU_VIDEO_LIBRARY_NODE_TOKEN: bindings.secret(),
-        FEISHU_VIDEO_LIBRARY_URL: bindings.secret(),
       },
     },
   };

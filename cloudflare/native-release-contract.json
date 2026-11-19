@@ -2,11 +2,11 @@
   "format": "native-release-contract-v1",
   "base": "2282230eb02ec40208681968ab1617855fb18ece",
   "application": "cyber-strategy",
-  "sourceReviewSha256": "2a2c0cc99210b4c0eff88befa5ce4e9fb07c1b33ca8d27435b68d475fe35ea45",
+  "sourceReviewSha256": "44313398ed0ad84d30706e1350500c7ad3ac1263996967b9c2c3d2b4877fb7d5",
   "baselineContractSha256": "8e93f5bcac5257854908f84b0288e75bb21d32c4d70176c8c09b107bd6a98bae",
   "assets": {
-    "/assets/_app-BH2BHSEs.js": {
-      "sha256": "fcc9b328d1246394b1d85bb245702bbab3a45f4c57d98475b9f44eeda048b8e6",
+    "/assets/_app-DtF4vw9d.js": {
+      "sha256": "96512ad569622988c7d8fabf5282bf397d30ec35116b7dd26907b84d4e064262",
       "bytes": 533,
       "mime": "text/javascript; charset=utf-8"
     },
@@ -100,8 +100,8 @@
       "bytes": 0,
       "mime": "text/javascript; charset=utf-8"
     },
-    "/assets/auth.login-BNS0SWEC.js": {
-      "sha256": "c125669156a24f2910efd7655bd588dc9e793d8a98fd162e4489136bdd58bbd2",
+    "/assets/auth.login-CWAmKo0f.js": {
+      "sha256": "99236083036d7a96a13597e6748a412c9a53b62809770f43b66baba2957652d6",
       "bytes": 2794,
       "mime": "text/javascript; charset=utf-8"
     },
@@ -130,8 +130,8 @@
       "bytes": 333,
       "mime": "text/javascript; charset=utf-8"
     },
-    "/assets/demo-UlcZ8wpt.js": {
-      "sha256": "6a76ed2ca54d802a98e46e5c1bc01ba8ede4d67cee4abf62b5ffd7323fea3bd8",
+    "/assets/demo-V6XdTe5z.js": {
+      "sha256": "66f4632e82b6a1f4ff33ad778743a3121980d6781fbb34fbdedfb9455072643f",
       "bytes": 3151,
       "mime": "text/javascript; charset=utf-8"
     },
@@ -155,8 +155,8 @@
       "bytes": 433,
       "mime": "text/javascript; charset=utf-8"
     },
-    "/assets/manifest-01cc4c20.js": {
-      "sha256": "67802b1a21bb498a3ea4ab9f50a13d3f96da3193cc1edc366d5e9879363c46bf",
+    "/assets/manifest-c6938b47.js": {
+      "sha256": "53d911dfc7f050dd87b4ae412cd43dc8049f5c04d57ff10cfcba6c9ee738a8a6",
       "bytes": 8857,
       "mime": "text/javascript; charset=utf-8"
     },
@@ -269,5 +269,28 @@
   "nativeBindings": "D1 cyber-strategy-native-preview; R2 cyber-strategy-native-preview; Durable Object sqlite StrategyBusiness",
   "dataGate": "verified-native-data",
   "integrationGate": "approved-preview-contract",
-  "status": "local-package-only; no cloud resources/secrets/cutover"
+  "status": "local-package-only; no cloud resources/secrets/cutover",
+  "authGateReleaseReview": {
+    "previousAssetsSha256": "8761f8514cff8c25be4c418de9753a3dce8a7dd5b89706162cb879e383e90a53",
+    "newAssetsSha256": "31d625521d0c8f5af2ab630849585698bf816e305a7db936465bd58ed6485826",
+    "changedFiles": [
+      "/assets/_app-DtF4vw9d.js",
+      "/assets/auth.login-CWAmKo0f.js",
+      "/assets/demo-V6XdTe5z.js",
+      "/assets/manifest-c6938b47.js"
+    ],
+    "removedFiles": [
+      "/assets/_app-CNB3-_am.js",
+      "/assets/auth.login-Bu7RJdvx.js",
+      "/assets/demo-BJVXitx8.js",
+      "/assets/manifest-9364943c.js"
+    ],
+    "reason": "Reviewed auth-only server gate and Strategy patch footer2026.1.80; CSS/public assets fixed, no data/catalog/offline/QR pin refresh."
+  },
+  "controlledCanaryReview": {
+    "previousSourceReviewSha256": "0a9d0e9212e4b0a7a580199858cafa084597c03fc3c03f1bbabfdc0f74140ddb",
+    "previousAssetsSha256": "31d625521d0c8f5af2ab630849585698bf816e305a7db936465bd58ed6485826",
+    "changedAssets": [],
+    "reason": "Server-only controlled-canary policy and synthetic runtime regressions; all browser assets, baseline/CSS/public/catalog/native-schema/data pins and previous auth review retained. Infrastructure only, not business-ready; no deployment."
+  }
 }
