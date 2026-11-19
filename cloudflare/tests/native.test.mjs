@@ -28,8 +28,12 @@ test("ordinary requests do not run the readiness query", async (t) => {
 
 test("only the formal host is served; an external database binding or a development override makes the Worker refuse", async (t) => {
   const r = await setup(t);
-  for (const url of ["https://strategy-cf.team8214.com/auth/login", "https://strategy.team8214.com.evil.invalid/auth/login", "https://strategy.team8214.com:444/auth/login", "http://strategy.team8214.com/auth/login", "https://localhost/auth/login"])
-    assert.equal((await r.mf.dispatchFetch(url)).status, 421, url);
+  for (const url of ["https://strategy-cf.team8214.com/auth/login", "https://strategy.team8214.com.evil.invalid/auth/login", "https://strategy.team8214.com:444/auth/login", "http://strategy-cf.team8214.com/auth/login", "https://localhost/auth/login"])
+    assert.equal((await r.mf.dispatchFetch(url, { redirect: "manual" })).status, 421, url);
+  // Plain HTTP on the formal host is sent to HTTPS, as the original deployment did; pages carry HSTS.
+  const plain = await r.mf.dispatchFetch("http://strategy.team8214.com/picklists?event=2026test", { redirect: "manual" });
+  assert.equal(plain.status, 308); assert.equal(plain.headers.get("location"), "https://strategy.team8214.com/picklists?event=2026test");
+  assert.equal((await r.fetch("/auth/login")).headers.get("strict-transport-security"), "max-age=63072000");
   for (const override of [{ SUPABASE_URL: "https://source.invalid" }, { CYBER_SCOUT_SUPABASE_SERVICE_ROLE_KEY: "x" }, { DATABASE_URL: "x" }, { FEISHU_API_BASE: "https://feishu.invalid" }, { CYBER_SCOUT_ORIGIN: "http://scout.team8214.com" }]) {
     const broken = await setup(t, override);
     for (const path of ["/__ready", "/auth/login", "/"]) assert.equal((await broken.fetch(path)).status, 503, JSON.stringify(override) + path);

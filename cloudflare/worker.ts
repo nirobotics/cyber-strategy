@@ -27,6 +27,8 @@ const privateHeaders = {
   "Surrogate-Control": "no-store",
   "X-Robots-Tag": "noindex, nofollow, noarchive",
   "X-Content-Type-Options": "nosniff",
+  // HTTPS only, as on the original deployment.
+  "Strict-Transport-Security": "max-age=63072000",
 };
 function secured(response: Response, request: Request, isStatic: boolean, pitOrigin: string): Response {
   const headers = new Headers(response.headers);
@@ -85,6 +87,8 @@ async function fetchRequest(request: Request, env: Env, ctx: Context, serialized
   const url = new URL(request.url), state = configuration(env);
   const finish = (response: Response, isStatic = false) => secured(response, request, isStatic, state.pitOrigin);
   const json = (body: unknown, status = 200) => finish(Response.json(body, { status }));
+  // Plain HTTP on the formal host goes to HTTPS (the original deployment did the same).
+  if (url.protocol === "http:" && "https://" + url.host === state.origin) return finish(new Response(null, { status: 308, headers: { Location: state.origin + url.pathname + url.search } }));
   if (!state.origin || url.origin !== state.origin) return json({ error: "host_not_served" }, 421);
   if (badPath(url.pathname)) return json({ error: "not_found" }, 404);
   if (Object.hasOwn(assets, url.pathname)) {

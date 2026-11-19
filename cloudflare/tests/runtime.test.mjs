@@ -53,7 +53,7 @@ test("unknown and private paths are 404; other hosts, ports and plain HTTP are n
   for (const path of ["/unknown", "/unknown.data", "/.env", "/%2eenv", "/_headers", "/app/root.tsx", "/cloudflare/cloudflare.config.ts", "/package.json", "/pnpm-lock.yaml", "/assets/nope.js", "/assets/app.css.map", "/api/admin/export", "/build/server/index.js", "/public/ni-logo.png"]) {
     const response = await r.fetch(path); assert.equal(response.status, 404, path); privateResponse(response);
   }
-  for (const url of ["https://strategy-cf.team8214.com/", "https://strategy.team8214.com.evil.invalid/", "https://strategy.team8214.com:444/", "http://strategy.team8214.com/"]) assert.equal((await r.mf.dispatchFetch(url)).status, 421, url);
+  for (const url of ["https://strategy-cf.team8214.com/", "https://strategy.team8214.com.evil.invalid/", "https://strategy.team8214.com:444/", "http://strategy.team8214.com:8080/"]) assert.equal((await r.mf.dispatchFetch(url, { redirect: "manual" })).status, 421, url);
 });
 
 test("the login page is server-rendered HTML with the packaged stylesheet, the product version and no analytics", async (t) => {
