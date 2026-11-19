@@ -1,0 +1,68 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'nirobotics/cyber-strategy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Install the application dependencies
+        run: corepack pnpm@11.5.0 install --frozen-lockfile
+      - name: Test the application
+        run: |
+          corepack pnpm@11.5.0 test
+          corepack pnpm@11.5.0 typecheck
+      - name: Install the Cloudflare tools
+        working-directory: cloudflare
+        run: corepack pnpm@11.7.0 install --frozen-lockfile
+      - name: Build, typecheck and check the Worker package (uploads nothing)
+        working-directory: cloudflare
+        run: node scripts/package.mjs
+      # cyber-scout is a private repository, so the SCOUT service binding is served here by tests/scout-double.mjs,
+      # a Worker that implements the same signed /_scout/v1 contract (see cloudflare/README.md).
+      - name: Test the built package on local workerd, D1 and R2
+        working-directory: cloudflare
+        run: node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs
+      # The only step that receives the publish token. It uploads the package built and tested above together
+      # with its route; the D1 database and the R2 bucket are bound by id/name, nothing is created, and the
+      # Worker's secrets are left as they are. The Worker cyber-scout (service binding SCOUT) must already exist.
+      - name: Deploy the Worker, static assets and route
+        working-directory: cloudflare
+        run: node node_modules/cf/bin/cf deploy --prebuilt --mode production --no-provision --force
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_STRATEGY_PUBLISH_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 2ca8df5c9754fb7e3f37d08c597535e0
+          WRANGLER_SEND_METRICS: 'false'
+          CF_TELEMETRY_DISABLED: 'true'
+      - name: Check the live site
+        run: |
+          set -euo pipefail
+          get() {
+            code=$(curl -sS -o "$RUNNER_TEMP/body" -w '%{http_code}' --retry 5 --retry-delay 5 --retry-all-errors "https://strategy.team8214.com$1")
+            echo "$1 -> $code"
+            test "$code" = 200
+          }
+          get /__ready
+          grep -q '"service":"cyber-strategy"' "$RUNNER_TEMP/body"
+          grep -q '"ready":true' "$RUNNER_TEMP/body"
+          get /auth/login
