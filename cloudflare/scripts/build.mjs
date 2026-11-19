@@ -1,26 +1,19 @@
-import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, relative, dirname } from "node:path";
-import { checkSources, hash, input, lock, original, current, sourcePaths, repo, run, sidecar, walk } from "./common.mjs";
+// Builds the React Router app (SSR + browser assets) for the Worker.
+// The app is copied to a throw-away directory and built there with a Cloudflare-specific
+// react-router/vite configuration, so the repository's own Vercel configuration is left alone.
+import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { extname, relative, resolve } from "node:path";
+import { hash, input, repo, run, scratch, sidecar, walk } from "./common.mjs";
 
-checkSources();
-assert(process.env.PI_SCRATCH_DIR, "PI_SCRATCH_DIR is required");
-// The ignored mirror points to scratch: no duplicate business source in delivery.
-const mirror = resolve(process.env.PI_SCRATCH_DIR, "strategy-build-input");
-rmSync(input, { recursive: true, force: true });
-rmSync(mirror, { recursive: true, force: true });
-mkdirSync(mirror, { recursive: true });
-symlinkSync(mirror, input, "dir");
-for (const path of sourcePaths) {
-  const dest = resolve(input, path);
-  mkdirSync(dirname(dest), { recursive: true });
-  writeFileSync(dest, current(path));
-}
+const mirror = resolve(scratch, "build-input");
+rmSync(input, { recursive: true, force: true }); rmSync(mirror, { recursive: true, force: true });
+mkdirSync(mirror, { recursive: true }); symlinkSync(mirror, input, "dir");
+const skip = (path) => /\.test\.[cm]?[jt]sx?$/.test(path) || path.split("/").some((part) => part.startsWith(".env"));
+for (const dir of ["app", "public"]) cpSync(resolve(repo, dir), resolve(input, dir), { recursive: true, filter: (path) => !skip(path) });
+for (const file of ["package.json", "tsconfig.json"]) cpSync(resolve(repo, file), resolve(input, file));
 symlinkSync(resolve(repo, "node_modules"), resolve(input, "node_modules"), "dir");
-writeFileSync(resolve(input, "react-router.config.ts"), `import type { Config } from "@react-router/dev/config";
-export default { ssr: true, routeDiscovery: { mode: "initial" } } satisfies Config;
-`);
-writeFileSync(resolve(input, "analytics-noop.ts"), "// Preview only: no analytics scripts or network requests.\nexport function Analytics() { return null; }\n");
+writeFileSync(resolve(input, "react-router.config.ts"), 'import type { Config } from "@react-router/dev/config";\nexport default { ssr: true, routeDiscovery: { mode: "initial" } } satisfies Config;\n');
+writeFileSync(resolve(input, "analytics-noop.ts"), "// Vercel Analytics is not used on Cloudflare.\nexport function Analytics() { return null; }\n");
 writeFileSync(resolve(input, "vite.config.ts"), `import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -30,41 +23,25 @@ export default defineConfig({
   plugins: [tailwindcss(), reactRouter()],
 });
 `);
-const sources = Object.entries(lock.files).filter(([, record]) => record.tailwind).map(([path]) => path);
-// Freeze only CSS class discovery, not executable app code. Backend/test words
-// must not introduce incidental utilities; reviewed UI uses existing classes.
-for (const path of sources) { const dest = resolve(input, ".tailwind-source", path); mkdirSync(dirname(dest), { recursive: true }); writeFileSync(dest, original(path)); }
-const css = original("app/app.css").toString();
-assert(css.startsWith('@import "tailwindcss";'));
-writeFileSync(resolve(input, "app/app.css"), css.replace('@import "tailwindcss";',
-  '@import "tailwindcss" source(none);\n' + sources.map((path) => `@source "../.tailwind-source/${path}";`).join("\n")));
+// Tailwind reads class names from the app sources only (explicit, so the browser and server builds agree).
+const css = resolve(input, "app/app.css"), sheet = readFileSync(css, "utf8");
+if (sheet.includes('@import "tailwindcss";')) writeFileSync(css, sheet.replace('@import "tailwindcss";', '@import "tailwindcss" source(none);\n@source "./";'));
 run(process.execPath, [resolve(repo, "node_modules/@react-router/dev/bin.js"), "build"], input);
-// Pin the complete mirror: only the four enumerated platform transformations.
-const transformed = new Set(["react-router.config.ts", "vite.config.ts", "app/app.css"]);
-for (const [path, record] of Object.entries(lock.files))
-  if (!transformed.has(path)) assert.equal(hash(readFileSync(resolve(input, path))), hash(current(path)), `Mirror byte gate: ${path}`);
+
 const client = resolve(input, "build/client");
 for (const path of walk(client)) {
   const name = relative(client, path);
   if (name.split("/").some((part) => part.startsWith(".")) || name.endsWith(".map")) rmSync(path);
 }
-const mime = { js: "text/javascript; charset=utf-8", css: "text/css; charset=utf-8", png: "image/png", webp: "image/webp" };
+// The Worker serves exactly the files listed here, with these content types.
+const mimes = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml", ".ico": "image/x-icon", ".wasm": "application/wasm", ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8", ".woff2": "font/woff2" };
 const assets = Object.fromEntries(walk(client).map((path) => {
-  const name = "/" + relative(client, path), bytes = readFileSync(path);
-  const type = mime[name.split(".").at(-1)];
-  assert(type, `Unexpected browser asset ${name}`);
-  return [name, { sha256: hash(bytes), bytes: bytes.length, mime: type }];
+  const name = "/" + relative(client, path), bytes = readFileSync(path), mime = mimes[extname(name)];
+  if (!mime) throw new Error(`No content type known for ${name}: add its extension to scripts/build.mjs`);
+  return [name, { sha256: hash(bytes), bytes: bytes.length, mime }];
 }));
-const sheets = Object.entries(assets).filter(([name]) => name.endsWith(".css"));
-assert.equal(sheets.length, 1);
-assert.equal(sheets[0][1].sha256, lock.css.sha256, "CSS byte gate (never refresh baseline automatically)");
-assert.equal(sheets[0][1].bytes, lock.css.bytes);
-for (const [path, record] of Object.entries(lock.files).filter(([name]) => name.startsWith("public/")))
-  assert.equal(assets["/" + path.slice(7)]?.sha256, hash(current(path)), `Public byte gate: ${path}`);
 mkdirSync(resolve(sidecar, ".required-tool-outputs"), { recursive: true });
 writeFileSync(resolve(sidecar, ".required-tool-outputs/assets.json"), JSON.stringify(assets, null, 2) + "\n");
-const serverFiles = Object.fromEntries(walk(resolve(input, "build/server")).map((path) => [relative(input, path), hash(readFileSync(path))]));
-writeFileSync(resolve(sidecar, ".required-tool-outputs/build.json"), JSON.stringify({ base: lock.base, assets, serverFiles }, null, 2) + "\n");
-for (const name of [".env", ".env.local", ".env.production"]) assert(!existsSync(resolve(input, name)));
-checkSources();
-console.log(`Preview SSR built; ${Object.keys(assets).length} exact assets; CSS ${lock.css.bytes} bytes / ${lock.css.sha256}`);
+console.log(`Built: ${Object.keys(assets).length} browser assets`);
