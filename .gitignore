@@ -9,5 +9,8 @@ supabase/.temp/
 *.log
 .DS_Store
 
-# Isolated Cloudflare preview: source deliverables are individually force-tracked.
-/cloudflare/
+# Cloudflare Worker package (cloudflare/): only its build outputs are ignored.
+/cloudflare/.cloudflare/
+/cloudflare/.build-input
+/cloudflare/.required-tool-outputs/
+/cloudflare/.wrangler/
