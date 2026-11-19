@@ -26,14 +26,30 @@ Cyber Scout and Cyber Strategy go live together: Strategy signs its requests for
 
 ## Build, test, deploy
 
-Node 22.23.4. Run from this directory, after `pnpm install --frozen-lockfile` here and in the repository root.
+Node 22. Run from this directory, after `pnpm install --frozen-lockfile` here and in the repository root.
 
 ```sh
-node scripts/package.mjs      # typecheck, build, package (no upload), verify -> .cloudflare/output
+node scripts/package.mjs      # build, package (no upload), typecheck, verify -> .cloudflare/output
 node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs
-node node_modules/cf/bin/cf deploy --prebuilt --mode production --no-provision      # after cyber-scout
+node node_modules/cf/bin/cf deploy --prebuilt --mode production --no-provision --force      # the Worker cyber-scout must exist
 ```
 
-The tests run this package and the packaged `cyber-scout` (checked out next to this repository, packaged first) together
-in local workerd; outbound calls are stubbed. `GET /__ready` checks the bindings and D1 (200 or 503); ordinary requests
-do not run that check.
+The tests run this package in local workerd together with a Scout Worker behind the `SCOUT` binding; outbound calls are
+stubbed. Which Scout Worker:
+
+- the packaged `cyber-scout`, when that repository is checked out next to this one and packaged (or `CYBER_SCOUT_PACKAGE`
+  names its Worker package directory): the two real Workers together;
+- otherwise `tests/scout-double.mjs`, a small Worker that implements the same signed `/_scout/v1/*` contract on its own
+  local D1 and R2. This is what CI uses, because `cyber-scout` is a private repository. `SCOUT_TEST_DOUBLE=1` forces it.
+
+A change to the `/_scout/v1/*` contract has to be made in `cyber-scout`, in `app/lib/scout-api.server.ts` and in the double.
+`GET /__ready` checks the bindings and D1 (200 or 503); ordinary requests do not run that check.
+
+## CI
+
+`.github/workflows/deploy.yml` runs the commands above on every push to `main` (and on manual dispatch): application
+tests and typecheck, package, the tests in this directory, `cf deploy`, then `GET /__ready` and `/auth/login` on the live
+host. Deploying needs `CLOUDFLARE_API_TOKEN` (Workers Scripts: Edit on the account, Workers Routes: Edit on the zone) and
+`CLOUDFLARE_ACCOUNT_ID`; in CI the token is the repository secret `CLOUDFLARE_STRATEGY_PUBLISH_TOKEN`.
+A deploy uploads code, static assets and the route only. Worker secrets, the D1 database and the R2 bucket are not
+created, migrated or changed by it.

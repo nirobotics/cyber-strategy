@@ -21,7 +21,7 @@ Cyber Strategy 面向 Team 8214 的侦查分析、选队和比赛策略工作：
 
 - React 19 + React Router 7 framework mode
 - TypeScript 5 + Vite 8 + Tailwind CSS 4
-- Supabase + Vercel
+- Cloudflare Workers + D1 + Durable Object（生产环境，见“部署”）
 - Chart.js
 - 飞书 OAuth、Cyber Scout、TBA 与 Statbotics
 
@@ -38,8 +38,7 @@ Cyber Strategy 面向 Team 8214 的侦查分析、选队和比赛策略工作：
 
 - Node.js 22
 - pnpm 11
-- NI Corporate Supabase 项目
-- NI Corporate Vercel 项目
+- NI Corporate Cloudflare 账号（Worker `cyber-strategy`）
 - 飞书自建应用
 - Cyber Scout Supabase 只读访问凭据
 - FIRST FRC Events API username/token
@@ -67,12 +66,32 @@ http://localhost:3000/auth/feishu/callback
 supabase db push
 ```
 
+## 部署
+
+- **运行位置**：Cloudflare Worker `cyber-strategy`，正式地址 `https://strategy.team8214.com`（路由 `strategy.team8214.com/*`）。不再部署到 Vercel，也不再读写 Supabase。
+- **数据资源**：D1 数据库 `cyber-strategy`（原数据库的十一张表）、Durable Object `StrategyBusiness`（所有写入串行执行）、R2 存储桶 `cyber-strategy`（旧 `match-videos` 归档，应用不读取）。Cyber Scout 数据通过 service binding `SCOUT` 调用 Worker `cyber-scout` 的签名接口读取和修改，本应用不保存副本。密钥保存在 Worker 上，部署不会改动密钥和数据。
+- **Worker 包**：[cloudflare](./cloudflare)（适配层 `worker.ts`、配置 `cloudflare.config.ts`、测试），说明见该目录的 README。
+- **CI**：推送到 `main` 即由 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml) 自动测试、打包并部署，随后检查线上 `/__ready` 和 `/auth/login`。需要仓库 secret `CLOUDFLARE_STRATEGY_PUBLISH_TOKEN`。
+- **手动部署**（与 CI 相同的命令，Worker `cyber-scout` 必须已存在）：
+
+```sh
+pnpm install --frozen-lockfile
+cd cloudflare
+pnpm install --frozen-lockfile
+node scripts/package.mjs
+node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs
+CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=2ca8df5c9754fb7e3f37d08c597535e0 \
+  node node_modules/cf/bin/cf deploy --prebuilt --mode production --no-provision --force
+```
+
+`supabase/migrations/` 是迁移前数据库的历史结构，当前表结构见 [cloudflare/native/schema.sql](./cloudflare/native/schema.sql)。
+
 ## 给 AI 看的工具
 
 - 包管理与校验：`pnpm`
 - 代码搜索：`rg`
 - 数据库迁移：Supabase CLI
-- 部署：Vercel CLI，适配器为 `@vercel/react-router`
+- 部署：推送到 `main` 由 GitHub Actions 部署到 Cloudflare（见“部署”）
 - 仓库规范：`.agents/skills/cyber-apps`、`.agents/skills/ni-github-repo`
 
 ## 给 AI 看的使用方法
@@ -86,7 +105,7 @@ pnpm test
 pnpm build
 ```
 
-数据库结构变化必须新增迁移，不直接改写已部署迁移。部署前确认 Vercel 中已配置 `.env.example` 列出的必需变量。
+部署由 CI 完成；新增密钥时先在 Worker `cyber-strategy` 上配置，再在 `cloudflare/cloudflare.config.ts` 中声明。
 
 ## 维护规则
 
