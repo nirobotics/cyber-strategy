@@ -7,8 +7,9 @@ export const identity = Object.freeze({
   name: "cyber-strategy",
   origin: "https://strategy.team8214.com",
   zone: "rockyxrq.com",
-  // D1 `cyber-strategy`: all eleven tables of the original database.
-  databaseId: "79f063f0-4b36-454b-aae5-656274956d9a",
+  // D1 `cyber-strategy-hk` (primary in Hong Kong): all eleven tables of the original database. On 2026-11-20 the data
+  // moved here, as a full export, from the first D1 database `cyber-strategy` (Singapore), which is no longer bound.
+  databaseId: "f31e6a3a-ec11-4ba6-9819-9b53983a40c0",
   // R2 `cyber-strategy`: the content of the original `match-videos` bucket (one processed video of an earlier feature).
   // The app does not read it; it is bound so the archive stays attached to its application.
   bucket: "cyber-strategy",
@@ -40,7 +41,7 @@ export default defineConfig(({ mode, isPreview }) => {
       exports: { StrategyBusiness: exports.durableObject({ storage: "sqlite" }) },
       env: {
         ASSETS: bindings.assets(),
-        DB: bindings.d1({ id: identity.databaseId, name: "cyber-strategy" }),
+        DB: bindings.d1({ id: identity.databaseId, name: "cyber-strategy-hk" }),
         FILES: bindings.r2({ name: identity.bucket }),
         BUSINESS: bindings.durableObject({ worker: identity.name, exportName: "StrategyBusiness" }),
         SCOUT: bindings.worker({ worker: identity.scout.worker }),

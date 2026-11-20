@@ -69,7 +69,7 @@ supabase db push
 ## 部署
 
 - **运行位置**：Cloudflare Worker `cyber-strategy`，正式地址 `https://strategy.team8214.com`（路由 `strategy.team8214.com/*`）。不再部署到 Vercel，也不再读写 Supabase。
-- **数据资源**：D1 数据库 `cyber-strategy`（原数据库的十一张表）、Durable Object `StrategyBusiness`（所有写入串行执行）、R2 存储桶 `cyber-strategy`（旧 `match-videos` 归档，应用不读取）。Cyber Scout 数据通过 service binding `SCOUT` 调用 Worker `cyber-scout` 的签名接口读取和修改，本应用不保存副本。密钥保存在 Worker 上，部署不会改动密钥和数据。
+- **数据资源**：D1 数据库 `cyber-strategy-hk`（主库在香港；原数据库的十一张表）、Durable Object `StrategyBusiness`（所有写入串行执行）、R2 存储桶 `cyber-strategy`（旧 `match-videos` 归档，应用不读取）。Cyber Scout 数据通过 service binding `SCOUT` 调用 Worker `cyber-scout` 的签名接口读取和修改，本应用不保存副本。密钥保存在 Worker 上，部署不会改动密钥和数据。
 - **Worker 包**：[cloudflare](./cloudflare)（适配层 `worker.ts`、配置 `cloudflare.config.ts`、测试），说明见该目录的 README。
 - **CI**：推送到 `main` 即由 [.github/workflows/deploy.yml](./.github/workflows/deploy.yml) 自动测试、打包并部署，随后检查线上 `/__ready` 和 `/auth/login`。需要仓库 secret `CLOUDFLARE_STRATEGY_PUBLISH_TOKEN`。
 - **手动部署**（与 CI 相同的命令，Worker `cyber-scout` 必须已存在）：

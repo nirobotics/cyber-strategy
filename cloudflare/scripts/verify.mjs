@@ -21,7 +21,7 @@ export function verify() {
   for (const [key, value] of Object.entries(texts)) assert.deepEqual(config.env[key], { type: "text", value });
   for (const key of secrets) assert.deepEqual(config.env[key], { type: "secret" });
   assert.deepEqual(config.env.ASSETS, { type: "assets" });
-  assert.deepEqual(config.env.DB, { type: "d1", name: "cyber-strategy", id: identity.databaseId });
+  assert.deepEqual(config.env.DB, { type: "d1", name: "cyber-strategy-hk", id: identity.databaseId });
   assert.deepEqual(config.env.FILES, { type: "r2", name: identity.bucket });
   assert.deepEqual(config.env.BUSINESS, { type: "durable-object", worker: identity.name, exportName: "StrategyBusiness" });
   // The whole Scout API (events, records, users, config, edits, assignments, photos): the Scout Worker's default entrypoint.

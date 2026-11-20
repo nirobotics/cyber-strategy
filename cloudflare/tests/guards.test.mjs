@@ -11,7 +11,8 @@ test("the production configuration serves strategy.team8214.com with logs on, it
   assert.deepEqual(worker.observability, { enabled: true });
   assert.equal(worker.workersDev, false); assert.equal(worker.previewUrls, false); assert.deepEqual(worker.domains, []);
   assert.deepEqual(worker.assets, { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: ["/*", "!/assets/*"] });
-  assert.deepEqual(worker.env.DB, { type: "d1", id: identity.databaseId, name: "cyber-strategy" });
+  assert.equal(identity.databaseId, "f31e6a3a-ec11-4ba6-9819-9b53983a40c0");
+  assert.deepEqual(worker.env.DB, { type: "d1", id: identity.databaseId, name: "cyber-strategy-hk" });
   assert.deepEqual(worker.env.FILES, { type: "r2", name: "cyber-strategy" });
   assert.deepEqual(worker.env.BUSINESS, { type: "durable-object", worker: "cyber-strategy", exportName: "StrategyBusiness" });
   // The default entrypoint of the production Scout Worker: events, records, users, config, edits, assignments, photos.
