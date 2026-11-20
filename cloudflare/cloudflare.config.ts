@@ -31,9 +31,6 @@ export default defineConfig(({ mode, isPreview }) => {
       compatibilityFlags: ["nodejs_compat"],
       workersDev: false,
       previewUrls: false,
-      // Run the request handler next to the database (D1 primary: Singapore) instead of in whichever data centre the
-      // visitor entered through, so database round trips stay local. Static files are still served at the edge.
-      placement: { mode: "targeted", region: "aws:ap-southeast-1" },
       domains: [],
       triggers: [triggers.fetch({ pattern: new URL(identity.origin).hostname + "/*", zone: identity.zone })],
       // Content-hashed build files under /assets/ are served straight from Static Assets (headers: see scripts/build.mjs);
