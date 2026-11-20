@@ -1,12 +1,12 @@
 import { bindings, defineConfig, exports, triggers } from "cf/config";
 
 // The production Worker for https://strategy.team8214.com.
-// strategy.team8214.com is a custom hostname on the zone below; its DNS stays at Aliyun (CNAME to saas-target.rockyxrq.com).
+// The route is declared on the host's own zone on Cloudflare; DNS is at Cloudflare since 2026-11-20.
 export const identity = Object.freeze({
   accountId: "2ca8df5c9754fb7e3f37d08c597535e0",
   name: "cyber-strategy",
   origin: "https://strategy.team8214.com",
-  zone: "rockyxrq.com",
+  zone: "team8214.com",
   // D1 `cyber-strategy-hk` (primary in Hong Kong): all eleven tables of the original database. On 2026-11-20 the data
   // moved here, as a full export, from the first D1 database `cyber-strategy` (Singapore), which is no longer bound.
   databaseId: "f31e6a3a-ec11-4ba6-9819-9b53983a40c0",

@@ -7,7 +7,7 @@ import { secrets } from "../scripts/verify.mjs";
 test("the production configuration serves strategy.team8214.com with logs on, its own D1/R2/Durable Object, the whole Scout Worker and nothing external", () => {
   const { accountId, worker } = config({ mode: "production", isPreview: false });
   assert.equal(accountId, "2ca8df5c9754fb7e3f37d08c597535e0"); assert.equal(worker.name, "cyber-strategy"); assert.equal(worker.entrypoint, "./worker.ts");
-  assert.deepEqual(worker.triggers, [{ type: "fetch", pattern: "strategy.team8214.com/*", zone: "rockyxrq.com" }]);
+  assert.deepEqual(worker.triggers, [{ type: "fetch", pattern: "strategy.team8214.com/*", zone: "team8214.com" }]);
   assert.deepEqual(worker.observability, { enabled: true });
   assert.equal(worker.workersDev, false); assert.equal(worker.previewUrls, false); assert.deepEqual(worker.domains, []);
   assert.deepEqual(worker.assets, { htmlHandling: "none", notFoundHandling: "none", runWorkerFirst: ["/*", "!/assets/*"] });

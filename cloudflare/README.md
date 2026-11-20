@@ -4,7 +4,7 @@ The production Worker for `https://strategy.team8214.com`. One configuration, on
 
 | Part | Resource |
 | --- | --- |
-| Worker | `cyber-strategy`, route `strategy.team8214.com/*` on zone `rockyxrq.com`, logs on |
+| Worker | `cyber-strategy`, route `strategy.team8214.com/*` on zone `team8214.com` (the host's own zone), logs on |
 | Database | D1 `cyber-strategy-hk` (`DB`, primary in Hong Kong): the eleven tables of the original database, one `row_json` per record |
 | Scout data | service binding `SCOUT` to the Worker `cyber-scout` (its signed `/_scout/v1/*` API); Strategy has no copy of it |
 | Writes | Durable Object `StrategyBusiness` (`BUSINESS`): every write runs through it, one at a time |
