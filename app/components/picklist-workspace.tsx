@@ -22,7 +22,7 @@ import {
 type LocalPersonalList = { id: string; name: string; createdAt: string };
 type ActiveList =
   | { kind: "personal"; local: LocalPersonalList; remote: SharedPicklist | null }
-  | { kind: "main"; remote: SharedPicklist };
+  | { kind: "main" | "snapshot"; remote: SharedPicklist };
 
 const TIER_LABELS: Record<PicklistAssignedColumn, string> = { tier1: "Tier 1", tier2: "Tier 2", tier3: "Tier 3", dnp: "DNP" };
 
@@ -45,9 +45,15 @@ export function PicklistWorkspace({
 }) {
   const commandFetcher = useFetcher<PicklistActionData>();
   const saveFetcher = useFetcher<PicklistActionData>();
-  const personalKey = personalListsKey(datasetId, resource.userOpenId);
+  const groupId = resource.groupId;
+  const eventWorkspace = !demoMode && !groupId;
+  const personalScope = groupId ? [eventKey, groupId, encodeURIComponent(resource.userOpenId)].join(":") : datasetId;
+  const personalKey = personalListsKey(personalScope, resource.userOpenId);
+  const [savedGroupMain, setSavedGroupMain] = useState<SharedPicklist | null>(null);
+  const submittedVersion = resource.submittedVersion;
+  const [confirmedVersion, setConfirmedVersion] = useState<number>();
   const demoListsKey = `cyber-strategy:picklist:${datasetId}:demo-main-lists:v2`;
-  const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, datasetId);
+  const [personalLists, setPersonalLists] = useLocalPersonalLists(personalKey, personalScope, !eventWorkspace);
   const [sharedLists, setSharedLists] = useState(resource.lists);
   const [demoMainLoaded, setDemoMainLoaded] = useState(false);
   const [active, setActive] = useState<ActiveList | null>(null);
@@ -110,11 +116,11 @@ export function PicklistWorkspace({
   }, []);
   const removeLocalPersonal = useCallback((local: LocalPersonalList, remoteId?: string) => {
     setPersonalLists((current) => current.filter((list) => list.id !== local.id));
-    localStorage.removeItem(personalBoardKey(datasetId, local.id));
+    localStorage.removeItem(personalBoardKey(personalScope, local.id));
     setSharedLists((current) => current.filter((list) => list.id !== remoteId && list.clientId !== local.id));
     setMergePersonalIds((current) => current.filter((id) => id !== remoteId));
     setStalePersonalIds((current) => updateSet(current, local.id, false));
-  }, [datasetId, setPersonalLists]);
+  }, [personalScope, setPersonalLists]);
 
   useEffect(() => {
     if (demoMode) return;
@@ -142,7 +148,7 @@ export function PicklistWorkspace({
     const stale = new Set<string>();
     for (const local of personalLists) {
       const submitted = submittedPersonal.find((list) => list.createdBy === resource.userOpenId && list.clientId === local.id);
-      const stored = localStorage.getItem(personalBoardKey(datasetId, local.id));
+      const stored = localStorage.getItem(personalBoardKey(personalScope, local.id));
       if (!submitted || !stored) continue;
       try {
         if (!samePicklistBoard(normalizePicklistBoard(JSON.parse(stored)), submitted.board)) stale.add(local.id);
@@ -151,7 +157,7 @@ export function PicklistWorkspace({
       }
     }
     queueMicrotask(() => setStalePersonalIds(stale));
-  }, [datasetId, personalLists, resource.userOpenId, submittedPersonal]);
+  }, [personalScope, personalLists, resource.userOpenId, submittedPersonal]);
 
   useEffect(() => {
     queueMicrotask(() => setMergePersonalIds((current) => {
@@ -161,6 +167,7 @@ export function PicklistWorkspace({
   }, [mergeablePersonal]);
 
   useEffect(() => {
+    if (eventWorkspace) return;
     const imports = resource.lists.filter((list) =>
       list.kind === "personal" && list.createdBy === resource.userOpenId && list.clientId && !personalLists.some((local) => local.id === list.clientId)
     );
@@ -169,7 +176,7 @@ export function PicklistWorkspace({
         ...current,
         ...imports.map((list) => ({ id: list.clientId!, name: list.name, createdAt: list.updatedAt })),
       ])));
-  }, [personalLists, resource.lists, resource.userOpenId, setPersonalLists]);
+  }, [eventWorkspace, personalLists, resource.lists, resource.userOpenId, setPersonalLists]);
 
   useEffect(() => {
     const result = commandFetcher.data;
@@ -183,6 +190,7 @@ export function PicklistWorkspace({
       return;
     }
     queueMicrotask(() => {
+      if (result.submittedVersion !== undefined) setConfirmedVersion(result.submittedVersion);
       if (result.picklist) {
         const list = result.picklist;
         setSharedLists((current) => [list, ...current.filter((item) => item.id !== list.id)]);
@@ -212,20 +220,24 @@ export function PicklistWorkspace({
     const list = saveFetcher.data?.picklist;
     if (!saveFetcher.data?.ok || !list || handledSave.current === saveFetcher.data) return;
     handledSave.current = saveFetcher.data;
-    queueMicrotask(() => setSharedLists((current) => current.map((item) => item.id === list.id ? list : item)));
+    queueMicrotask(() => {
+      setSharedLists((current) => current.map((item) => item.id === list.id ? list : item));
+      if (list.version !== undefined) setSavedGroupMain(list);
+    });
   }, [saveFetcher.data]);
 
   useEffect(() => {
-    if (!activeBoard || active?.kind !== "main" || !resource.isAdmin || demoMode) return;
+    if (!activeBoard || active?.kind !== "main" || !resource.isAdmin || !eventWorkspace) return;
     const timeout = window.setTimeout(() => {
       submitMain({
         intent: "save-main",
+        eventKey,
         id: active.remote.id,
         board: JSON.stringify(activeBoard),
       }, { method: "post", action: "/picklists" });
     }, 600);
     return () => window.clearTimeout(timeout);
-  }, [active, activeBoard, demoMode, resource.isAdmin, submitMain]);
+  }, [active, activeBoard, eventKey, eventWorkspace, resource.isAdmin, submitMain]);
 
   function createPersonal() {
     const name = personalName.trim();
@@ -289,6 +301,7 @@ export function PicklistWorkspace({
     commandFetcher.submit({
       intent: "submit-personal",
       eventKey,
+      groupId: groupId ?? "",
       clientId: active.local.id,
       name: active.local.name,
       board: JSON.stringify(activeBoard),
@@ -309,7 +322,7 @@ export function PicklistWorkspace({
     }
     setPendingDelete(local);
     setPendingCommand("delete-personal");
-    commandFetcher.submit({ intent: "delete-personal", id: remote.id }, { method: "post", action: "/picklists" });
+    commandFetcher.submit({ intent: "delete-personal", id: remote.id, groupId: groupId ?? "", eventKey }, { method: "post", action: "/picklists" });
   }
 
   function deleteMain(list: SharedPicklist) {
@@ -321,13 +334,24 @@ export function PicklistWorkspace({
       return;
     }
     setPendingCommand("delete-main");
-    commandFetcher.submit({ intent: "delete-main", id: list.id }, { method: "post", action: "/picklists" });
+    commandFetcher.submit({ intent: "delete-main", id: list.id, eventKey }, { method: "post", action: "/picklists" });
   }
 
   function openMain(remote: SharedPicklist) {
     clearUndo();
     setActiveBoard(null);
+    setSavedGroupMain(groupId ? remote : null);
     setActive({ kind: "main", remote });
+  }
+
+  function groupMainCommand(intent: "save-group-main" | "submit-group-main") {
+    if (!groupId || savedGroupMain?.version === undefined || !activeBoard) return;
+    const form = { intent, eventKey, groupId, version: String(savedGroupMain.version) };
+    if (intent === "save-group-main") {
+      void submitMain({ ...form, board: JSON.stringify(activeBoard) }, { method: "post", action: "/picklists" });
+    } else if (samePicklistBoard(activeBoard, savedGroupMain.board)) {
+      void commandFetcher.submit(form, { method: "post", action: "/picklists" });
+    }
   }
 
   function startMerge() {
@@ -336,6 +360,7 @@ export function PicklistWorkspace({
     currentBoard.current = selectedMergeMain.board;
     previousBoard.current = null;
     setCanUndo(false);
+    setSavedGroupMain(groupId ? selectedMergeMain : null);
     setActive({ kind: "main", remote: selectedMergeMain });
     setMergeMode(true);
   }
@@ -355,19 +380,23 @@ export function PicklistWorkspace({
       <div className="min-h-0 min-w-0 space-y-3 sm:grid sm:flex-1 sm:grid-rows-[minmax(0,3fr)_minmax(11rem,2fr)] sm:overflow-hidden">
         {resource.error ? <Badge className="w-fit border-danger/40 bg-danger/10 text-danger">{resource.error}</Badge> : null}
 
+        {commandFetcher.data?.error ? <p className="text-sm text-danger" role="alert">{commandFetcher.data.error}</p> : null}
         <div className="grid min-h-0 min-w-0 gap-3 lg:grid-cols-2">
-          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} /> : null}>
+          <PicklistCollection title="Main" icon={<Users className="size-4" />} count={mainLists.length} footer={resource.isAdmin && !groupId ? <CreateRow value={mainName} onChange={setMainName} onCreate={createMain} placeholder="Main Picklist 名称" busy={!demoMode && commandFetcher.state !== "idle"} /> : null}>
             {mainLists.map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <ListButton list={list} onClick={() => openMain(list)} readOnly={!resource.isAdmin} embedded />
-                {resource.isAdmin ? <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => setMainDeleteTarget(list)} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}><Trash2 className="size-4" /></Button> : null}
+                {resource.isAdmin && !groupId ? <Button type="button" className="mr-2 shrink-0 px-2" onClick={() => setMainDeleteTarget(list)} title={`删除 ${list.name}`} aria-label={`删除 ${list.name}`}><Trash2 className="size-4" /></Button> : null}
               </div>
             ))}
             {!mainLists.length ? <EmptyCollection text="暂无 Main Picklist" /> : null}
           </PicklistCollection>
 
-          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={personalLists.length} footer={<CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />}>
-            {personalLists.filter((list) => !demoMode || /scout 1/i.test(list.name)).map((list) => (
+          <PicklistCollection title="Personal" icon={<UserRound className="size-4" />} count={eventWorkspace ? submittedPersonal.length : personalLists.length} footer={eventWorkspace ? null : <CreateRow value={personalName} onChange={setPersonalName} onCreate={createPersonal} placeholder="Personal Picklist 名称" busy={false} error={personalName.trim() && personalNameExists ? "名称已存在" : undefined} />}>
+            {eventWorkspace ? submittedPersonal.map((list) => (
+              <ListButton key={list.id} list={list} onClick={() => { clearUndo(); setActiveBoard(null); setActive({ kind: "snapshot", remote: list }); }} readOnly />
+            )) : null}
+            {!eventWorkspace ? personalLists.filter((list) => !demoMode || /scout 1/i.test(list.name)).map((list) => (
               <div key={list.id} className="flex min-w-0 items-center rounded-md border border-line bg-surface-2 hover:border-brand">
                 <button type="button" onClick={() => openPersonal(list)} className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 text-left">
                   <span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>
@@ -377,8 +406,8 @@ export function PicklistWorkspace({
                   <Trash2 className="size-4" />
                 </Button>
               </div>
-            ))}
-            {!personalLists.length ? <EmptyCollection text="暂无 Personal Picklist" /> : null}
+            )) : null}
+            {!(eventWorkspace ? submittedPersonal.length : personalLists.length) ? <EmptyCollection text={eventWorkspace ? "暂无 Group Main 提交" : "暂无 Personal Picklist"} /> : null}
           </PicklistCollection>
         </div>
 
@@ -404,7 +433,7 @@ export function PicklistWorkspace({
                 </div>
               </div>
               <div className="grid content-start gap-1.5 text-sm text-ink-dim">
-                已提交 Personal Picklist
+                {eventWorkspace ? "已提交 Group Main" : "已提交 Personal Picklist"}
                 <div className="max-h-40 min-h-10 overflow-y-auto rounded-md border border-line bg-surface-2">
                   {mergeablePersonal.map((list) => (
                     <label key={list.id} className={cn("flex h-10 cursor-pointer items-center gap-2 border-b border-line px-3 text-ink last:border-b-0 hover:bg-surface", mergePersonalIds.includes(list.id) && "bg-brand/10 text-brand")}>
@@ -449,13 +478,19 @@ export function PicklistWorkspace({
   }
 
   const isMain = active.kind === "main";
-  const editable = !isMain || resource.isAdmin;
-  const listName = isMain ? active.remote.name : active.local.name;
-  const personalSubmission = !isMain && !stalePersonalIds.has(active.local.id) ? ownSubmissions.get(active.local.id) : null;
-  const remoteBoard = isMain ? active.remote.board : active.remote?.board;
-  const storageKey = isMain
-    ? `cyber-strategy:picklist:${datasetId}:main:${active.remote.id}:board`
-    : personalBoardKey(datasetId, active.local.id);
+  const isPersonal = active.kind === "personal";
+  const editable = isPersonal || (isMain && resource.isAdmin);
+  const listName = isPersonal ? active.local.name : active.remote.name;
+  const personalSubmission = isPersonal && !stalePersonalIds.has(active.local.id) ? ownSubmissions.get(active.local.id) : null;
+  const updatedGroupMain = groupId && isMain && !editable ? mainLists.find((list) => list.id === active.remote.id) : null;
+  const remoteBoard = updatedGroupMain?.board ?? active.remote?.board;
+  const storageKey = isPersonal
+    ? personalBoardKey(personalScope, active.local.id)
+    : `cyber-strategy:picklist:${datasetId}:main:${active.remote.id}:board`;
+  const groupMainCurrent = activeBoard && savedGroupMain && samePicklistBoard(activeBoard, savedGroupMain.board);
+  const groupMainVersion = savedGroupMain?.version ?? 0;
+  const groupMainBusy = saveFetcher.state !== "idle" || commandFetcher.state !== "idle";
+  const groupMainSubmitted = groupMainCurrent && (confirmedVersion === groupMainVersion || submittedVersion === groupMainVersion);
   const searchedTeam = teams.some((team) => team.team === teamSearch.replace(/^frc/i, "").trim())
     ? teamSearch.replace(/^frc/i, "").trim()
     : null;
@@ -468,7 +503,7 @@ export function PicklistWorkspace({
             <ArrowLeft className="size-4" />
           </Button>
           <h2 className="truncate font-semibold text-ink">{listName}</h2>
-          <Badge className={isMain ? "border-brand/40 bg-brand/10 text-brand" : "border-line bg-surface-2 text-ink-dim"}>{isMain ? "Main" : "Personal"}</Badge>
+          <Badge className={isMain ? "border-brand/40 bg-brand/10 text-brand" : "border-line bg-surface-2 text-ink-dim"}>{isMain ? "Main" : isPersonal ? "Personal" : active.remote.historical ? "历史 Group Main 提交" : "Group Main 提交"}</Badge>
           {personalSubmission ? <Badge className="border-success/40 bg-success/10 text-success"><Check className="size-3" />已上传</Badge> : null}
           {!editable ? <LockKeyhole className="size-4 text-ink-faint" aria-label="只读" /> : null}
           {saveFetcher.state !== "idle" ? <span className="text-xs text-ink-faint">保存中</span> : null}
@@ -516,7 +551,13 @@ export function PicklistWorkspace({
               <RotateCcw className="size-4" />重置
             </Button>
           ) : null}
-          {!isMain ? (
+          {isMain && groupId && editable ? <>
+            <Button type="button" onClick={() => groupMainCommand("save-group-main")} disabled={!activeBoard || groupMainBusy || (groupMainVersion > 0 && Boolean(groupMainCurrent))}>保存 Group Main</Button>
+            <Button type="button" variant="primary" onClick={() => groupMainCommand("submit-group-main")} disabled={!groupMainCurrent || groupMainVersion === 0 || groupMainBusy}>
+              <Send className="size-4" />{groupMainSubmitted ? "已提交 · 再次提交" : "提交 Group Main"}
+            </Button>
+          </> : null}
+          {isPersonal ? (
             <Button type="button" variant="primary" onClick={submitPersonal} disabled={!activeBoard || (!demoMode && commandFetcher.state !== "idle")}>
               <Send className="size-4" />提交
             </Button>
@@ -535,7 +576,8 @@ export function PicklistWorkspace({
         datasetId={datasetId}
         storageKey={storageKey}
         initialBoard={remoteBoard ?? emptyPicklistBoard()}
-        preferInitial={isMain}
+        preferInitial={!isPersonal}
+        persist={isPersonal || (isMain && !groupId)}
         resetToken={resetToken}
         restoreRequest={restoreRequest}
         highlightedTeam={searchedTeam}
@@ -587,7 +629,7 @@ function PicklistCollection({ title, icon, count, children, footer }: { title: s
 }
 
 function ListButton({ list, onClick, readOnly, embedded = false }: { list: SharedPicklist; onClick: () => void; readOnly: boolean; embedded?: boolean }) {
-  return <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between gap-3 p-3 text-left", !embedded && "rounded-md border border-line bg-surface-2 hover:border-brand")}><span className="min-w-0 truncate font-semibold text-ink">{list.name}</span>{readOnly ? <LockKeyhole className="size-3 shrink-0 text-ink-dim" /> : null}</button>;
+  return <button type="button" onClick={onClick} className={cn("flex w-full items-center justify-between gap-3 p-3 text-left", !embedded && "rounded-md border border-line bg-surface-2 hover:border-brand")}><span className="min-w-0 truncate font-semibold text-ink">{list.name}{list.kind === "personal" ? <span className="block text-xs font-normal text-ink-dim">{list.createdByName} · {list.historical ? "历史 Group Main 提交" : "Group Main 提交"}</span> : null}</span>{readOnly ? <LockKeyhole className="size-3 shrink-0 text-ink-dim" /> : null}</button>;
 }
 
 function CreateRow({ value, onChange, onCreate, placeholder, busy, error }: { value: string; onChange: (value: string) => void; onCreate: () => void; placeholder: string; busy: boolean; error?: string }) {
@@ -610,10 +652,11 @@ function personalBoardKey(datasetId: string, id: string) {
   return id === "legacy" ? `cyber-strategy:picklist:${datasetId}:board` : `cyber-strategy:picklist:${datasetId}:personal:${id}:board`;
 }
 
-function useLocalPersonalLists(key: string, datasetId: string) {
+function useLocalPersonalLists(key: string, datasetId: string, enabled: boolean) {
   const [lists, setLists] = useState<LocalPersonalList[]>([]);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -628,7 +671,7 @@ function useLocalPersonalLists(key: string, datasetId: string) {
       setLoadedKey(key);
     });
     return () => { cancelled = true; };
-  }, [datasetId, key]);
+  }, [datasetId, enabled, key]);
   useEffect(() => {
     if (loadedKey === key) localStorage.setItem(key, JSON.stringify(lists));
   }, [key, lists, loadedKey]);

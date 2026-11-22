@@ -12,7 +12,7 @@ Cyber Strategy 面向 Team 8214 的侦查分析、选队和比赛策略工作：
 - 从 Cyber Scout 实时读取普通侦查、超级侦查和 Pit Scouting 数据。
 - 浏览与比较队伍数据，查看逐场表现、比赛自动路线、可靠性和综合评分。
 - 结合 TBA 与 Statbotics 数据进行赛程预测和 Match Analysis。
-- 维护个人 Picklist，并按赛事分别保存排序与忽略状态。
+- 按赛事分组，维护 Personal、Group Main 和赛事总 Main Picklist。
 - 创建、提交、审核、版本恢复和导出 Strategy Proposal PDF。
 - 为 Scouting Lead 提供提交记录、人员分配和信心分分析。
 - 使用飞书组织身份登录，管理员功能受服务端权限控制。
@@ -111,7 +111,8 @@ pnpm build
 
 - service role key、飞书 secret、TBA key、Vercel token 禁止进入客户端 bundle、README、日志和提交历史。
 - Strategy 共享数据写入 Strategy Supabase；Cyber Scout 数据通过服务端只读连接获取。
-- Picklist、隐藏队伍、忽略场次等个人状态保存在浏览器本地，并按数据集隔离。
+- Personal Picklist 草稿按赛事、Group 和用户保存在浏览器本地。分组、组内上传、Group Main、提交快照和赛事总 Main 写入 D1。
+- 飞书应用需开通读取部门与部门直属用户的通讯录权限，通讯录可见范围设为全员。
 - 管理、Scouting Lead 和 Proposal 审核仅允许管理员访问；权限必须在服务端再次校验。
 - 常规改动至少执行 `pnpm typecheck`、`pnpm lint`、`pnpm test` 和 `pnpm build`。
 - UI 继续沿用 Cyber App shell、light/dark 主题和紧凑的内部工具风格。

@@ -51,6 +51,11 @@ export async function setup(t,overrides={},withAssets=true){
   if(url.pathname.endsWith("/oauth/token"))return Response.json({code:0,access_token:"synthetic-access-"+body.code});
   if(url.pathname.endsWith("/user_info")){const code=request.headers.get("Authorization").split("synthetic-access-")[1];return Response.json({code:0,data:{open_id:"synthetic-"+(["admin","other"].includes(code)?code:"member"),name:code==="admin"?"Synthetic Admin":"Synthetic Scout",tenant_key:state.tenant}});}
   if(url.pathname.endsWith("/tenant_access_token/internal"))return Response.json({code:0,tenant_access_token:"synthetic-wiki-token"});
+  if(url.pathname.endsWith("/department/0/children"))return Response.json({code:0,data:{items:[{open_department_id:"synthetic-department"}]}});
+  if(url.pathname.endsWith("/user/find_by_department")){
+    const ids=url.searchParams.get("department_id")==="0"?["admin"]:url.searchParams.has("page_token")?["unseen"]:["member","other"];
+    return Response.json({code:0,data:{items:ids.map(id=>({open_id:"synthetic-"+id,name:id})),has_more:ids.includes("member"),page_token:"next"}});
+  }
   if(url.pathname.endsWith("/spaces/get_node"))return Response.json({code:0,data:{node:{space_id:"synthetic-space",node_token:"synthetic-wiki-root",title:"Synthetic video library"}}});
   if(url.pathname.endsWith("/spaces/synthetic-space/nodes"))return Response.json({code:0,data:{items:[{node_token:"synthetic-video",title:"2026test_qm1.mp4",obj_type:"file",has_child:false}],has_more:false}});
  }

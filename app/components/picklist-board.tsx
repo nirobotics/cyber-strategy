@@ -52,6 +52,7 @@ export function PicklistBoard({
   initialBoard,
   readOnly = false,
   preferInitial = false,
+  persist = true,
   resetToken = 0,
   restoreRequest,
   highlightedTeam = null,
@@ -65,6 +66,7 @@ export function PicklistBoard({
   initialBoard?: PicklistBoardState;
   readOnly?: boolean;
   preferInitial?: boolean;
+  persist?: boolean;
   resetToken?: number;
   restoreRequest?: { token: number; board: PicklistBoardState } | null;
   highlightedTeam?: string | null;
@@ -75,7 +77,7 @@ export function PicklistBoard({
 }) {
   const validTeams = useMemo(() => teams.map((team) => team.team), [teams]);
   const resolvedStorageKey = storageKey ?? `cyber-strategy:picklist:${datasetId}:board`;
-  const [board, setBoard] = useStoredPicklistBoard(resolvedStorageKey, datasetId, validTeams, initialBoard, preferInitial, onBoardChange);
+  const [board, setBoard] = useStoredPicklistBoard(resolvedStorageKey, datasetId, validTeams, initialBoard, preferInitial, persist, onBoardChange);
   const [previewBoard, setPreviewBoard] = useState<PicklistBoardState | null>(null);
   const [activeTeam, setActiveTeam] = useState<string | null>(null);
   const dragColumn = useRef<PicklistColumn | null>(null);
@@ -330,6 +332,7 @@ function useStoredPicklistBoard(
   validTeams: string[],
   initialBoard: PicklistBoardState | undefined,
   preferInitial: boolean,
+  persist: boolean,
   onBoardChange: ((board: PicklistBoardState) => void) | undefined,
 ) {
   const [board, setBoard] = useState<PicklistBoardState>(emptyPicklistBoard);
@@ -344,7 +347,7 @@ function useStoredPicklistBoard(
     queueMicrotask(() => {
       if (cancelled) return;
       try {
-        const raw = window.localStorage.getItem(key);
+        const raw = persist ? window.localStorage.getItem(key) : null;
         const next = preferInitial
           ? sanitizePicklistBoard(stableInitialBoard, validTeams)
           : raw
@@ -366,14 +369,14 @@ function useStoredPicklistBoard(
     return () => {
       cancelled = true;
     };
-  }, [datasetId, hasInitialBoard, key, preferInitial, stableInitialBoard, validSignature, validTeams]);
+  }, [datasetId, hasInitialBoard, key, persist, preferInitial, stableInitialBoard, validSignature, validTeams]);
 
   useEffect(() => {
     if (loadedKey !== key) return;
     const sanitized = sanitizePicklistBoard(board, validTeams);
-    window.localStorage.setItem(key, JSON.stringify(sanitized));
+    if (persist) window.localStorage.setItem(key, JSON.stringify(sanitized));
     onBoardChange?.(sanitized);
-  }, [board, key, loadedKey, onBoardChange, validSignature, validTeams]);
+  }, [board, key, loadedKey, onBoardChange, persist, validSignature, validTeams]);
 
   return [board, setBoard] as const;
 }

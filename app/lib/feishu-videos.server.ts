@@ -1,3 +1,4 @@
+import { tenantAccessToken } from "./feishu.server";
 import { matchIdentity, matchLabel, matchScheduleIdentity, type TbaMatch } from "./match-analysis";
 import { cleanTbaEventKey, fetchTbaMatches } from "./tba.server";
 
@@ -154,21 +155,6 @@ async function fetchVideoEntries(rootToken: string): Promise<VideoEntry[]> {
   }
 
   return entries;
-}
-
-async function tenantAccessToken() {
-  const appId = process.env.FEISHU_APP_ID;
-  const appSecret = process.env.FEISHU_APP_SECRET;
-  if (!appId || !appSecret) throw new Error("未配置飞书应用凭据。");
-
-  const response = await fetch(`${API_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
-  });
-  const json = await response.json() as { code?: number; msg?: string; tenant_access_token?: string };
-  if (!json.tenant_access_token) throw new Error(json.msg || "获取飞书 tenant token 失败。");
-  return json.tenant_access_token;
 }
 
 async function getWikiNode(token: string, nodeToken: string): Promise<WikiNode & { space_id?: string }> {

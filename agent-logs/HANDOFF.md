@@ -1355,3 +1355,10 @@
 **失败轮与修复**：strict TS R1 的 tuple/route-map undefined 已用 const tuple/type guard 修复；runtime R1 测试 fixture 括号修复，R2 mock 缺 PostgREST limit=1 与 Scout user_profiles 修复，R3 16/16 通过。没有放宽断言或刷新来源合同。保留原 Vercel envFile deprecation / SSR Navigate 提示。
 
 **阻塞/交接**：见 `cloudflare/README.md` 与 `.memory/cloudflare-preview.md`。缺独立 preview secret、Feishu 非空租户 allowlist/callback/管理员配置、自有五表真实 schema/data/RLS/审计/审批快照迁移、Scout 四表与 pit-photos 的隔离迁移/读写验收，以及 Pit/Scout preview 域名/共享签名配置确认。两道门禁默认 blocked，不能接 Scout 生产库冒充预览。原 HTTPS Supabase 访问层作为兼容准备保留，退出旧 DB **未完成**；无共享 DB/gateway。生产 CSP 不改，preview embed 仅允许 pit-cf.team8214.com。真实登录、数据/照片迁移、跨应用及浏览器视觉验收未做。回滚仅需丢弃/反向本地适配提交，无线上资源待回滚。
+
+---
+
+## 2026-11-23 · Picklist Group on Cloudflare
+
+- 基于 main 的 2026.1.80 实现 Picklist Group，版本升至 2026.1.81。生产 Worker 复用 D1 app_settings、现有 Durable Object 和审计批次。已有 D1 环境直接读取旧 Main 和 Personal。Supabase 迁移 0007 仅用于本地兼容模式。
+- 本地应用检查和 Cloudflare dry-run 通过。33 个 workerd 测试通过，覆盖组内权限、移除撤权、并发保存、快照和原 Worker 流程。真实飞书通讯录和生产部署仍待完成。

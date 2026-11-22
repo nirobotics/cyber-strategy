@@ -57,9 +57,9 @@ export async function createMainPicklist(opts: { eventKey: string; name: string;
   return rowToPicklist(data as PicklistSettingRow) ?? { ...list, createdByName: opts.actorOpenId, updatedAt: now };
 }
 
-export async function saveMainPicklist(opts: { id: string; board: unknown; actorOpenId: string; isAdmin: boolean }) {
+export async function saveMainPicklist(opts: { id: string; eventKey?: string; board: unknown; actorOpenId: string; isAdmin: boolean }) {
   const stored = await getPicklist(opts.id);
-  if (!stored) throw new Response("Main Picklist 不存在", { status: 404 });
+  if (!stored || (opts.eventKey && stored.list.eventKey !== opts.eventKey)) throw new Response("Main Picklist 不存在", { status: 404 });
   const { row, list } = stored;
   if (list.kind !== "main" || !canEditSharedPicklist(list, opts.actorOpenId, opts.isAdmin)) throw new Response("无权修改 Main Picklist", { status: 403 });
   const sb = hasNative() ? null : requireClient();
@@ -118,10 +118,10 @@ export async function deletePersonalPicklist(opts: { id: string; actorOpenId: st
   return stored.list.id;
 }
 
-export async function deleteMainPicklist(opts: { id: string; actorOpenId: string; isAdmin: boolean }) {
+export async function deleteMainPicklist(opts: { id: string; eventKey?: string; actorOpenId: string; isAdmin: boolean }) {
   if (!opts.isAdmin) throw new Response("只有管理员可以删除 Main Picklist", { status: 403 });
   const stored = await getPicklist(opts.id);
-  if (!stored) throw new Response("Main Picklist 不存在", { status: 404 });
+  if (!stored || (opts.eventKey && stored.list.eventKey !== opts.eventKey)) throw new Response("Main Picklist 不存在", { status: 404 });
   if (stored.list.kind !== "main") throw new Response("无权删除 Main Picklist", { status: 403 });
   const { error } = hasNative() ? await nativeDeleteSetting(stored.row.key, opts.actorOpenId, "picklist.main.delete") : await requireClient()!.from("app_settings").delete().eq("key", stored.row.key);
   if (error) throw new Response("删除 Main Picklist 失败", { status: 500 });

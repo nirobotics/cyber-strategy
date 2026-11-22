@@ -112,3 +112,14 @@ export async function completeLogin(code: string, codeVerifier: string): Promise
   if (!token) return null;
   return fetchUserInfo(token);
 }
+
+export async function tenantAccessToken() {
+  const response = await fetch(`${API_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ app_id: appId(), app_secret: appSecret() }),
+  });
+  const json = await response.json() as { code?: number; msg?: string; tenant_access_token?: string };
+  if (!json.tenant_access_token) throw new Error(json.msg || "获取飞书 tenant token 失败。");
+  return json.tenant_access_token;
+}

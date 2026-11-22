@@ -230,19 +230,45 @@ test("proposal create, submit, review, edit after approval, restore, reject and 
   const listed = await r.fetch("/strategy-proposal.data?event=2026test", { headers: { Cookie: member } }); assert.equal(listed.status, 200);
 });
 
-test("picklists: admin main list, personal lists with idempotent resubmission, owner-only deletion", async (t) => {
-  const r = await setup(t), member = await login(r), admin = await login(r, "admin"), other = await login(r, "other"), lists = async () => (await rows(r.db, "app_settings")).filter((row) => row.key.startsWith("picklist:"));
-  await fetcher(r, "/picklists", { intent: "create-main", eventKey: "2026test", name: "Main" }, member); assert.equal((await lists()).length, 0);
-  assert.equal((await fetcher(r, "/picklists", { intent: "create-main", eventKey: "2026test", name: "Main" }, admin)).status, 200);
-  const main = (await lists()).find((row) => row.value?.kind === "main"); assert(main);
-  const personal = { intent: "submit-personal", eventKey: "2026test", clientId: "offline-client-1", name: "Personal", board: "{}" };
-  await Promise.all(Array.from({ length: 3 }, () => fetcher(r, "/picklists", personal, member)));
-  assert.equal((await lists()).length, 2); const own = (await lists()).find((row) => row.value.kind === "personal"); assert.equal(own.value.createdBy, "synthetic-member");
-  await fetcher(r, "/picklists", { intent: "delete-personal", id: own.value.id }, other); assert.equal((await lists()).length, 2);
-  await fetcher(r, "/picklists", { intent: "save-main", id: main.value.id, board: "{}" }, admin);
-  await fetcher(r, "/picklists", { intent: "delete-personal", id: own.value.id }, member);
-  await fetcher(r, "/picklists", { intent: "delete-main", id: main.value.id }, admin); assert.equal((await lists()).length, 0);
-  assert.equal((await r.fetch("/picklists.data?event=2026test", { headers: { Cookie: member } })).status, 200);
+test("picklist groups: roles, isolated uploads, versioning, snapshots and removal", async (t) => {
+  const r = await setup(t), leader = await login(r), admin = await login(r, "admin"), student = await login(r, "other");
+  const eventKey = "2026test";
+  const write = (cookie, intent, fields = {}) => fetcher(r, "/picklists", { intent, eventKey, ...fields }, cookie);
+  const load = (cookie, groupId) => r.fetch("/picklists.data?" + new URLSearchParams({ event: eventKey, ...(groupId ? { group: groupId } : {}) }), { headers: { Cookie: cookie } });
+  const groupRows = async () => (await rows(r.db, "app_settings")).filter((row) => row.key.startsWith("picklist-group:"));
+  const member = { leaderId: "synthetic-member", studentId: "synthetic-other", name: "First Group" };
+  assert.equal((await write(student, "submit-personal", { board: "{}" })).status, 403);
+  assert.equal((await write(leader, "create-group", member)).status, 403);
+  assert.equal((await write(admin, "directory")).status, 200);
+  assert.equal((await write(admin, "create-group", member)).status, 200);
+  assert.equal((await write(admin, "create-group", { ...member, name: "Second Group" })).status, 200);
+  const groups = (await groupRows()).map((row) => row.value);
+  const groupId = groups.find((group) => group.name === "First Group").id;
+  const otherId = groups.find((group) => group.name === "Second Group").id;
+  assert.equal((await load(student, groupId)).status, 200);
+  assert.equal((await write(student, "directory", { groupId })).status, 403);
+  const personal = { groupId, clientId: "p1", name: "Student Personal", board: '{"tier1":["8214"]}' };
+  for (const id of [groupId, otherId, groupId]) assert.equal((await write(student, "submit-personal", { ...personal, groupId: id })).status, 200);
+  const personals = (await rows(r.db, "app_settings")).filter((row) => row.key.startsWith("picklist-group-personal:"));
+  assert.equal(personals.length, 2);
+  assert.equal((await write(student, "save-group-main", { groupId, version: 0, board: "{}" })).status, 403);
+  assert.equal((await write(leader, "submit-group-main", { groupId, version: 0 })).status, 400);
+  const sameVersion = await Promise.all([personal.board, "{}"].map((board) => write(leader, "save-group-main", { groupId, version: 0, board })));
+  assert.deepEqual(sameVersion.map((response) => response.status).sort(), [200, 409]);
+  assert.equal((await write(leader, "submit-group-main", { groupId, version: 1 })).status, 200);
+  const snapshot = (await groupRows()).find((row) => row.value.id === groupId).value.submission;
+  assert.equal((await write(leader, "save-group-main", { groupId, version: 1, board: '{"tier1":["6328"]}' })).status, 200);
+  assert.deepEqual((await groupRows()).find((row) => row.value.id === groupId).value.submission, snapshot);
+  assert.equal((await write(leader, "submit-group-main", { groupId, version: 2 })).status, 200);
+  assert.match(await (await load(admin)).text(), /6328/);
+  assert.equal((await write(leader, "update-students", { groupId, rosterVersion: 1, studentId: "synthetic-unseen" })).status, 200);
+  assert.equal((await load(student, groupId)).status, 403);
+  assert.equal((await load(student, otherId)).status, 200);
+  assert.equal((await write(student, "submit-personal", personal)).status, 403);
+  assert.doesNotMatch(await (await load(leader, groupId)).text(), /Student Personal/);
+  assert.equal((await write(admin, "create-main", { name: "Event Main" })).status, 200);
+  const main = (await rows(r.db, "app_settings")).find((row) => row.key.startsWith("picklist:main:"));
+  assert.equal((await write(admin, "delete-main", { id: main.value.id })).status, 200);
 });
 
 test("admin settings are saved with their audit row, and nothing is saved when the audit row cannot be written", async (t) => {
