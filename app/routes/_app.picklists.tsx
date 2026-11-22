@@ -6,11 +6,11 @@ import { cleanTbaEventKey } from "../lib/tba.server";
 import { createMainPicklist, deleteMainPicklist, listPicklists, saveMainPicklist } from "../lib/picklists.server";
 import { normalizePicklistBoard, type PicklistGroupUser, type PicklistResource, type SharedPicklist } from "../lib/picklist";
 import { readGroups, resolveRoster, saveGroupCommand } from "../lib/picklist-groups.server";
-import { listFeishuDirectory } from "../lib/feishu-directory.server";
+import { picklistMemberDirectory } from "../lib/feishu-directory.server";
 
 export type PicklistActionData = {
   error?: string; ok?: boolean; picklist?: SharedPicklist; deletedId?: string;
-  submittedVersion?: number; directory?: PicklistGroupUser[];
+  submittedVersion?: number; directory?: PicklistGroupUser[]; directoryWarning?: string;
 };
 
 const privateHeaders = { "Cache-Control": "private, no-store" };
@@ -51,7 +51,10 @@ export async function action({ request }: Route.ActionArgs) {
       if (!isEventAdmin && !leaderOnly) throw new Response("只有管理员可以管理分组", { status: 403 });
       const group = groups.find((item) => item.id === groupId);
       if ((leaderOnly && group?.leaderId !== actorOpenId) || (groupId && !group)) throw new Response("无权管理此 Group", { status: 403 });
-      if (intent === "directory") return data<PicklistActionData>({ ok: true, directory: await listFeishuDirectory() }, { headers: privateHeaders });
+      if (intent === "directory") {
+        const { users, fromProfiles } = await picklistMemberDirectory();
+        return data<PicklistActionData>({ ok: true, directory: users, directoryWarning: fromProfiles ? "飞书通讯录暂不可用，当前显示已登录过的成员。" : undefined }, { headers: privateHeaders });
+      }
       const leaderId = intent === "update-students" ? group!.leaderId : cleanId(form.get("leaderId"));
       const ids = [...new Set([leaderId, ...form.getAll("studentId").map(cleanId)])];
       const [leader, ...students] = await resolveRoster(ids, group ? [{ openId: group.leaderId, name: group.leaderName }, ...group.students] : []);

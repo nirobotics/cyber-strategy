@@ -230,6 +230,28 @@ test("proposal create, submit, review, edit after approval, restore, reject and 
   const listed = await r.fetch("/strategy-proposal.data?event=2026test", { headers: { Cookie: member } }); assert.equal(listed.status, 200);
 });
 
+test("picklist member directory uses Pit-style Feishu traversal and profile fallback", async (t) => {
+  for (const mode of ["recursive", "scope", "unavailable"]) {
+    await t.test(mode, async (t) => {
+      const r = await setup(t);
+      r.state.contacts = mode;
+      const admin = await login(r, "admin");
+      const response = await fetcher(r, "/picklists", { intent: "directory", eventKey: "2026test" }, admin);
+      assert.equal(response.status, 200);
+      const body = await response.text();
+      assert.match(body, /Synthetic Admin/);
+      if (mode === "unavailable") {
+        assert.match(body, /当前显示已登录过的成员/);
+        assert.doesNotMatch(body, /synthetic-unseen/);
+      } else {
+        assert.match(body, /synthetic-unseen/);
+        assert.doesNotMatch(body, /当前显示已登录过的成员/);
+        assert(r.calls.some((call) => call.path.endsWith(mode === "scope" ? "/scopes" : "/departments/synthetic-department/children")));
+      }
+    });
+  }
+});
+
 test("picklist groups: roles, isolated uploads, versioning, snapshots and removal", async (t) => {
   const r = await setup(t), leader = await login(r), admin = await login(r, "admin"), student = await login(r, "other");
   const eventKey = "2026test";

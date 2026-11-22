@@ -72,7 +72,7 @@ export default function DemoRoute({ loaderData }: Route.ComponentProps) {
     <AppShell
       appName="Cyber Strategy"
       appSubtitle={locale === "en" ? "FRC match data viewer" : "FRC比赛数据查看"}
-      version="2026.1.81"
+      version="2026.1.82"
       user={null}
       authLoading={false}
       allowGuest

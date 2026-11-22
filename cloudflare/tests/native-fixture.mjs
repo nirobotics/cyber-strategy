@@ -51,10 +51,22 @@ export async function setup(t,overrides={},withAssets=true){
   if(url.pathname.endsWith("/oauth/token"))return Response.json({code:0,access_token:"synthetic-access-"+body.code});
   if(url.pathname.endsWith("/user_info")){const code=request.headers.get("Authorization").split("synthetic-access-")[1];return Response.json({code:0,data:{open_id:"synthetic-"+(["admin","other"].includes(code)?code:"member"),name:code==="admin"?"Synthetic Admin":"Synthetic Scout",tenant_key:state.tenant}});}
   if(url.pathname.endsWith("/tenant_access_token/internal"))return Response.json({code:0,tenant_access_token:"synthetic-wiki-token"});
-  if(url.pathname.endsWith("/department/0/children"))return Response.json({code:0,data:{items:[{open_department_id:"synthetic-department"}]}});
-  if(url.pathname.endsWith("/user/find_by_department")){
-    const ids=url.searchParams.get("department_id")==="0"?["admin"]:url.searchParams.has("page_token")?["unseen"]:["member","other"];
-    return Response.json({code:0,data:{items:ids.map(id=>({open_id:"synthetic-"+id,name:id})),has_more:ids.includes("member"),page_token:"next"}});
+  if(url.pathname.includes("/contact/v3/")){
+    if(state.contacts==="unavailable")return Response.json({code:99991672});
+    if(state.contacts==="scope"){
+      if(url.pathname.endsWith("/scopes"))return Response.json({code:0,data:{department_ids:["synthetic-department"]}});
+      if(url.pathname.includes("/departments/"))return Response.json({code:99991672});
+    }
+    if(url.pathname.endsWith("/departments/0/children")){
+      if(state.contacts==="recursive"&&url.searchParams.get("department_id_type")==="open_department_id")return Response.json({code:99991672});
+      if(state.contacts==="recursive"&&url.searchParams.has("fetch_child"))return Response.json({code:43010});
+      return Response.json({code:0,data:{items:[{open_department_id:"synthetic-department",department_id:"synthetic-department"}]}});
+    }
+    if(url.pathname.endsWith("/departments/synthetic-department/children"))return Response.json({code:0,data:{items:[]}});
+    if(url.pathname.endsWith("/users/find_by_department")){
+      const ids=url.searchParams.get("department_id")==="0"?["admin"]:url.searchParams.has("page_token")?["unseen"]:["member","other"];
+      return Response.json({code:0,data:{items:ids.map(id=>({open_id:"synthetic-"+id,name:id})),has_more:ids.includes("member"),page_token:"next"}});
+    }
   }
   if(url.pathname.endsWith("/spaces/get_node"))return Response.json({code:0,data:{node:{space_id:"synthetic-space",node_token:"synthetic-wiki-root",title:"Synthetic video library"}}});
   if(url.pathname.endsWith("/spaces/synthetic-space/nodes"))return Response.json({code:0,data:{items:[{node_token:"synthetic-video",title:"2026test_qm1.mp4",obj_type:"file",has_child:false}],has_more:false}});
