@@ -1,4 +1,5 @@
 {
+  "exclude": ["cloudflare"],
   "include": [
     "**/*",
     "**/.server/**/*",

@@ -1,0 +1,20 @@
+{
+  "name": "cyber-strategy-cloudflare",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.7.0",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "node ../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "package": "node scripts/package.mjs",
+    "check": "node scripts/verify.mjs",
+    "test": "node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs",
+    "deploy": "node --disable-warning=ExperimentalWarning scripts/deploy.mjs"
+  },
+  "devDependencies": {
+    "cf": "1.0.0-beta.31",
+    "wrangler": "4.161.0",
+    "miniflare": "5.20261110.2-beta"
+  }
+}

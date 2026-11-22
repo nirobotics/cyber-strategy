@@ -24,4 +24,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+      - name: Package and test the isolated Cloudflare template (no deploy)
+        working-directory: cloudflare
+        run: |
+          corepack pnpm@11.7.0 install --frozen-lockfile
+          node scripts/package.mjs
+          node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs
       - run: pnpm audit --audit-level=low

@@ -9,6 +9,8 @@ export type PicklistKind = "main" | "personal";
 export type SharedPicklist = {
   id: string;
   clientId: string | null;
+  historical?: boolean;
+  version?: number;
   eventKey: string;
   name: string;
   kind: PicklistKind;
@@ -19,7 +21,21 @@ export type SharedPicklist = {
   updatedAt: string;
 };
 
+export type PicklistGroupUser = { openId: string; name: string };
+export type PicklistGroup = {
+  id: string;
+  name: string;
+  leaderId: string;
+  leaderName: string;
+  joined: boolean;
+  students: PicklistGroupUser[];
+  rosterVersion: number;
+};
+
 export type PicklistResource = {
+  groups?: PicklistGroup[];
+  groupId?: string;
+  submittedVersion?: number | null;
   selectedEventKey: string;
   isAdmin: boolean;
   userOpenId: string;

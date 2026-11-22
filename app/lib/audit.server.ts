@@ -1,3 +1,4 @@
+import { hasNative, nativeAudit } from "./native-repository.server";
 import { getClient } from "./supabase.server";
 
 /**
@@ -13,6 +14,7 @@ export async function appendAudit(
     targetId?: string | null;
   } = {},
 ): Promise<void> {
+  if (hasNative()) return nativeAudit(action, opts);
   const sb = getClient();
   if (!sb) {
     console.error("audit_logs unavailable: Supabase 未配置");

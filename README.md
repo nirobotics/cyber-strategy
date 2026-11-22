@@ -12,7 +12,7 @@ Cyber Strategy 面向 FRC 队伍的侦查分析、选队和比赛策略工作：
 - 从 Cyber Scout 实时读取普通侦查、超级侦查和 Pit Scouting 数据。
 - 浏览与比较队伍数据，查看逐场表现、比赛自动路线、可靠性和综合评分。
 - 结合 TBA 与 Statbotics 数据进行赛程预测和 Match Analysis。
-- 维护个人 Picklist，并按赛事分别保存排序与忽略状态。
+- 按赛事分组，维护 Personal、Group Main 和赛事总 Main Picklist。
 - 创建、提交、审核、版本恢复和导出 Strategy Proposal PDF。
 - 为 Scouting Lead 提供提交记录、人员分配和信心分分析。
 - 使用飞书组织身份登录，管理员功能受服务端权限控制。
@@ -29,7 +29,7 @@ Cyber Strategy 面向 FRC 队伍的侦查分析、选队和比赛策略工作：
 
 - React 19 + React Router 7 framework mode
 - TypeScript 5 + Vite 8 + Tailwind CSS 4
-- Supabase + Vercel
+- Cloudflare Workers、D1、R2 和 Durable Objects
 - Chart.js
 - 飞书 OAuth、Cyber Scout、TBA 与 Statbotics
 
@@ -37,10 +37,11 @@ Cyber Strategy 面向 FRC 队伍的侦查分析、选队和比赛策略工作：
 
 - `app/routes/` - 页面、登录回调和服务端 API 路由。
 - `app/components/` - Cyber App shell、分析页面、图表和战术工具。
-- `app/lib/` - 数据转换、统计、认证、Supabase 和外部数据源逻辑。
+- `app/lib/` - 数据转换、统计、认证、D1 和外部数据源逻辑。
 - `app/season/` - 当前年度的赛季配置、Scout 映射、计分适配和场地定义。
 - `public/` - 年度场地图、品牌资源和静态文件。
-- `supabase/migrations/` - Strategy 数据表、设置和 Proposal 版本迁移。
+- `supabase/migrations/` - 本地兼容模式的 Supabase 迁移。
+- `cloudflare/` - Worker 打包、D1 初始化和本地测试。
 - `.agents/skills/` - 项目级 Cyber App 与 NI GitHub 规范。
 
 ## 数据源职责
@@ -55,10 +56,9 @@ Cyber Strategy 面向 FRC 队伍的侦查分析、选队和比赛策略工作：
 
 - Node.js 22
 - pnpm 11
-- NI Corporate Supabase 项目
-- NI Corporate Vercel 项目
+- 独立的 Cloudflare Worker、D1 和 R2 绑定
 - 飞书自建应用
-- Cyber Scout Supabase 只读访问凭据
+- Cyber Scout Worker 和共用签名密钥
 - FIRST FRC Events API username/token
 - TBA API key（队伍综合分分项）
 
@@ -76,20 +76,16 @@ pnpm dev
 http://localhost:5173/auth/feishu/callback
 ```
 
-根据 `.env.example` 配置服务端环境变量。所有密钥只允许放在 `.env.local`、Vercel 环境变量或其他受控密钥存储中，禁止添加 `VITE_` 前缀或提交到 Git。
+根据 `.env.example` 配置服务端环境变量。所有密钥只允许放在 `.env.local`、Cloudflare Worker secrets 或其他受控密钥存储中，禁止添加 `VITE_` 前缀或提交到 Git。
 
-首次部署前，按顺序应用数据库迁移：
-
-```sh
-supabase db push
-```
+Cloudflare 打包、初始化和部署见 [Worker 使用说明](cloudflare/README.md)。`pnpm dev` 使用本地兼容模式，校验 Cloudflare 行为应运行 Worker 测试。
 
 ## 给 AI 看的工具
 
 - 包管理与校验：`pnpm`
 - 代码搜索：`rg`
-- 数据库迁移：Supabase CLI
-- 部署：Vercel CLI，适配器为 `@vercel/react-router`
+- 数据库初始化：Wrangler D1
+- 部署：`cloudflare/` 下的 `cf` 和 Wrangler
 - 仓库规范：`.agents/skills/cyber-apps`、`.agents/skills/ni-github-repo`
 
 ## 给 AI 看的使用方法
@@ -103,11 +99,11 @@ pnpm test
 pnpm build
 ```
 
-数据库结构变化必须新增迁移，不直接改写已部署迁移。部署前确认 Vercel 中已配置 `.env.example` 列出的必需变量。年度定制前先完成 `SEASON_REQUIREMENTS.md`，实施后执行 `SEASON_CUSTOMIZATION.md` 的验收清单。
+数据库结构变化必须新增迁移，不直接改写已部署迁移。部署前按 Worker 使用说明配置赛季专用绑定和 secrets。年度定制前先完成 `SEASON_REQUIREMENTS.md`，实施后执行 `SEASON_CUSTOMIZATION.md` 的验收清单。
 
 ## 维护规则
 
-- service role key、飞书 secret、TBA key、Vercel token 禁止进入客户端 bundle、README、日志和提交历史。
+- service role key、飞书 secret、TBA key、Cloudflare token 禁止进入客户端 bundle、README、日志和提交历史。
 - Strategy 共享数据写入 Strategy Supabase；Cyber Scout 数据通过服务端只读连接获取。
 - Picklist、隐藏队伍、忽略场次等个人状态保存在浏览器本地，并按数据集隔离。
 - 管理、Scouting Lead 和 Proposal 审核仅允许管理员访问；权限必须在服务端再次校验。

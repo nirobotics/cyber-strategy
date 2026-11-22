@@ -1,3 +1,5 @@
+import { hasNative } from "./native-repository.server";
+import { scoutEvents, scoutRecords, scoutUsers, scoutConfig, scoutAssignment, scoutDelete, scoutRequest } from "./scout-api.server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import {
@@ -130,6 +132,7 @@ const scoutPositions = ["R1", "R2", "R3", "B1", "B2", "B3"] as const;
 let cachedScoutClient: SupabaseClient | null | undefined;
 
 export function getCyberScoutClient(): SupabaseClient | null {
+  if (hasNative()) return null; // No source client or source credentials in the native runtime.
   if (cachedScoutClient !== undefined) return cachedScoutClient;
 
   const url = process.env.CYBER_SCOUT_SUPABASE_URL;
@@ -185,7 +188,7 @@ export async function loadCyberScoutDataset(
   includedMatchTypes: DataRange[] = DEFAULT_DATA_RANGE,
 ): Promise<CyberScoutLoadResult> {
   const db = getCyberScoutClient();
-  if (!db) {
+  if (!db && !hasNative()) {
     return unavailable(eventKey, "未配置 cyber-scout 数据源。");
   }
 
@@ -260,9 +263,10 @@ export async function loadCyberScoutDataset(
 }
 
 export async function hasCyberScoutTarget(eventKey: string, teamNumber?: string): Promise<boolean> {
+  if (hasNative()) { const event = (await scoutEvents()).find((row) => row.tba_event_key === eventKey); return Boolean(event && (!teamNumber || (await scoutRecords(event.id)).some((row) => String(row.team_number) === teamNumber))); }
   const db = getCyberScoutClient();
-  if (!db) return false;
-  const { data: event, error: eventError } = await db
+  if (!db && !hasNative()) return false;
+  const { data: event, error: eventError } = await db!
     .from("scouting_events")
     .select("id")
     .eq("tba_event_key", eventKey)
@@ -270,7 +274,7 @@ export async function hasCyberScoutTarget(eventKey: string, teamNumber?: string)
     .maybeSingle();
   if (eventError || !event) return false;
   if (!teamNumber) return true;
-  const { data: record, error: recordError } = await db
+  const { data: record, error: recordError } = await db!
     .from("scouting_records")
     .select("id")
     .eq("event_id", event.id)
@@ -282,7 +286,7 @@ export async function hasCyberScoutTarget(eventKey: string, teamNumber?: string)
 
 export async function loadCyberScoutProposalMatches(eventKey: string, includedMatchTypes?: DataRange[]): Promise<ProposalMatch[]> {
   const db = getCyberScoutClient();
-  if (!db) return [];
+  if (!db && !hasNative()) return [];
   const config = await fetchScoutEventConfig(db);
   if (config.tbaEventKey !== eventKey) return [];
   return toCyberScoutProposalMatches(config.matches, includedMatchTypes);
@@ -298,7 +302,7 @@ export async function loadCyberScoutMatches(eventKey: string, includedMatchTypes
 
 export async function loadSuperScoutMatchResults(eventKey: string): Promise<MatchResult[]> {
   const db = getCyberScoutClient();
-  if (!db) return [];
+  if (!db && !hasNative()) return [];
   const eventRows = await fetchEvents(db);
   const event = resolveEvent(eventRows, eventKey);
   if (!event) return [];
@@ -316,7 +320,7 @@ export async function loadScoutConfidenceReport(
   opts: { includedMatchTypes?: DataRange[]; tbaMatches?: TbaMatch[] } = {},
 ): Promise<ScoutConfidenceResult> {
   const db = getCyberScoutClient();
-  if (!db) {
+  if (!db && !hasNative()) {
     return emptyConfidenceResult(eventKey, {
       source: "fallback",
       label: "Scout 未配置",
@@ -414,22 +418,23 @@ export async function loadScoutConfidenceReport(
 }
 
 export async function deleteCyberScoutRecord(recordId: string, actorOpenId: string) {
+  if (hasNative()) return scoutDelete(recordId);
   const id = cleanUuid(recordId);
   if (!id) throw new Error("记录 ID 无效。");
   const db = getCyberScoutClient();
-  if (!db) throw new Error("cyber-scout 数据源未配置。");
+  if (!db && !hasNative()) throw new Error("cyber-scout 数据源未配置。");
 
-  const existing = await db.from("scouting_records").select("id,payload").eq("id", id).maybeSingle();
+  const existing = await db!.from("scouting_records").select("id,payload").eq("id", id).maybeSingle();
   if (existing.error) throw existing.error;
   if (!existing.data) return false;
 
   const photoPaths = readPhotoPaths(existing.data.payload);
   if (photoPaths.length) {
-    const removed = await db.storage.from("pit-photos").remove(photoPaths);
+    const removed = await db!.storage.from("pit-photos").remove(photoPaths);
     if (removed.error) throw removed.error;
   }
 
-  const deleted = await db.from("scouting_records").delete().eq("id", id);
+  const deleted = await db!.from("scouting_records").delete().eq("id", id);
   if (deleted.error) throw deleted.error;
   await appendAudit("cyber_scout.record.delete", {
     actorOpenId,
@@ -450,7 +455,8 @@ export async function saveCyberScoutAssignment(input: {
   actorOpenId: string;
 }) {
   const db = getCyberScoutClient();
-  if (!db) throw new Error("cyber-scout 数据源未配置。");
+  if (!db && !hasNative()) throw new Error("cyber-scout 数据源未配置。");
+  if (hasNative()) { await scoutAssignment("save", input); return; }
   const config = await fetchScoutEventConfig(db);
   const assignment = normalizeAssignment({
     id: input.id || randomUUID(),
@@ -477,8 +483,9 @@ export async function saveCyberScoutAssignment(input: {
 }
 
 export async function deleteCyberScoutAssignment(id: string, actorOpenId: string) {
+  if (hasNative()) { await scoutAssignment("delete", { id }); return; }
   const db = getCyberScoutClient();
-  if (!db) throw new Error("cyber-scout 数据源未配置。");
+  if (!db && !hasNative()) throw new Error("cyber-scout 数据源未配置。");
   const config = await fetchScoutEventConfig(db);
   await saveScoutEventConfig(db, {
     ...config,
@@ -493,14 +500,15 @@ export async function deleteCyberScoutAssignment(id: string, actorOpenId: string
 }
 
 export async function downloadCyberScoutPhoto(path: string): Promise<Response> {
+  if (hasNative()) { if (!isSafeCyberScoutPhotoPath(path)) throw new Response("无效照片路径", { status: 400 }); return scoutRequest("/photo?path=" + encodeURIComponent(path)); }
   if (!isSafeCyberScoutPhotoPath(path)) {
     throw new Response("无效照片路径", { status: 400 });
   }
 
   const db = getCyberScoutClient();
-  if (!db) throw new Response("cyber-scout 数据源未配置", { status: 503 });
+  if (!db && !hasNative()) throw new Response("cyber-scout 数据源未配置", { status: 503 });
 
-  const { data, error } = await db.storage.from("pit-photos").download(path);
+  const { data, error } = await db!.storage.from("pit-photos").download(path);
   if (error || !data) throw new Response("照片不存在", { status: 404 });
 
   return new Response(data, {
@@ -531,8 +539,9 @@ function unavailable(eventKey: string | null, message: string): CyberScoutLoadRe
   };
 }
 
-async function fetchEvents(db: SupabaseClient): Promise<CyberScoutEventRow[]> {
-  const { data, error } = await db
+async function fetchEvents(db: SupabaseClient | null): Promise<CyberScoutEventRow[]> {
+  if (hasNative()) return scoutEvents();
+  const { data, error } = await db!
     .from("scouting_events")
     .select("id,tba_event_key,name,is_active,updated_at")
     .order("is_active", { ascending: false })
@@ -541,8 +550,9 @@ async function fetchEvents(db: SupabaseClient): Promise<CyberScoutEventRow[]> {
   return (data ?? []) as CyberScoutEventRow[];
 }
 
-async function fetchRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
-  const { data, error } = await db
+async function fetchRecords(db: SupabaseClient | null, eventId: string): Promise<CyberScoutRecordRow[]> {
+  if (hasNative()) return scoutRecords(eventId);
+  const { data, error } = await db!
     .from("scouting_records")
     .select("id,record_type,match_type,match_number,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
@@ -552,8 +562,9 @@ async function fetchRecords(db: SupabaseClient, eventId: string): Promise<CyberS
   return (data ?? []) as CyberScoutRecordRow[];
 }
 
-async function fetchConfidenceRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
-  const { data, error } = await db
+async function fetchConfidenceRecords(db: SupabaseClient | null, eventId: string): Promise<CyberScoutRecordRow[]> {
+  if (hasNative()) return (await scoutRecords(eventId)).filter((row) => ["normal_match", "super_match"].includes(row.record_type));
+  const { data, error } = await db!
     .from("scouting_records")
     .select("id,record_type,match_type,match_number,alliance,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
@@ -563,8 +574,9 @@ async function fetchConfidenceRecords(db: SupabaseClient, eventId: string): Prom
   return (data ?? []) as CyberScoutRecordRow[];
 }
 
-async function fetchSuperRecords(db: SupabaseClient, eventId: string): Promise<CyberScoutRecordRow[]> {
-  const { data, error } = await db
+async function fetchSuperRecords(db: SupabaseClient | null, eventId: string): Promise<CyberScoutRecordRow[]> {
+  if (hasNative()) return (await scoutRecords(eventId)).filter((row) => row.record_type === "super_match");
+  const { data, error } = await db!
     .from("scouting_records")
     .select("id,record_type,match_type,match_number,alliance,team_number,payload,uploaded_at,client_created_at,created_at")
     .eq("event_id", eventId)
@@ -574,8 +586,9 @@ async function fetchSuperRecords(db: SupabaseClient, eventId: string): Promise<C
   return (data ?? []) as CyberScoutRecordRow[];
 }
 
-async function fetchLeadRecords(db: SupabaseClient, eventId: string): Promise<ScoutLeadRecordRow[]> {
-  const { data, error } = await db
+async function fetchLeadRecords(db: SupabaseClient | null, eventId: string): Promise<ScoutLeadRecordRow[]> {
+  if (hasNative()) { const users = new Map((await scoutUsers()).map((row) => [row.id, row.display_name])); return ((await scoutRecords(eventId)) as ScoutLeadRecordRow[]).filter((row) => ["normal_match", "super_match"].includes(row.record_type)).sort((a, b) => (a.match_number ?? 0) - (b.match_number ?? 0) || String(b.uploaded_at).localeCompare(String(a.uploaded_at))).map((row) => ({ ...row, uploadedByName: row.uploaded_by ? users.get(row.uploaded_by) ?? "" : "" })); }
+  const { data, error } = await db!
     .from("scouting_records")
     .select("id,record_type,match_type,match_number,alliance,position,team_number,payload,device_id,client_created_at,uploaded_at,uploaded_by,created_at")
     .eq("event_id", eventId)
@@ -595,8 +608,9 @@ async function fetchLeadRecords(db: SupabaseClient, eventId: string): Promise<Sc
   }));
 }
 
-async function fetchScoutUsers(db: SupabaseClient): Promise<ScoutUserOption[]> {
-  const { data, error } = await db
+async function fetchScoutUsers(db: SupabaseClient | null): Promise<ScoutUserOption[]> {
+  if (hasNative()) return (await scoutUsers()).map((row) => ({ id: row.id, displayName: row.display_name.trim() })).filter((row) => row.displayName);
+  const { data, error } = await db!
     .from("user_profiles")
     .select("id,display_name")
     .order("display_name", { ascending: true });
@@ -609,23 +623,26 @@ async function fetchScoutUsers(db: SupabaseClient): Promise<ScoutUserOption[]> {
     .filter((user) => user.displayName);
 }
 
-async function fetchScoutUsersById(db: SupabaseClient, ids: string[]): Promise<Map<string, string>> {
-  const { data, error } = await db.from("user_profiles").select("id,display_name").in("id", ids);
+async function fetchScoutUsersById(db: SupabaseClient | null, ids: string[]): Promise<Map<string, string>> {
+  if (hasNative()) return new Map((await scoutUsers()).filter((row) => ids.includes(row.id)).map((row) => [row.id, row.display_name.trim()]));
+  const { data, error } = await db!.from("user_profiles").select("id,display_name").in("id", ids);
   if (error) throw error;
   return new Map((data ?? []).map((row) => [String(row.id), String(row.display_name ?? "").trim()]));
 }
 
-async function fetchScoutEventConfig(db: SupabaseClient): Promise<ScoutEventConfig> {
-  const { data, error } = await db.from("app_settings").select("config,updated_at").eq("key", appSettingsKey).maybeSingle();
+async function fetchScoutEventConfig(db: SupabaseClient | null): Promise<ScoutEventConfig> {
+  if (hasNative()) return normalizeScoutEventConfig(await scoutConfig());
+  const { data, error } = await db!.from("app_settings").select("config,updated_at").eq("key", appSettingsKey).maybeSingle();
   if (error) throw error;
   if (!data) return emptyScoutEventConfig();
   return normalizeScoutEventConfig({ ...objectValue(data.config), savedAt: data.updated_at });
 }
 
-async function saveScoutEventConfig(db: SupabaseClient, config: ScoutEventConfig) {
+async function saveScoutEventConfig(db: SupabaseClient | null, config: ScoutEventConfig) {
+  if (hasNative()) throw new Error("Use explicit assignment operations");
   const savedAt = new Date().toISOString();
   const next = normalizeScoutEventConfig({ ...config, savedAt });
-  const { error } = await db.from("app_settings").upsert(
+  const { error } = await db!.from("app_settings").upsert(
     {
       key: appSettingsKey,
       config: {

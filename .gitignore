@@ -8,3 +8,8 @@ supabase/.temp/
 .env.*.local
 *.log
 .DS_Store
+
+cloudflare/.build-input
+cloudflare/.cloudflare/
+cloudflare/.required-tool-outputs/
+cloudflare/.wrangler/

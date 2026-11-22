@@ -1,3 +1,4 @@
+import { hasNative, nativeProposals, nativeProposal, nativeSaveProposal, nativeDeleteProposal, nativeNames } from "./native-repository.server";
 import { appendAudit } from "./audit.server";
 import { getClient } from "./supabase.server";
 import {
@@ -19,7 +20,7 @@ import {
   type StrategyProposalType,
 } from "./strategy-proposals";
 
-type StrategyProposalRow = {
+export type StrategyProposalRow = {
   id: string;
   event_key: string;
   match_key: string;
@@ -40,10 +41,10 @@ type StrategyProposalRow = {
 };
 
 export async function listStrategyProposals(eventKey: string): Promise<StrategyProposal[]> {
-  const sb = getClient();
-  if (!sb) return [];
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return [];
 
-  const { data, error } = await sb
+  const { data, error } = hasNative() ? await nativeProposals(eventKey) : await sb!
     .from("strategy_proposals")
     .select("*")
     .eq("event_key", eventKey)
@@ -67,8 +68,8 @@ export async function saveStrategyProposal(opts: {
   proposalType: string;
   payload: unknown;
 }): Promise<StrategyProposal> {
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
   if (!isProposalType(opts.proposalType)) throw new Response("Proposal 类型无效", { status: 400 });
   if (!cleanText(opts.eventKey) || !cleanText(opts.matchKey)) throw new Response("请选择赛事和比赛", { status: 400 });
   const ownTeam = normalizeOwnTeam(opts.ownTeam);
@@ -119,13 +120,15 @@ export async function saveStrategyProposal(opts: {
     last_approved_snapshot: lastApprovedSnapshot,
   };
 
-  const request = existing
-    ? sb.from("strategy_proposals").update(values).eq("id", existing.id).select("*").single()
-    : sb.from("strategy_proposals").insert(values).select("*").single();
+  const request = hasNative()
+    ? nativeSaveProposal(existing?.id ?? null, values, opts.actorOpenId, opts.submit ? "strategy_proposal.submit" : "strategy_proposal.save")
+    : existing
+      ? sb!.from("strategy_proposals").update(values).eq("id", existing.id).select("*").single()
+      : sb!.from("strategy_proposals").insert(values).select("*").single();
   const { data, error } = await request;
   if (error || !data) throw new Response("保存 Strategy Proposal 失败", { status: 500 });
 
-  await appendAudit(opts.submit ? "strategy_proposal.submit" : "strategy_proposal.save", {
+  if (!hasNative()) await appendAudit(opts.submit ? "strategy_proposal.submit" : "strategy_proposal.save", {
     actorOpenId: opts.actorOpenId,
     changedFields: ["event_key", "match_key", "own_team", "proposal_type", "status", "title", "payload"],
   });
@@ -143,12 +146,20 @@ export async function reviewStrategyProposal(opts: {
   if (!proposal) throw new Response("Proposal 不存在", { status: 404 });
   if (!canReviewProposal(proposal, opts.isAdmin)) throw new Response("无审核权限或当前状态不可审核", { status: 403 });
   const status: StrategyProposalStatus = opts.decision === "approved" ? "approved" : "rejected";
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
   const reviewedAt = new Date().toISOString();
   const reviewNote = cleanText(opts.note) || null;
 
-  const { error } = await sb
+  const { error } = hasNative() ? await nativeSaveProposal(proposal.id, {
+      status,
+      reviewed_by: opts.actorOpenId,
+      review_note: reviewNote,
+      reviewed_at: reviewedAt,
+      last_approved_snapshot: status === "approved"
+        ? snapshotFromProposal({ ...proposal, reviewedBy: opts.actorOpenId, reviewNote, reviewedAt })
+        : proposal.lastApprovedSnapshot,
+    }, opts.actorOpenId, status === "approved" ? "strategy_proposal.approve" : "strategy_proposal.reject") : await sb!
     .from("strategy_proposals")
     .update({
       status,
@@ -162,7 +173,7 @@ export async function reviewStrategyProposal(opts: {
     .eq("id", proposal.id);
   if (error) throw new Response("审核 Strategy Proposal 失败", { status: 500 });
 
-  await appendAudit(status === "approved" ? "strategy_proposal.approve" : "strategy_proposal.reject", {
+  if (!hasNative()) await appendAudit(status === "approved" ? "strategy_proposal.approve" : "strategy_proposal.reject", {
     actorOpenId: opts.actorOpenId,
     changedFields: ["status", "review_note"],
   });
@@ -179,10 +190,23 @@ export async function restoreApprovedStrategyProposal(opts: {
   const snapshot = proposal.lastApprovedSnapshot;
   if (!snapshot) throw new Response("没有可恢复的已通过版本", { status: 400 });
   if (!isConfiguredOwnTeam(snapshot.ownTeam)) throw new Response("已通过版本的己方队伍未在当前赛季配置中", { status: 400 });
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
 
-  const { data, error } = await sb
+  const { data, error } = hasNative() ? await nativeSaveProposal(proposal.id, {
+      match_key: snapshot.matchKey,
+      match_label: snapshot.matchLabel,
+      own_team: snapshot.ownTeam,
+      proposal_type: snapshot.proposalType,
+      status: "approved",
+      title: snapshot.title,
+      payload: snapshot.payload,
+      reviewed_by: snapshot.reviewedBy,
+      review_note: snapshot.reviewNote,
+      submitted_at: proposal.submittedAt,
+      reviewed_at: snapshot.reviewedAt,
+      last_approved_snapshot: snapshot,
+    }, opts.actorOpenId, "strategy_proposal.restore_approved") : await sb!
     .from("strategy_proposals")
     .update({
       match_key: snapshot.matchKey,
@@ -203,7 +227,7 @@ export async function restoreApprovedStrategyProposal(opts: {
     .single();
   if (error || !data) throw new Response("恢复已通过版本失败", { status: 500 });
 
-  await appendAudit("strategy_proposal.restore_approved", {
+  if (!hasNative()) await appendAudit("strategy_proposal.restore_approved", {
     actorOpenId: opts.actorOpenId,
     changedFields: ["match_key", "match_label", "own_team", "proposal_type", "status", "title", "payload"],
   });
@@ -218,13 +242,13 @@ export async function deleteStrategyProposal(opts: {
   const proposal = await getStrategyProposal(opts.id);
   if (!proposal) throw new Response("Proposal 不存在", { status: 404 });
   if (!canDeleteProposalAs(proposal, opts.actorOpenId, opts.isAdmin)) throw new Response("无删除权限", { status: 403 });
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
 
-  const { error } = await sb.from("strategy_proposals").delete().eq("id", proposal.id);
+  const { error } = hasNative() ? await nativeDeleteProposal(proposal.id, opts.actorOpenId) : await sb!.from("strategy_proposals").delete().eq("id", proposal.id);
   if (error) throw new Response("删除 Strategy Proposal 失败", { status: 500 });
 
-  await appendAudit("strategy_proposal.delete", {
+  if (!hasNative()) await appendAudit("strategy_proposal.delete", {
     actorOpenId: opts.actorOpenId,
     changedFields: ["id", "status"],
   });
@@ -232,9 +256,9 @@ export async function deleteStrategyProposal(opts: {
 
 async function getStrategyProposal(id: string): Promise<StrategyProposal | null> {
   if (!cleanUuid(id)) return null;
-  const sb = getClient();
-  if (!sb) return null;
-  const { data, error } = await sb.from("strategy_proposals").select("*").eq("id", id).maybeSingle();
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return null;
+  const { data, error } = hasNative() ? await nativeProposal(id) : await sb!.from("strategy_proposals").select("*").eq("id", id).maybeSingle();
   if (error) throw new Response("加载 Strategy Proposal 失败", { status: 500 });
   return data ? rowToProposal(data as StrategyProposalRow) : null;
 }
@@ -264,11 +288,11 @@ function rowToProposal(row: StrategyProposalRow): StrategyProposal {
 }
 
 async function hydrateCreatorNames(proposals: StrategyProposal[]) {
-  const sb = getClient();
+  const sb = hasNative() ? null : getClient();
   const ids = [...new Set(proposals.map((proposal) => proposal.createdBy).filter((id): id is string => Boolean(id)))];
-  if (!sb || !ids.length) return proposals;
+  if ((!sb && !hasNative()) || !ids.length) return proposals;
 
-  const { data } = await sb.from("profiles").select("open_id,name").in("open_id", ids);
+  const { data } = hasNative() ? await nativeNames(ids) : await sb!.from("profiles").select("open_id,name").in("open_id", ids);
   const names = new Map(((data as Array<{ open_id: string; name: string }> | null) ?? []).map((row) => [row.open_id, row.name]));
   return proposals.map((proposal) => ({
     ...proposal,

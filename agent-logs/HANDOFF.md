@@ -1473,3 +1473,11 @@
 **验证**：typecheck、lint、158 项测试、build、git diff --check 和三处版本一致性检查通过。使用真实 StrategyBoard 组件和构建 CSS 的隔离页面，在 Chrome 与 WebKit、1280/390px、浅色/深色下验证绘制、撤销、机器人拖动、备注输入和无横向溢出；无页面脚本错误；本地登录页 WebKit 会记录 Vercel Analytics debug 脚本被既有 CSP 拦截，未放宽 CSP。模板未登录跳转和登录页版本检查通过。构建 CSS 包含 user-select 与 -webkit-touch-callout 声明。
 
 **风险 / 未完成**：未验证 iOS 真机长按，也未验证真实飞书会话下的完整业务流程；隔离页面不替代认证集成测试。仓库既有名称 `cyber-strategy` 不符合 ni-github-repo 的下划线命名要求，本次未改名。生产部署 Ready、域名 alias 与 error logs 需在推送后单独确认，不能用本地构建通过代替。
+
+---
+
+## 2026-11-23 · Cloudflare 赛季模板与 Picklist Group
+
+- strategy-template 0.0.15 支持独立 Cloudflare Workers、D1、R2、Durable Object 和 Scout 服务绑定。赛季配置仍在 app/season。采用与 main 相同的 D1 Picklist Group 实现，保留模板的登录保护及会话撤销。
+- 应用 typecheck、lint、158 个测试和构建通过；Cloudflare 打包 dry-run 和 8 个本地 Worker 测试通过。没有创建或修改线上模板 Worker、数据库、域名和密钥。
+- 部署所需的独立资源及飞书全员通讯录权限见 cloudflare/README.md。Supabase 保留为本地兼容模式。

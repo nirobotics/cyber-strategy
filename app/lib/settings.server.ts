@@ -1,3 +1,4 @@
+import { hasNative, nativeSetting, nativeSaveSetting } from "./native-repository.server";
 import { appendAudit } from "./audit.server";
 import { DEFAULT_DATA_RANGE, normalizeDataRange, validateDataRange, type DataRange } from "./data-range";
 import type { AppSettingRow } from "./db-types";
@@ -13,11 +14,11 @@ const TIER_PERCENTAGES_KEY = "tier_percentages";
 const DATA_RANGE_KEY = "data_range";
 
 export async function getTierPercentages(): Promise<TierPercentages> {
-  const sb = getClient();
-  if (!sb) return DEFAULT_TIER_PERCENTAGES;
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return DEFAULT_TIER_PERCENTAGES;
 
   try {
-    const { data, error } = await sb.from("app_settings").select("value").eq("key", TIER_PERCENTAGES_KEY).maybeSingle();
+    const { data, error } = hasNative() ? await nativeSetting(TIER_PERCENTAGES_KEY) : await sb!.from("app_settings").select("value").eq("key", TIER_PERCENTAGES_KEY).maybeSingle();
     if (error || !data) return DEFAULT_TIER_PERCENTAGES;
     return normalizeTierPercentages((data as Pick<AppSettingRow, "value">).value);
   } catch {
@@ -29,10 +30,10 @@ export async function saveTierPercentages(percentages: TierPercentages, actorOpe
   const error = validateTierPercentages(percentages);
   if (error) throw new Response(error, { status: 400 });
 
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
 
-  const { error: saveError } = await sb.from("app_settings").upsert(
+  const { error: saveError } = hasNative() ? await nativeSaveSetting(TIER_PERCENTAGES_KEY, percentages, actorOpenId, "settings.tier_percentages.update") : await sb!.from("app_settings").upsert(
     {
       key: TIER_PERCENTAGES_KEY,
       value: percentages,
@@ -42,18 +43,18 @@ export async function saveTierPercentages(percentages: TierPercentages, actorOpe
   );
   if (saveError) throw new Response("保存分档比例失败，请确认数据库迁移已执行。", { status: 500 });
 
-  await appendAudit("settings.tier_percentages.update", {
+  if (!hasNative()) await appendAudit("settings.tier_percentages.update", {
     actorOpenId,
     changedFields: ["tier_percentages"],
   });
 }
 
 export async function getDataRange(): Promise<DataRange[]> {
-  const sb = getClient();
-  if (!sb) return DEFAULT_DATA_RANGE;
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) return DEFAULT_DATA_RANGE;
 
   try {
-    const { data, error } = await sb.from("app_settings").select("value").eq("key", DATA_RANGE_KEY).maybeSingle();
+    const { data, error } = hasNative() ? await nativeSetting(DATA_RANGE_KEY) : await sb!.from("app_settings").select("value").eq("key", DATA_RANGE_KEY).maybeSingle();
     if (error || !data) return DEFAULT_DATA_RANGE;
     return normalizeDataRange((data as Pick<AppSettingRow, "value">).value);
   } catch {
@@ -65,10 +66,10 @@ export async function saveDataRange(range: DataRange[], actorOpenId: string): Pr
   const error = validateDataRange(range);
   if (error) throw new Response(error, { status: 400 });
 
-  const sb = getClient();
-  if (!sb) throw new Response("Supabase 未配置", { status: 503 });
+  const sb = hasNative() ? null : getClient();
+  if (!sb && !hasNative()) throw new Response("Supabase 未配置", { status: 503 });
 
-  const { error: saveError } = await sb.from("app_settings").upsert(
+  const { error: saveError } = hasNative() ? await nativeSaveSetting(DATA_RANGE_KEY, range, actorOpenId, "settings.data_range.update") : await sb!.from("app_settings").upsert(
     {
       key: DATA_RANGE_KEY,
       value: range,
@@ -78,7 +79,7 @@ export async function saveDataRange(range: DataRange[], actorOpenId: string): Pr
   );
   if (saveError) throw new Response("保存数据范围失败，请确认数据库迁移已执行。", { status: 500 });
 
-  await appendAudit("settings.data_range.update", {
+  if (!hasNative()) await appendAudit("settings.data_range.update", {
     actorOpenId,
     changedFields: ["data_range"],
   });

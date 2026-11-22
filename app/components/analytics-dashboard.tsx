@@ -52,7 +52,7 @@ const loadMatchAnalysis = () => import("./match-analysis").then((module) => ({ d
 const loadScoutingLeadPanel = () => import("./scouting-lead-panel").then((module) => ({ default: module.ScoutingLeadPanel }));
 const loadStrategyProposalPanel = () => import("./strategy-proposal-panel").then((module) => ({ default: module.StrategyProposalPanel }));
 const loadStrategySettingsPanel = () => import("./strategy-settings-panel").then((module) => ({ default: module.StrategySettingsPanel }));
-const loadPicklistWorkspace = () => import("./picklist-workspace").then((module) => ({ default: module.PicklistWorkspace }));
+const loadPicklistWorkspace = () => import("./picklist-groups").then((module) => ({ default: module.PicklistGroups }));
 const MatchAnalysis = lazy(loadMatchAnalysis);
 const ScoutingLeadPanel = lazy(loadScoutingLeadPanel);
 const StrategyProposalPanel = lazy(loadStrategyProposalPanel);
@@ -360,7 +360,7 @@ export function AnalyticsDashboard({
       ) : null}
       {visitedTabs.has("picklist") ? (
         <div className="min-h-0 flex-1 flex-col" hidden={activeTab !== "picklist"} style={activeTab === "picklist" ? { display: "flex" } : undefined}>
-          {teams.length && resolvedPicklists ? (
+          {resolvedPicklists ? (
             <PicklistWorkspace
               key={`${dataset.id}:${resolvedEventKey}:${resolvedPicklists.userOpenId}`}
               datasetId={dataset.id}

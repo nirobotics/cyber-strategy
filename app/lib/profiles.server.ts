@@ -1,3 +1,5 @@
+import { hasNative, nativeLogin, nativeProfile } from "./native-repository.server";
+import { requireMutation, statement, timestamp } from "./native-context.server";
 import { getClient } from "./supabase.server";
 import type { FeishuUser } from "./feishu.server";
 import type { ProfileRow } from "./db-types";
@@ -18,6 +20,7 @@ export function toSessionUser(u: FeishuUser): SessionUser {
  * 登录时 upsert 身份档案。身份数据库是认证硬依赖，失败时拒绝登录。
  */
 export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean; isActive: boolean }> {
+  if (hasNative()) return nativeLogin(u);
   const sb = getClient();
   if (!sb) throw new Error("Supabase 未配置");
   const { data, error } = await sb.from("profiles").upsert(
@@ -33,6 +36,7 @@ export async function upsertProfile(u: FeishuUser): Promise<{ isAdmin: boolean; 
 }
 
 export async function getProfile(openId: string): Promise<ProfileRow | null> {
+  if (hasNative()) return (await nativeProfile(openId)).data;
   const sb = getClient();
   if (!sb) return null;
   try {
@@ -50,12 +54,17 @@ export async function isAdmin(openId: string): Promise<boolean> {
 
 export async function isSessionAllowed(openId: string, issuedAt: number): Promise<boolean> {
   const profile = await getProfile(openId);
-  if (!profile?.is_active) return false;
-  const validAfter = Date.parse(profile.session_valid_after);
+  if (!profile || profile.is_active === false) return false;
+  const validAfter = Date.parse(profile.session_valid_after ?? "1970-01-01T00:00:00.000Z");
   return Number.isFinite(validAfter) && issuedAt >= validAfter;
 }
 
 export async function revokeSessions(openId: string): Promise<void> {
+  if (hasNative()) {
+    requireMutation();
+    await statement("UPDATE profiles SET row_json=json_set(row_json,'$.session_valid_after',?) WHERE id=?", timestamp(), openId).run();
+    return;
+  }
   const sb = getClient();
   if (!sb) throw new Error("Supabase 未配置");
   const { error } = await sb

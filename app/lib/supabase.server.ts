@@ -1,3 +1,4 @@
+import { nativeDB } from "./native-context.server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -9,6 +10,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let cached: SupabaseClient | null | undefined;
 
 export function getClient(): SupabaseClient | null {
+  if (nativeDB()) throw new Error("Legacy backend forbidden in native runtime");
   if (cached !== undefined) return cached;
 
   const url = process.env.SUPABASE_URL;
