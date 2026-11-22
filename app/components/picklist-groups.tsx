@@ -111,6 +111,7 @@ function RosterEditor({ eventKey, group, admin, onClose }: { eventKey: string; g
             </select></label> : <span className="text-sm">Leader · {group?.leaderName}</span>}
             <Button type="button" onClick={loadDirectory} disabled={directory.state !== "idle"}>{directory.state === "idle" ? "打开飞书通讯录" : "正在读取飞书通讯录"}</Button>
           </div>
+          {directory.data?.directoryWarning ? <p className="text-sm text-ink-dim" role="status">{directory.data.directoryWarning}</p> : null}
           {directory.data?.error ? <p className="text-sm text-danger" role="alert">{directory.data.error}</p> : null}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">学生</legend>

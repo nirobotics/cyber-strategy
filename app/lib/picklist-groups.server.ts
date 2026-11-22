@@ -1,4 +1,4 @@
-import { listFeishuDirectory } from "./feishu-directory.server";
+import { picklistMemberDirectory } from "./feishu-directory.server";
 import { normalizePicklistBoard, type PicklistGroup, type PicklistGroupUser, type SharedPicklist } from "./picklist";
 import { getClient } from "./supabase.server";
 import { nativeDB } from "./native-context.server";
@@ -54,7 +54,7 @@ export async function saveGroupCommand(eventKey: string, actor: string, groupId:
 export async function resolveRoster(ids: string[], existing: PicklistGroupUser[]) {
   const users = new Map(existing.map((user) => [user.openId, user]));
   if (ids.some((id) => !users.has(id))) {
-    for (const user of await listFeishuDirectory()) users.set(user.openId, user);
+    for (const user of (await picklistMemberDirectory()).users) users.set(user.openId, user);
   }
   return ids.map((id) => {
     const user = users.get(id);

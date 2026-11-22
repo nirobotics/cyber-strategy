@@ -113,13 +113,14 @@ export async function completeLogin(code: string, codeVerifier: string): Promise
   return fetchUserInfo(token);
 }
 
-export async function tenantAccessToken() {
+export async function tenantAccessToken(signal?: AbortSignal) {
   const response = await fetch(`${API_BASE}/open-apis/auth/v3/tenant_access_token/internal`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ app_id: appId(), app_secret: appSecret() }),
+    body: JSON.stringify({ app_id: appId().replace(/^\uFEFF/, "").trim(), app_secret: appSecret().replace(/^\uFEFF/, "").trim() }),
+    signal,
   });
   const json = await response.json() as { code?: number; msg?: string; tenant_access_token?: string };
-  if (!json.tenant_access_token) throw new Error(json.msg || "获取飞书 tenant token 失败。");
-  return json.tenant_access_token;
+  if (!response.ok || json.code !== 0 || !json.tenant_access_token) throw new Error(json.msg || "获取飞书 tenant token 失败。");
+  return json.tenant_access_token.replace(/^\uFEFF/, "").trim();
 }
